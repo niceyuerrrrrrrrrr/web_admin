@@ -1,0 +1,46 @@
+.app-layout {
+  min-height: 100vh;
+}
+
+.logo-wrapper {
+  height: 56px;
+  display: flex;
+  align-items: center;
+  padding: 0 16px;
+  color: #fff;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+.logo-mark {
+  font-size: 18px;
+}
+
+.logo-text {
+  margin-left: 8px;
+  font-size: 14px;
+  opacity: 0.9;
+}
+
+.app-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0 24px;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.app-title {
+  margin: 0;
+}
+
+.app-content {
+  padding: 24px;
+  min-height: calc(100vh - 56px);
+  background: #f5f7fb;
+}
+
+.dashboard-card {
+  height: 100%;
+}
