@@ -39,6 +39,8 @@ import * as XLSX from 'xlsx'
 import { RECEIPT_TYPES, fetchReceipts, updateChargingReceipt, updateWaterTicket, deleteWaterTicket } from '../api/services/receipts'
 import { fetchUsers } from '../api/services/users'
 import type { Receipt, ReceiptType } from '../api/types'
+import useAuthStore from '../store/auth'
+import useCompanyStore from '../store/company'
 
 const { Title, Paragraph } = Typography
 const { RangePicker } = DatePicker
@@ -49,6 +51,11 @@ const getReceiptTypeLabel = (type: ReceiptType) =>
 const ReceiptsPage = () => {
   const queryClient = useQueryClient()
   const { message } = AntdApp.useApp()
+  const { user } = useAuthStore()
+  const { selectedCompanyId } = useCompanyStore()
+
+  const isSuperAdmin = user?.role === 'super_admin' || user?.positionType === '超级管理员'
+  const effectiveCompanyId = isSuperAdmin ? selectedCompanyId : undefined
 
   const [activeTab, setActiveTab] = useState<ReceiptType | 'stats'>('loading')
   const [filters, setFilters] = useState<{
@@ -65,38 +72,43 @@ const ReceiptsPage = () => {
   const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([])
   const [selectedUserId, setSelectedUserId] = useState<number | undefined>(undefined)
   const [editForm] = Form.useForm()
+  const showCompanyWarning = isSuperAdmin && !effectiveCompanyId
 
   // 获取用户列表
   const usersQuery = useQuery({
-    queryKey: ['users', 'list'],
+    queryKey: ['users', 'list', effectiveCompanyId],
     queryFn: () => fetchUsers({ size: 1000 }),
+    enabled: !isSuperAdmin || !!effectiveCompanyId,
   })
 
   const users = usersQuery.data?.items || []
 
   // 获取当前标签页的票据数据
   const receiptsQuery = useQuery<Receipt[]>({
-    queryKey: ['receipts', activeTab, filters, selectedUserId],
+    queryKey: ['receipts', activeTab, filters, selectedUserId, effectiveCompanyId],
     queryFn: () =>
       fetchReceipts({
-        userId: selectedUserId, // 不传则查询所有票据
+        userId: selectedUserId,
         receiptType: activeTab === 'stats' ? undefined : activeTab,
         startDate: filters.startDate,
         endDate: filters.endDate,
+        companyId: effectiveCompanyId,
       }),
+    enabled: !isSuperAdmin || !!effectiveCompanyId,
   })
 
   // 获取所有票据数据（用于统计）
   const allReceiptsQuery = useQuery<Receipt[]>({
-    queryKey: ['receipts', 'all', filters, selectedUserId],
+    queryKey: ['receipts', 'all', filters, selectedUserId, effectiveCompanyId],
     queryFn: () =>
       fetchReceipts({
-        userId: selectedUserId, // 不传则查询所有票据
+        userId: selectedUserId,
         receiptType: undefined,
         startDate: filters.startDate,
         endDate: filters.endDate,
+        companyId: effectiveCompanyId,
       }),
-    enabled: activeTab === 'stats',
+    enabled: activeTab === 'stats' && (!isSuperAdmin || !!effectiveCompanyId),
   })
 
   const receipts = activeTab === 'stats' ? allReceiptsQuery.data || [] : receiptsQuery.data || []
@@ -960,6 +972,10 @@ const ReceiptsPage = () => {
           </Button>
         </Space>
       </Flex>
+
+      {showCompanyWarning && (
+        <Alert type="warning" message="请选择要查看的公司后再查看票据数据" showIcon />
+      )}
 
       {/* 统计卡片 */}
       <Row gutter={16}>

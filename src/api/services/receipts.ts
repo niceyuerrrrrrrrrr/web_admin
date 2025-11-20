@@ -36,6 +36,7 @@ export const fetchReceipts = (params: ReceiptListParams & { userId?: number }) =
         receipt_type: params.receiptType,
         start_date: params.startDate,
         end_date: params.endDate,
+        company_id: params.companyId,
       },
     }),
   )
@@ -52,6 +53,7 @@ export const fetchAllReceipts = (params: Omit<ReceiptListParams, 'userId'>) =>
         receipt_type: params.receiptType,
         start_date: params.startDate,
         end_date: params.endDate,
+        company_id: params.companyId,
       },
     }),
   )

@@ -79,6 +79,7 @@ export interface ReceiptListParams {
   receiptType?: ReceiptType
   startDate?: string
   endDate?: string
+  companyId?: number
   vehicleNo?: string
   driverName?: string
   page?: number
@@ -835,6 +836,7 @@ export interface LoginUserInfo {
   phone?: string
   plateNumber?: string
   positionType?: string
+  position_type?: string
   status?: string
   companyName?: string
   role?: string
