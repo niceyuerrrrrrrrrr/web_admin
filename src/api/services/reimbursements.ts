@@ -25,6 +25,7 @@ export interface ReimbursementListParams {
   beginDate?: string
   endDate?: string
   keyword?: string
+  companyId?: number
 }
 
 export const REIMBURSEMENT_STATUS_OPTIONS = [
@@ -45,6 +46,7 @@ export const fetchReimbursements = (params?: ReimbursementListParams) =>
         begin_date: params?.beginDate,
         end_date: params?.endDate,
         keyword: params?.keyword,
+        company_id: params?.companyId,
       },
     }),
   )

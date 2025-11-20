@@ -15,11 +15,12 @@ const unwrap = async <T>(promise: Promise<{ data: ApiResponse<T> }>) => {
   return response.data.data
 }
 
-export const fetchChargingStations = (params?: { is_active?: boolean }) =>
+export const fetchChargingStations = (params?: { is_active?: boolean; companyId?: number }) =>
   unwrap<ChargingStation[]>(
     client.get('/charging-pricing/stations', {
       params: {
         is_active: params?.is_active,
+        company_id: params?.companyId,
       },
     }),
   )

@@ -29,12 +29,20 @@ import {
   updateMaterialType,
 } from '../api/services/materialPricing'
 import type { MaterialIncomeCalculation, MaterialType } from '../api/types'
+import useAuthStore from '../store/auth'
+import useCompanyStore from '../store/company'
 
 const { Title, Paragraph, Text } = Typography
 
 const MaterialPricingPage = () => {
   const queryClient = useQueryClient()
   const { message } = AntdApp.useApp()
+  const { user } = useAuthStore()
+  const { selectedCompanyId } = useCompanyStore()
+
+  const isSuperAdmin = user?.role === 'super_admin' || user?.positionType === '超级管理员'
+  const effectiveCompanyId = isSuperAdmin ? selectedCompanyId : undefined
+  const showCompanyWarning = isSuperAdmin && !effectiveCompanyId
 
   const [createModalOpen, setCreateModalOpen] = useState(false)
   const [selectedMaterial, setSelectedMaterial] = useState<MaterialType | null>(null)
@@ -45,8 +53,9 @@ const MaterialPricingPage = () => {
   const [calcResult, setCalcResult] = useState<MaterialIncomeCalculation | null>(null)
 
   const materialsQuery = useQuery({
-    queryKey: ['material-pricing', 'types'],
-    queryFn: () => fetchMaterialTypes(),
+    queryKey: ['material-pricing', 'types', effectiveCompanyId],
+    queryFn: () => fetchMaterialTypes({ companyId: effectiveCompanyId }),
+    enabled: !isSuperAdmin || !!effectiveCompanyId,
   })
 
   const createMutation = useMutation({
@@ -215,6 +224,10 @@ const MaterialPricingPage = () => {
           </Button>
         </Space>
       </Flex>
+
+      {showCompanyWarning && (
+        <Alert type="warning" message="请选择要查看的公司后再查看材料定价数据" showIcon />
+      )}
 
       <Tabs
         items={[

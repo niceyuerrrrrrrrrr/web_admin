@@ -25,6 +25,7 @@ export interface LeaveListParams {
   begin_date?: string
   end_date?: string
   keyword?: string
+  companyId?: number
 }
 
 export interface LeavePayload {
@@ -57,6 +58,7 @@ export const fetchLeaves = (params: LeaveListParams) =>
         begin_date: params.begin_date,
         end_date: params.end_date,
         keyword: params.keyword,
+        company_id: params.companyId,
       },
     }),
   )

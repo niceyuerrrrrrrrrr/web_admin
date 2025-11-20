@@ -52,6 +52,8 @@ import type {
   StockOperationRecord,
   Warehouse,
 } from '../api/types'
+import useAuthStore from '../store/auth'
+import useCompanyStore from '../store/company'
 
 const { Title, Paragraph } = Typography
 const { RangePicker } = DatePicker
@@ -59,6 +61,12 @@ const { RangePicker } = DatePicker
 const InventoryPage = () => {
   const queryClient = useQueryClient()
   const { message } = AntdApp.useApp()
+  const { user } = useAuthStore()
+  const { selectedCompanyId } = useCompanyStore()
+
+  const isSuperAdmin = user?.role === 'super_admin' || user?.positionType === '超级管理员'
+  const effectiveCompanyId = isSuperAdmin ? selectedCompanyId : undefined
+  const showCompanyWarning = isSuperAdmin && !effectiveCompanyId
 
   const [statsFilters, setStatsFilters] = useState<{ warehouseId?: number; dateRange?: [dayjs.Dayjs, dayjs.Dayjs] }>({
     dateRange: [dayjs().subtract(29, 'day'), dayjs()],
@@ -79,31 +87,35 @@ const InventoryPage = () => {
   const [operationForm] = Form.useForm()
 
   const warehousesQuery = useQuery({
-    queryKey: ['inventory', 'warehouses'],
-    queryFn: () => fetchWarehouses(),
+    queryKey: ['inventory', 'warehouses', effectiveCompanyId],
+    queryFn: () => fetchWarehouses({ companyId: effectiveCompanyId }),
+    enabled: !isSuperAdmin || !!effectiveCompanyId,
   })
 
   const statsQuery = useQuery({
-    queryKey: ['inventory', 'stats', statsFilters],
+    queryKey: ['inventory', 'stats', statsFilters, effectiveCompanyId],
     queryFn: () =>
       fetchInventoryStatistics({
         warehouseId: statsFilters.warehouseId,
         beginDate: statsFilters.dateRange ? statsFilters.dateRange[0]?.format('YYYY-MM-DD') : undefined,
         endDate: statsFilters.dateRange ? statsFilters.dateRange[1]?.format('YYYY-MM-DD') : undefined,
       }),
+    enabled: !isSuperAdmin || !!effectiveCompanyId,
   })
 
   const inventoryQuery = useQuery({
-    queryKey: ['inventory', 'items', inventoryFilters],
+    queryKey: ['inventory', 'items', inventoryFilters, effectiveCompanyId],
     queryFn: () =>
       fetchInventoryItems({
         warehouseId: inventoryFilters.warehouseId,
         keyword: inventoryFilters.keyword,
+        companyId: effectiveCompanyId,
       }),
+    enabled: !isSuperAdmin || !!effectiveCompanyId,
   })
 
   const operationsQuery = useQuery({
-    queryKey: ['inventory', 'operations', operationFilters],
+    queryKey: ['inventory', 'operations', operationFilters, effectiveCompanyId],
     queryFn: () =>
       fetchStockOperations({
         warehouseId: operationFilters.warehouseId,
@@ -111,7 +123,9 @@ const InventoryPage = () => {
         beginDate: operationFilters.dateRange ? operationFilters.dateRange[0]?.format('YYYY-MM-DD') : undefined,
         endDate: operationFilters.dateRange ? operationFilters.dateRange[1]?.format('YYYY-MM-DD') : undefined,
         pageSize: 50,
+        companyId: effectiveCompanyId,
       }),
+    enabled: !isSuperAdmin || !!effectiveCompanyId,
   })
 
   const createWarehouseMutation = useMutation({
@@ -423,6 +437,10 @@ const InventoryPage = () => {
           </Button>
         </Space>
       </Flex>
+
+      {showCompanyWarning && (
+        <Alert type="warning" message="请选择要查看的公司后再查看库存数据" showIcon />
+      )}
 
       <Tabs
         items={[

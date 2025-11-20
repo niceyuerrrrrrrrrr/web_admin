@@ -50,6 +50,7 @@ import { fetchWarehouses } from '../api/services/inventory'
 import { fetchUsers } from '../api/services/users'
 import type { MaterialRequestRecord } from '../api/types'
 import useAuthStore from '../store/auth'
+import useCompanyStore from '../store/company'
 
 const { Title, Paragraph, Text } = Typography
 const { RangePicker } = DatePicker
@@ -58,6 +59,11 @@ const MaterialRequestsPage = () => {
   const queryClient = useQueryClient()
   const { message } = AntdApp.useApp()
   const { user } = useAuthStore()
+  const { selectedCompanyId } = useCompanyStore()
+
+  const isSuperAdmin = user?.role === 'super_admin' || user?.positionType === '超级管理员'
+  const effectiveCompanyId = isSuperAdmin ? selectedCompanyId : undefined
+  const showCompanyWarning = isSuperAdmin && !effectiveCompanyId
 
   const [filters, setFilters] = useState<{ status?: string; keyword?: string; userId?: number; dateRange?: [dayjs.Dayjs, dayjs.Dayjs] }>({
     dateRange: [dayjs().subtract(29, 'day'), dayjs()],
@@ -77,12 +83,13 @@ const MaterialRequestsPage = () => {
   })
 
   const warehousesQuery = useQuery({
-    queryKey: ['inventory', 'warehouses'],
-    queryFn: () => fetchWarehouses(),
+    queryKey: ['inventory', 'warehouses', effectiveCompanyId],
+    queryFn: () => fetchWarehouses({ companyId: effectiveCompanyId }),
+    enabled: !isSuperAdmin || !!effectiveCompanyId,
   })
 
   const listQuery = useQuery({
-    queryKey: ['materials', filters],
+    queryKey: ['materials', filters, effectiveCompanyId],
     queryFn: () =>
       fetchMaterialRequests({
         status: filters.status,
@@ -90,7 +97,9 @@ const MaterialRequestsPage = () => {
         userId: filters.userId,
         beginDate: filters.dateRange ? filters.dateRange[0]?.format('YYYY-MM-DD') : undefined,
         endDate: filters.dateRange ? filters.dateRange[1]?.format('YYYY-MM-DD') : undefined,
+        companyId: effectiveCompanyId,
       }),
+    enabled: !isSuperAdmin || !!effectiveCompanyId,
   })
 
   const detailQuery = useQuery({
@@ -292,6 +301,10 @@ const MaterialRequestsPage = () => {
           </Button>
         </Space>
       </Flex>
+
+      {showCompanyWarning && (
+        <Alert type="warning" message="请选择要查看的公司后再查看物品领用数据" showIcon />
+      )}
 
       <Tabs
         items={[

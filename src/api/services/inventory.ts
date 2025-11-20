@@ -15,11 +15,12 @@ const unwrap = async <T>(promise: Promise<{ data: ApiResponse<T> }>) => {
   return response.data.data
 }
 
-export const fetchWarehouses = (params?: { status?: string }) =>
+export const fetchWarehouses = (params?: { status?: string; companyId?: number }) =>
   unwrap<{ records: Warehouse[] }>(
     client.get('/inventory/warehouses', {
       params: {
         status: params?.status,
+        company_id: params?.companyId,
       },
     }),
   )
@@ -35,13 +36,14 @@ export const createWarehouse = (data: {
 export const updateWarehouse = (warehouseId: number, data: Partial<Warehouse>) =>
   unwrap<Warehouse>(client.put(`/inventory/warehouses/${warehouseId}`, data))
 
-export const fetchInventoryItems = (params?: { warehouseId?: number; materialCode?: string; keyword?: string }) =>
+export const fetchInventoryItems = (params?: { warehouseId?: number; materialCode?: string; keyword?: string; companyId?: number }) =>
   unwrap<{ records: InventoryItem[] }>(
     client.get('/inventory/items', {
       params: {
         warehouse_id: params?.warehouseId,
         material_code: params?.materialCode,
         keyword: params?.keyword,
+        company_id: params?.companyId,
       },
     }),
   )
@@ -70,6 +72,7 @@ export const fetchStockOperations = (params?: {
   endDate?: string
   page?: number
   pageSize?: number
+  companyId?: number
 }) =>
   unwrap<{
     records: StockOperationRecord[]
@@ -88,6 +91,7 @@ export const fetchStockOperations = (params?: {
         end_date: params?.endDate,
         page: params?.page || 1,
         page_size: params?.pageSize || 20,
+        company_id: params?.companyId,
       },
     }),
   )

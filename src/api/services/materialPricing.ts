@@ -9,11 +9,12 @@ const unwrap = async <T>(promise: Promise<{ data: ApiResponse<T> }>) => {
   return response.data.data
 }
 
-export const fetchMaterialTypes = (params?: { is_active?: boolean }) =>
+export const fetchMaterialTypes = (params?: { is_active?: boolean; companyId?: number }) =>
   unwrap<MaterialType[]>(
     client.get('/material-pricing/types', {
       params: {
         is_active: params?.is_active,
+        company_id: params?.companyId,
       },
     }),
   )

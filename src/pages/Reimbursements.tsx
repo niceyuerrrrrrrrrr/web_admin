@@ -54,6 +54,7 @@ import {
 import { fetchUsers } from '../api/services/users'
 import type { ReimbursementRecord, ReimbursementStats } from '../api/types'
 import useAuthStore from '../store/auth'
+import useCompanyStore from '../store/company'
 
 const { Title, Paragraph, Text } = Typography
 const { RangePicker } = DatePicker
@@ -71,6 +72,11 @@ const ReimbursementsPage = () => {
   const queryClient = useQueryClient()
   const { message } = AntdApp.useApp()
   const { user } = useAuthStore()
+  const { selectedCompanyId } = useCompanyStore()
+
+  const isSuperAdmin = user?.role === 'super_admin' || user?.positionType === '超级管理员'
+  const effectiveCompanyId = isSuperAdmin ? selectedCompanyId : undefined
+  const showCompanyWarning = isSuperAdmin && !effectiveCompanyId
 
   const [filters, setFilters] = useState<{
     status?: string
@@ -100,7 +106,7 @@ const ReimbursementsPage = () => {
   }, [createModalOpen, createForm, user])
 
   const listQuery = useQuery({
-    queryKey: ['reimbursements', filters],
+    queryKey: ['reimbursements', filters, effectiveCompanyId],
     queryFn: () =>
       fetchReimbursements({
         status: filters.status,
@@ -108,7 +114,9 @@ const ReimbursementsPage = () => {
         userId: filters.applicantId,
         beginDate: filters.dateRange ? filters.dateRange[0]?.format('YYYY-MM-DD') : undefined,
         endDate: filters.dateRange ? filters.dateRange[1]?.format('YYYY-MM-DD') : undefined,
+        companyId: effectiveCompanyId,
       }),
+    enabled: !isSuperAdmin || !!effectiveCompanyId,
   })
 
   const statsQuery = useQuery({
@@ -405,6 +413,10 @@ const ReimbursementsPage = () => {
           </Button>
         </Space>
       </Flex>
+
+      {showCompanyWarning && (
+        <Alert type="warning" message="请选择要查看的公司后再查看报销数据" showIcon />
+      )}
 
       <Tabs
         items={[

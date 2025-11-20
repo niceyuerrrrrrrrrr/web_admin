@@ -22,6 +22,7 @@ export interface MaterialRequestListParams {
   beginDate?: string
   endDate?: string
   keyword?: string
+  companyId?: number
 }
 
 export const MATERIAL_REQUEST_STATUS_OPTIONS = [
@@ -42,6 +43,7 @@ export const fetchMaterialRequests = (params?: MaterialRequestListParams) =>
         begin_date: params?.beginDate,
         end_date: params?.endDate,
         keyword: params?.keyword,
+        company_id: params?.companyId,
       },
     }),
   )

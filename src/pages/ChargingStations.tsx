@@ -57,6 +57,8 @@ import {
   updateChargingRule,
   updateChargingStation,
 } from '../api/services/charging'
+import useAuthStore from '../store/auth'
+import useCompanyStore from '../store/company'
 
 const { Title, Paragraph, Text } = Typography
 const { RangePicker } = DatePicker
@@ -65,6 +67,12 @@ const { Dragger } = Upload
 const ChargingStationsPage = () => {
   const queryClient = useQueryClient()
   const { message } = AntdApp.useApp()
+  const { user } = useAuthStore()
+  const { selectedCompanyId } = useCompanyStore()
+
+  const isSuperAdmin = user?.role === 'super_admin' || user?.positionType === '超级管理员'
+  const effectiveCompanyId = isSuperAdmin ? selectedCompanyId : undefined
+  const showCompanyWarning = isSuperAdmin && !effectiveCompanyId
 
   const [statsFilters, setStatsFilters] = useState<{ stationId?: number; dateRange?: [dayjs.Dayjs, dayjs.Dayjs] }>({
     dateRange: [dayjs().subtract(6, 'day'), dayjs()],
@@ -83,8 +91,9 @@ const ChargingStationsPage = () => {
   const [calculatorForm] = Form.useForm()
 
   const stationsQuery = useQuery({
-    queryKey: ['charging', 'stations'],
-    queryFn: () => fetchChargingStations(),
+    queryKey: ['charging', 'stations', effectiveCompanyId],
+    queryFn: () => fetchChargingStations({ companyId: effectiveCompanyId }),
+    enabled: !isSuperAdmin || !!effectiveCompanyId,
   })
 
   const statsQuery = useQuery({
@@ -518,6 +527,10 @@ const ChargingStationsPage = () => {
           </Button>
         </Space>
       </Flex>
+
+      {showCompanyWarning && (
+        <Alert type="warning" message="请选择要查看的公司后再查看充电站数据" showIcon />
+      )}
 
       <Tabs
         items={[

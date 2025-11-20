@@ -56,6 +56,8 @@ import {
   uploadLeaveImage,
 } from '../api/services/leave'
 import { fetchUsers } from '../api/services/users'
+import useAuthStore from '../store/auth'
+import useCompanyStore from '../store/company'
 
 const { RangePicker } = DatePicker
 const { Title, Paragraph } = Typography
@@ -70,6 +72,13 @@ const statusColorMap: Record<LeaveStatus, string> = {
 const LeavePage = () => {
   const { message, modal } = AntdApp.useApp()
   const queryClient = useQueryClient()
+  const { user } = useAuthStore()
+  const { selectedCompanyId } = useCompanyStore()
+
+  const isSuperAdmin = user?.role === 'super_admin' || user?.positionType === '超级管理员'
+  const effectiveCompanyId = isSuperAdmin ? selectedCompanyId : undefined
+  const showCompanyWarning = isSuperAdmin && !effectiveCompanyId
+
   const [filters, setFilters] = useState<{
     status?: LeaveStatus
     user_id?: number
@@ -99,7 +108,7 @@ const LeavePage = () => {
   }
 
   const leavesQuery = useQuery({
-    queryKey: ['leave', 'list', filters],
+    queryKey: ['leave', 'list', filters, effectiveCompanyId],
     queryFn: () =>
       fetchLeaves({
         status: filters.status,
@@ -108,7 +117,9 @@ const LeavePage = () => {
         page_size: filters.page_size,
         begin_date: filters.dateRange ? filters.dateRange[0].format('YYYY-MM-DD') : undefined,
         end_date: filters.dateRange ? filters.dateRange[1].format('YYYY-MM-DD') : undefined,
+        companyId: effectiveCompanyId,
       }),
+    enabled: !isSuperAdmin || !!effectiveCompanyId,
   })
 
   const statsQuery = useQuery({
@@ -397,6 +408,10 @@ const LeavePage = () => {
           </Button>
         </Space>
       </Flex>
+
+      {showCompanyWarning && (
+        <Alert type="warning" message="请选择要查看的公司后再查看请假数据" showIcon />
+      )}
 
       <Tabs
         items={[
