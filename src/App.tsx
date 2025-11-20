@@ -63,6 +63,8 @@ import SettingsPage from './pages/Settings'
 import ReportBuilderPage from './pages/ReportBuilder'
 import ExportCenterPage from './pages/ExportCenter'
 import useAuthStore from './store/auth'
+import useCompanyStore from './store/company'
+import CompanySelector from './components/CompanySelector'
 import LoginPage from './pages/Login'
 import NotFoundPage from './pages/NotFound'
 import './App.css'
@@ -234,6 +236,22 @@ const routeDefinitions = [
   },
 ]
 
+/**
+ * 全局公司选择器组件
+ * 使用全局状态，所有页面共享
+ */
+const GlobalCompanySelector = () => {
+  const { selectedCompanyId, setSelectedCompanyId } = useCompanyStore()
+  
+  return (
+    <CompanySelector
+      value={selectedCompanyId}
+      onChange={setSelectedCompanyId}
+      style={{ minWidth: 180 }}
+    />
+  )
+}
+
 const AppLayout = () => {
   const [collapsed, setCollapsed] = useState(false)
   const location = useLocation()
@@ -286,23 +304,21 @@ const AppLayout = () => {
           <Title level={4} className="app-title">
             物流数字化运营中心
           </Title>
-          <Space size="large" align="center">
-            <Space>
-              <Avatar size={36}>
-                {user?.name?.slice(0, 1)?.toUpperCase() || 'GM'}
-              </Avatar>
+          <Space size="middle" align="center">
+            <GlobalCompanySelector />
+            <Avatar size={36}>
+              {user?.name?.slice(0, 1)?.toUpperCase() || 'U'}
+            </Avatar>
+            <div style={{ lineHeight: '20px' }}>
               <div>
-                <Text strong>{user?.name || '总经理'}</Text>
-                <br />
-                <Text
-                  type="secondary"
-                  style={{ maxWidth: 160, display: 'inline-block' }}
-                  ellipsis={{ tooltip: user?.email || 'admin@hodaruner.cn' }}
-                >
-                  {user?.email || 'admin@hodaruner.cn'}
+                <Text strong>{user?.name || '用户'}</Text>
+              </div>
+              <div>
+                <Text type="secondary" style={{ fontSize: 12 }}>
+                  {user?.role || '管理员'}
                 </Text>
               </div>
-            </Space>
+            </div>
             <Button
               icon={<LogoutOutlined />}
               onClick={() => {

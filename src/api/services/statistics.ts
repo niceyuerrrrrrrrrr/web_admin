@@ -59,11 +59,12 @@ export const fetchFleetManagerStatistics = (params?: { timeRange?: string }) =>
 /**
  * 获取总经理统计数据
  */
-export const fetchCEOStatistics = (params?: { timeRange?: string }) =>
+export const fetchCEOStatistics = (params?: { timeRange?: string; companyId?: number }) =>
   unwrap(
     client.get('/statistics/ceo', {
       params: {
         time_range: params?.timeRange || 'month',
+        company_id: params?.companyId,
       },
     }),
   )

@@ -9,5 +9,5 @@ const unwrap = async <T>(promise: Promise<{ data: ApiResponse<T> }>) => {
   return response.data.data
 }
 
-export const login = (payload: LoginPayload) => unwrap<LoginResponse>(client.post('/api/v1/auth/login', payload))
+export const login = (payload: LoginPayload) => unwrap<LoginResponse>(client.post('/auth/login', payload))
 

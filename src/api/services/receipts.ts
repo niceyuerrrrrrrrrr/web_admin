@@ -26,9 +26,9 @@ export const RECEIPT_TYPES: Array<{ value: ReceiptType; label: string }> = [
 
 /**
  * 获取票据列表
- * 注意：后端 API 需要 user_id 参数，管理端需要先获取用户列表或使用当前用户ID
+ * user_id 可选，不传则查询所有票据（需要管理员权限）
  */
-export const fetchReceipts = (params: ReceiptListParams & { userId: number }) =>
+export const fetchReceipts = (params: ReceiptListParams & { userId?: number }) =>
   unwrap<Receipt[]>(
     client.get('/receipts', {
       params: {

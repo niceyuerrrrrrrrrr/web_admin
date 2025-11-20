@@ -514,7 +514,12 @@ const ReimbursementsPage = () => {
                           angleField="value"
                           colorField="type"
                           radius={0.9}
-                          label={{ type: 'outer', content: '{name} {percentage}' }}
+                          label={{ 
+                            content: (data: any) => {
+                              const item = data.data || data
+                              return `${item.category}: ${item.amount}`
+                            } 
+                          }}
                         />
                       ) : (
                         <Alert type="info" message="暂无分类数据" showIcon />

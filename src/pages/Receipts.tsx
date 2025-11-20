@@ -74,15 +74,12 @@ const ReceiptsPage = () => {
 
   const users = usersQuery.data?.items || []
 
-  // 用户ID：优先使用选择的用户，否则使用第一个用户（如果有）
-  const userId = selectedUserId || users[0]?.id || 1
-
   // 获取当前标签页的票据数据
   const receiptsQuery = useQuery<Receipt[]>({
-    queryKey: ['receipts', activeTab, filters, userId],
+    queryKey: ['receipts', activeTab, filters, selectedUserId],
     queryFn: () =>
       fetchReceipts({
-        userId,
+        userId: selectedUserId, // 不传则查询所有票据
         receiptType: activeTab === 'stats' ? undefined : activeTab,
         startDate: filters.startDate,
         endDate: filters.endDate,
@@ -91,10 +88,10 @@ const ReceiptsPage = () => {
 
   // 获取所有票据数据（用于统计）
   const allReceiptsQuery = useQuery<Receipt[]>({
-    queryKey: ['receipts', 'all', filters, userId],
+    queryKey: ['receipts', 'all', filters, selectedUserId],
     queryFn: () =>
       fetchReceipts({
-        userId,
+        userId: selectedUserId, // 不传则查询所有票据
         receiptType: undefined,
         startDate: filters.startDate,
         endDate: filters.endDate,

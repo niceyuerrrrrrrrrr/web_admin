@@ -178,10 +178,13 @@ const unwrap = async <T>(promise: Promise<{ data: ApiResponse<T> }>) => {
 export const fetchApprovalStats = () =>
   unwrap<ApprovalStats>(client.get('/approval/stats'))
 
-export const fetchPendingApprovals = (params?: { approvalType?: string }) =>
+export const fetchPendingApprovals = (params?: { approvalType?: string; companyId?: number }) =>
   unwrap<ApprovalPendingResponse>(
     client.get('/approval/pending', {
-      params: params?.approvalType ? { approval_type: params.approvalType } : undefined,
+      params: {
+        approval_type: params?.approvalType,
+        company_id: params?.companyId,
+      },
     }),
   )
 
@@ -190,6 +193,7 @@ export const fetchApprovalHistory = (params: {
   status?: string
   beginDate?: string
   endDate?: string
+  companyId?: number
   page?: number
   pageSize?: number
 }) =>
@@ -200,6 +204,7 @@ export const fetchApprovalHistory = (params: {
         status: params.status,
         begin_date: params.beginDate,
         end_date: params.endDate,
+        company_id: params.companyId,
         page: params.page,
         page_size: params.pageSize,
       },
@@ -227,6 +232,7 @@ export const fetchManagerStats = (params: {
   approvalType?: string
   beginDate?: string
   endDate?: string
+  companyId?: number
 }) =>
   unwrap<ApprovalManagerStats>(
     client.get('/approval/stats/manager', {
@@ -234,6 +240,7 @@ export const fetchManagerStats = (params: {
         approval_type: params.approvalType,
         begin_date: params.beginDate,
         end_date: params.endDate,
+        company_id: params.companyId,
       },
     }),
   )
@@ -243,6 +250,7 @@ export const fetchTrendStats = (params: {
   beginDate?: string
   endDate?: string
   groupBy?: 'day' | 'week' | 'month'
+  companyId?: number
 }) =>
   unwrap<ApprovalTrendStats>(
     client.get('/approval/stats/trend', {
@@ -251,6 +259,7 @@ export const fetchTrendStats = (params: {
         begin_date: params.beginDate,
         end_date: params.endDate,
         group_by: params.groupBy || 'day',
+        company_id: params.companyId,
       },
     }),
   )

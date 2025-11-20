@@ -23,10 +23,11 @@ import {
   Timeline,
   Typography,
 } from 'antd'
+import ApprovalAnalytics from './ApprovalAnalytics'
+import useCompanyStore from '../store/company'
 import type { ColumnsType } from 'antd/es/table'
 import type { Dayjs } from 'dayjs'
 import dayjs from 'dayjs'
-import { Column, Line, Pie } from '@ant-design/charts'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   APPROVAL_TYPES,
@@ -129,6 +130,7 @@ const ApprovalsPage = () => {
   const [actionForm] = Form.useForm()
   const [managerForm] = Form.useForm()
 
+  const { selectedCompanyId } = useCompanyStore() // 从全局状态读取
   const [pendingFilters, setPendingFilters] = useState<{ approvalType?: string }>({})
   const [historyFilters, setHistoryFilters] = useState<HistoryFilters>({ status: 'all' })
   const [historyPagination, setHistoryPagination] = useState({ current: 1, pageSize: 10 })
@@ -170,21 +172,23 @@ const ApprovalsPage = () => {
   })
 
   const pendingQuery = useQuery<ApprovalPendingResponse>({
-    queryKey: ['approval', 'pending', pendingFilters],
+    queryKey: ['approval', 'pending', pendingFilters, selectedCompanyId],
     queryFn: () =>
       fetchPendingApprovals({
         approvalType: pendingFilters.approvalType,
+        companyId: selectedCompanyId ?? undefined,
       }),
   })
 
   const historyQuery = useQuery<ApprovalHistoryResponse>({
-    queryKey: ['approval', 'history', historyFilters, historyPagination],
+    queryKey: ['approval', 'history', historyFilters, historyPagination, selectedCompanyId],
     queryFn: () =>
       fetchApprovalHistory({
         approvalType: historyFilters.approvalType,
         status: historyFilters.status,
         beginDate: historyFilters.beginDate,
         endDate: historyFilters.endDate,
+        companyId: selectedCompanyId ?? undefined,
         page: historyPagination.current,
         pageSize: historyPagination.pageSize,
       }),
@@ -268,6 +272,7 @@ const ApprovalsPage = () => {
     return record.metric_total.toFixed(2)
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const managerColumns: ColumnsType<ManagerTypeStat> = [
     {
       title: '审批类型',
@@ -365,6 +370,7 @@ const ApprovalsPage = () => {
     [managerQuery.data],
   )
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const managerChartConfig = useMemo(
     () => ({
       data: managerChartData,
@@ -374,10 +380,6 @@ const ApprovalsPage = () => {
       colorField: 'status',
       color: (datum: ManagerStatusStat) =>
         statusColorMap[datum.status]?.color || '#1677ff',
-      label: {
-        position: 'middle' as const,
-        style: { fill: '#fff' },
-      },
     }),
     [managerChartData],
   )
@@ -405,6 +407,7 @@ const ApprovalsPage = () => {
     return result
   }, [trendQuery.data])
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const trendLineConfig = useMemo(
     () => ({
       data: trendLineData,
@@ -441,11 +444,13 @@ const ApprovalsPage = () => {
     if (!managerQuery.data?.types) return []
     return managerQuery.data.types.map((type) => ({
       type: type.type_name,
+      name: type.type_name,
       value: type.total,
       key: type.key,
     }))
   }, [managerQuery.data])
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const typePieConfig = useMemo(
     () => ({
       data: typePieData,
@@ -453,8 +458,12 @@ const ApprovalsPage = () => {
       colorField: 'type',
       radius: 0.8,
       label: {
-        type: 'outer',
-        content: '{name}: {value}',
+        formatter: (data: any) => {
+          if (!data) return ''
+          const name = data.name || data.type || ''
+          const value = data.value || 0
+          return `${name}: ${value}条`
+        },
       },
       interactions: [{ type: 'element-active' }],
       onReady: (plot: any) => {
@@ -471,6 +480,7 @@ const ApprovalsPage = () => {
   )
 
   // 按类型拆分的趋势图表
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const typeTrendCharts = useMemo(() => {
     if (!trendQuery.data?.trend || selectedTypeForDrill) return []
     const trend = trendQuery.data.trend
@@ -518,6 +528,7 @@ const ApprovalsPage = () => {
   }, [trendQuery.data, selectedTypeForDrill])
 
   // 选中类型的详细趋势
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const selectedTypeTrend = useMemo(() => {
     if (!selectedTypeForDrill || !trendQuery.data?.trend) return null
     const trend = trendQuery.data.trend.filter((point) => point.type === selectedTypeForDrill)
@@ -682,6 +693,7 @@ const ApprovalsPage = () => {
     })
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const handleManagerSearch = (values: {
     approvalType: string
     dateRange?: Dayjs[]
@@ -698,6 +710,7 @@ const ApprovalsPage = () => {
     }
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const handleManagerReset = () => {
     setManagerFilters({
       approvalType: 'all',
@@ -736,31 +749,31 @@ const ApprovalsPage = () => {
             统一查看并处理报销、采购、请假、物品领用等审批任务。
           </Paragraph>
         </div>
-        <Space>
-          <Button
-            type="primary"
-            onClick={() => {
-              queryClient.invalidateQueries({ queryKey: ['approval', 'pending'] })
-              queryClient.invalidateQueries({ queryKey: ['approval', 'history'] })
-              queryClient.invalidateQueries({ queryKey: ['approval', 'stats'] })
-              queryClient.invalidateQueries({ queryKey: ['approval', 'manager'] })
-              queryClient.invalidateQueries({ queryKey: ['approval', 'trend'] })
-            }}
-          >
-            刷新数据
-          </Button>
-        </Space>
+        <Button
+          type="primary"
+          onClick={() => {
+            queryClient.invalidateQueries({ queryKey: ['approval', 'pending'] })
+            queryClient.invalidateQueries({ queryKey: ['approval', 'history'] })
+            queryClient.invalidateQueries({ queryKey: ['approval', 'stats'] })
+            queryClient.invalidateQueries({ queryKey: ['approval', 'manager'] })
+            queryClient.invalidateQueries({ queryKey: ['approval', 'trend'] })
+          }}
+        >
+          刷新数据
+        </Button>
       </Flex>
 
-      <Row gutter={[16, 16]}>
-        {statCards.map((card) => (
-          <Col xs={24} sm={12} md={8} lg={6} key={card.title}>
-            <Card>
-              <Statistic title={card.title} value={card.value} loading={statsQuery.isLoading} />
-            </Card>
-          </Col>
-        ))}
-      </Row>
+      <Card title="待审批中心" bordered={false}>
+        <Row gutter={[16, 16]}>
+          {statCards.map((card) => (
+            <Col xs={24} sm={12} md={8} lg={6} key={card.title}>
+              <Card>
+                <Statistic title={card.title} value={card.value} loading={statsQuery.isLoading} />
+              </Card>
+            </Col>
+          ))}
+        </Row>
+      </Card>
 
       <Card>
         <Tabs
@@ -859,159 +872,8 @@ const ApprovalsPage = () => {
         />
       </Card>
 
-      <Card
-        title={
-          <Space>
-            <span>审批统计分析</span>
-            {selectedTypeForDrill && (
-              <Tag
-                closable
-                onClose={() => {
-                  setSelectedTypeForDrill(null)
-                  setManagerFilters((prev) => ({ ...prev, approvalType: 'all' }))
-                }}
-                color="blue"
-              >
-                {getApprovalTypeLabel(selectedTypeForDrill)}
-              </Tag>
-            )}
-          </Space>
-        }
-        extra={<Text type="secondary">{managerQuery.data?.scope}</Text>}
-      >
-        <Space direction="vertical" size="large" style={{ width: '100%' }}>
-          <Form
-            form={managerForm}
-            layout="inline"
-            onFinish={handleManagerSearch}
-            initialValues={{ groupBy: 'day' }}
-          >
-            <Form.Item name="approvalType" label="审批类型">
-              <Select
-                style={{ width: 200 }}
-                options={[{ value: 'all', label: '全部类型' }, ...APPROVAL_TYPES]}
-              />
-            </Form.Item>
-            <Form.Item name="dateRange" label="统计区间">
-              <RangePicker allowClear />
-            </Form.Item>
-            <Form.Item name="groupBy" label="分组方式">
-              <Select
-                style={{ width: 120 }}
-                options={[
-                  { value: 'day', label: '按日' },
-                  { value: 'week', label: '按周' },
-                  { value: 'month', label: '按月' },
-                ]}
-              />
-            </Form.Item>
-            <Form.Item>
-              <Space>
-                <Button type="primary" htmlType="submit" loading={managerQuery.isFetching || trendQuery.isFetching}>
-                  查询
-                </Button>
-                <Button onClick={handleManagerReset}>恢复默认</Button>
-              </Space>
-            </Form.Item>
-          </Form>
-          {(managerQuery.error || trendQuery.error) && (
-            <Alert
-              type="error"
-              showIcon
-              message={
-                (managerQuery.error || trendQuery.error) instanceof Error
-                  ? (managerQuery.error || trendQuery.error)?.message
-                  : '统计数据加载失败'
-              }
-            />
-          )}
-
-          {/* 概览图表：状态分布柱状图 + 类型分布饼图 */}
-          <Row gutter={16}>
-            <Col xs={24} lg={12}>
-              <Card size="small" title="状态分布" bordered={false}>
-                {managerChartData.length ? (
-                  <Column {...managerChartConfig} height={300} />
-                ) : (
-                  <Empty description={managerQuery.isLoading ? '加载中' : '暂无数据'} />
-                )}
-              </Card>
-            </Col>
-            <Col xs={24} lg={12}>
-              <Card size="small" title="类型分布" bordered={false}>
-                {typePieData.length ? (
-                  <Pie {...typePieConfig} height={300} />
-                ) : (
-                  <Empty description={managerQuery.isLoading ? '加载中' : '暂无数据'} />
-                )}
-                <Text type="secondary" style={{ fontSize: 12, display: 'block', marginTop: 8 }}>
-                  点击饼图可钻取查看该类型详情
-                </Text>
-              </Card>
-            </Col>
-          </Row>
-
-          {/* 趋势分析：总体趋势或选中类型趋势 */}
-          <Card size="small" title={selectedTypeForDrill ? `${getApprovalTypeLabel(selectedTypeForDrill)}趋势分析` : '审批趋势分析'} bordered={false}>
-            {selectedTypeForDrill && selectedTypeTrend ? (
-              selectedTypeTrend.config.data.length ? (
-                <Line {...selectedTypeTrend.config} height={350} />
-              ) : (
-                <Empty description={trendQuery.isLoading ? '加载中' : '暂无趋势数据'} />
-              )
-            ) : trendLineData.length ? (
-              <Line {...trendLineConfig} height={350} />
-            ) : (
-              <Empty description={trendQuery.isLoading ? '加载中' : '暂无趋势数据'} />
-            )}
-          </Card>
-
-          {/* 按类型拆分的趋势图表（仅在查看全部类型时显示） */}
-          {!selectedTypeForDrill && typeTrendCharts.length > 0 && (
-            <Card size="small" title="各类型趋势对比" bordered={false}>
-              <Row gutter={[16, 16]}>
-                {typeTrendCharts.map((chart) => (
-                  <Col xs={24} lg={12} key={chart.type}>
-                    <Card
-                      size="small"
-                      title={chart.typeName}
-                      bordered
-                      hoverable
-                      onClick={() => {
-                        setSelectedTypeForDrill(chart.type)
-                        setManagerFilters((prev) => ({ ...prev, approvalType: chart.type }))
-                      }}
-                      style={{ cursor: 'pointer' }}
-                    >
-                      <Line {...chart.config} height={250} />
-                    </Card>
-                  </Col>
-                ))}
-              </Row>
-            </Card>
-          )}
-
-          {/* 数据表格 */}
-          <Card size="small" title="详细数据" bordered={false}>
-            <Table
-              rowKey="key"
-              size="small"
-              columns={managerColumns}
-              dataSource={managerQuery.data?.types}
-              loading={managerQuery.isLoading}
-              pagination={false}
-              scroll={{ x: 360 }}
-              onRow={(record) => ({
-                onClick: () => {
-                  setSelectedTypeForDrill(record.key)
-                  setManagerFilters((prev) => ({ ...prev, approvalType: record.key }))
-                },
-                style: { cursor: 'pointer' },
-              })}
-            />
-          </Card>
-        </Space>
-      </Card>
+      {/* 新的专业数据分析页面 */}
+      <ApprovalAnalytics />
 
       <Drawer
         title={

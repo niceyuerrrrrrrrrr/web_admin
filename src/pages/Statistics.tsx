@@ -29,22 +29,26 @@ import {
   fetchStatisticianStatistics,
 } from '../api/services/statistics'
 import useAuthStore from '../store/auth'
+import useCompanyStore from '../store/company'
 
 const { Title, Paragraph } = Typography
 
 const StatisticsPage = () => {
   const queryClient = useQueryClient()
   const { user } = useAuthStore()
+  const { selectedCompanyId } = useCompanyStore() // 从全局状态读取
   const [timeRange, setTimeRange] = useState<string>('month')
 
   // 根据用户角色选择统计API
   const getStatisticsQuery = () => {
-    const positionType = (user as any)?.position_type || (user as any)?.role || ''
-    
-    if (positionType === '总经理') {
+    const positionType = (user as any)?.position_type || ''
+    const role = (user as any)?.role || ''
+    const roleKey = role || positionType
+
+    if (roleKey === 'super_admin' || positionType === '超级管理员' || positionType === '总经理') {
       return useQuery({
-        queryKey: ['statistics', 'ceo', timeRange],
-        queryFn: () => fetchCEOStatistics({ timeRange }),
+        queryKey: ['statistics', 'ceo', timeRange, selectedCompanyId],
+        queryFn: () => fetchCEOStatistics({ timeRange, companyId: selectedCompanyId }),
       })
     } else if (positionType === '车队长') {
       return useQuery({
@@ -73,19 +77,57 @@ const StatisticsPage = () => {
     
     const cards = []
     
-    // 根据不同的统计数据类型显示不同的指标
-    if (statsData.summary) {
-      // CEO/车队长视图
+    // CEO/总经理视图 - 使用 kpi 字段
+    if (statsData.kpi) {
+      cards.push({
+        title: '运单数',
+        value: statsData.kpi.orders || 0,
+        prefix: <FileTextOutlined />,
+        suffix: statsData.kpi.ordersTrend !== undefined ? (
+          <span style={{ fontSize: 12, color: statsData.kpi.ordersTrend >= 0 ? '#3f8600' : '#cf1322' }}>
+            {statsData.kpi.ordersTrend >= 0 ? '+' : ''}{statsData.kpi.ordersTrend?.toFixed(1)}%
+          </span>
+        ) : null,
+      })
+      
+      cards.push({
+        title: '收入(元)',
+        value: (statsData.kpi.revenue || 0).toLocaleString(),
+        prefix: <DollarOutlined />,
+        suffix: statsData.kpi.revenueTrend !== undefined ? (
+          <span style={{ fontSize: 12, color: statsData.kpi.revenueTrend >= 0 ? '#3f8600' : '#cf1322' }}>
+            {statsData.kpi.revenueTrend >= 0 ? '+' : ''}{statsData.kpi.revenueTrend?.toFixed(1)}%
+          </span>
+        ) : null,
+      })
+      
+      cards.push({
+        title: '利润(元)',
+        value: (statsData.kpi.profit || 0).toLocaleString(),
+        prefix: <DollarOutlined />,
+        suffix: statsData.kpi.profitRate !== undefined ? (
+          <span style={{ fontSize: 12 }}>
+            利润率 {statsData.kpi.profitRate?.toFixed(1)}%
+          </span>
+        ) : null,
+      })
+      
+      if (statsData.personnel?.attendanceRate !== undefined) {
+        cards.push({
+          title: '出勤率',
+          value: (statsData.personnel.attendanceRate || 0).toFixed(1),
+          prefix: <ClockCircleOutlined />,
+          suffix: '%',
+        })
+      }
+    } 
+    // 旧的数据结构兼容（如果有 summary 字段）
+    else if (statsData.summary) {
       if (statsData.summary.orders) {
         cards.push({
           title: '运单数',
           value: statsData.summary.orders.current || 0,
           prefix: <FileTextOutlined />,
-          suffix: statsData.summary.orders.growth !== undefined ? (
-            <span style={{ fontSize: 12, color: statsData.summary.orders.growth >= 0 ? '#3f8600' : '#cf1322' }}>
-              {statsData.summary.orders.growth >= 0 ? '+' : ''}{statsData.summary.orders.growth?.toFixed(1)}%
-            </span>
-          ) : null,
         })
       }
       
@@ -94,11 +136,6 @@ const StatisticsPage = () => {
           title: '运输重量(吨)',
           value: (statsData.summary.weight.current || 0).toFixed(1),
           prefix: <TruckOutlined />,
-          suffix: statsData.summary.weight.growth !== undefined ? (
-            <span style={{ fontSize: 12, color: statsData.summary.weight.growth >= 0 ? '#3f8600' : '#cf1322' }}>
-              {statsData.summary.weight.growth >= 0 ? '+' : ''}{statsData.summary.weight.growth?.toFixed(1)}%
-            </span>
-          ) : null,
         })
       }
       
@@ -107,24 +144,11 @@ const StatisticsPage = () => {
           title: '收入(元)',
           value: (statsData.summary.income.current || 0).toLocaleString(),
           prefix: <DollarOutlined />,
-          suffix: statsData.summary.income.growth !== undefined ? (
-            <span style={{ fontSize: 12, color: statsData.summary.income.growth >= 0 ? '#3f8600' : '#cf1322' }}>
-              {statsData.summary.income.growth >= 0 ? '+' : ''}{statsData.summary.income.growth?.toFixed(1)}%
-            </span>
-          ) : null,
         })
       }
-      
-      if (statsData.summary.attendanceRate) {
-        cards.push({
-          title: '出勤率',
-          value: (statsData.summary.attendanceRate || 0).toFixed(1),
-          prefix: <ClockCircleOutlined />,
-          suffix: '%',
-        })
-      }
-    } else if (statsData.orders) {
-      // 司机视图
+    }
+    // 司机视图
+    else if (statsData.orders) {
       cards.push({
         title: '运单数',
         value: statsData.orders.current || 0,
@@ -147,11 +171,11 @@ const StatisticsPage = () => {
   const receiptChartData = useMemo(() => {
     if (!statsData) return []
     
-    // 根据统计数据类型构建图表数据
-    if (statsData.summary && statsData.summary.orders) {
+    // 使用 operation 字段构建图表数据
+    if (statsData.operation) {
       return [
-        { type: '运单数', value: statsData.summary.orders.current || 0 },
-        { type: '运输重量(吨)', value: (statsData.summary.weight?.current || 0).toFixed(1) },
+        { type: '运单数', value: statsData.operation.totalOrders || 0 },
+        { type: '运输重量(吨)', value: parseFloat((statsData.operation.totalWeight || 0).toFixed(1)) },
       ]
     }
     
@@ -160,50 +184,38 @@ const StatisticsPage = () => {
 
   // 考勤统计图表数据
   const attendanceChartData = useMemo(() => {
-    if (!statsData) return []
+    if (!statsData || !statsData.personnel) return []
     
-    // 如果有考勤数据，构建趋势图数据
-    if (statsData.attendance) {
-      // 根据实际数据结构调整
-      return []
-    }
-    
-    // 如果有趋势数据
-    if (statsData.trendData) {
-      return statsData.trendData.map((item: any) => ({
-        date: item.date || item.day || '',
-        rate: item.attendanceRate || item.rate || 0,
-      }))
-    }
-    
-    return []
+    // 使用 personnel 字段构建考勤数据
+    return [
+      { name: '出勤率', value: statsData.personnel.attendanceRate || 0 },
+      { name: '迟到次数', value: statsData.personnel.lateCount || 0 },
+      { name: '总司机数', value: statsData.personnel.totalDrivers || 0 },
+    ]
   }, [statsData])
 
   // 能耗统计图表数据
   const energyChartData = useMemo(() => {
-    if (!statsData) return []
+    if (!statsData || !statsData.business) return []
     
-    // 从统计数据中提取能耗数据
-    if (statsData.charging) {
-      return [
-        { type: '充电量(kWh)', value: statsData.charging.totalEnergy || 0 },
-        { type: '充电费用(元)', value: statsData.charging.totalCost || 0 },
-        { type: '充电次数', value: statsData.charging.count || 0 },
-      ]
-    }
-    
-    return []
+    // 从 business.costBreakdown 提取能耗数据
+    const costBreakdown = statsData.business.costBreakdown || {}
+    return [
+      { type: '充电费用', value: costBreakdown.charging || 0 },
+      { type: '报销费用', value: costBreakdown.reimbursement || 0 },
+      { type: '人工成本', value: costBreakdown.salary || 0 },
+    ]
   }, [statsData])
 
   // 司机排行榜数据
   const driverRankingData = useMemo(() => {
-    if (!statsData || !statsData.details || !statsData.details.driverRanking) return []
+    if (!statsData || !statsData.topDrivers) return []
     
-    return statsData.details.driverRanking.slice(0, 10).map((driver: any, index: number) => ({
+    return statsData.topDrivers.slice(0, 10).map((driver: any, index: number) => ({
       rank: index + 1,
       name: driver.name || driver.driver_name || '未知',
       orders: driver.orders || driver.order_count || 0,
-      weight: driver.weight || driver.total_weight || 0,
+      weight: parseFloat((driver.weight || driver.total_weight || 0).toFixed(1)),
     }))
   }, [statsData])
 
