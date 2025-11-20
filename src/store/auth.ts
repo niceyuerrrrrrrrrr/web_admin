@@ -4,6 +4,7 @@ import { persist } from 'zustand/middleware'
 interface UserInfo {
   name: string
   role: string
+  positionType?: string
   email?: string
 }
 

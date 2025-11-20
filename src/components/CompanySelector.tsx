@@ -15,10 +15,13 @@ export default function CompanySelector({ onChange, value, ...props }: CompanySe
   const { user } = useAuthStore()
 
   // 获取公司列表
+  const isSuperAdmin =
+    user?.role === 'super_admin' || user?.positionType === '超级管理员'
+
   const { data: companiesResponse, isLoading } = useQuery({
     queryKey: ['companies'],
     queryFn: () => fetchCompanies({ status: 'active' }),
-    enabled: (user as any)?.role === 'super_admin' || (user as any)?.position_type === '超级管理员',
+    enabled: isSuperAdmin,
   })
 
   const companies = companiesResponse?.records || []
@@ -38,7 +41,7 @@ export default function CompanySelector({ onChange, value, ...props }: CompanySe
   }
 
   // 非超级管理员不显示
-  if ((user as any)?.role !== 'super_admin' && (user as any)?.position_type !== '超级管理员') {
+  if (!isSuperAdmin) {
     return null
   }
 

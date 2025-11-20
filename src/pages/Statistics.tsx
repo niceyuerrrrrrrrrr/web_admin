@@ -41,8 +41,8 @@ const StatisticsPage = () => {
 
   // 根据用户角色选择统计API
   const getStatisticsQuery = () => {
-    const positionType = (user as any)?.position_type || ''
-    const role = (user as any)?.role || ''
+    const positionType = user?.positionType || (user as any)?.position_type || ''
+    const role = user?.role || ''
     const roleKey = role || positionType
 
     if (roleKey === 'super_admin' || positionType === '超级管理员' || positionType === '总经理') {

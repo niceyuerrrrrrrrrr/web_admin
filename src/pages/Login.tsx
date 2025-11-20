@@ -21,6 +21,7 @@ const LoginPage = () => {
         user: {
           name: data.user.name || data.user.nickname || data.user.phone || '管理员',
           role: data.user.role || data.user.positionType || '管理员',
+          positionType: data.user.positionType || data.user.position_type,
           email: data.user.phone,
         },
       })
