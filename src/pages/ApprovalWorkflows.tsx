@@ -36,6 +36,9 @@ import {
   type WorkflowPayload,
 } from '../api/services/approval'
 
+import useAuthStore from '../store/auth'
+import useCompanyStore from '../store/company'
+
 const { Title, Paragraph, Text } = Typography
 
 const getApprovalTypeLabel = (value: string) =>
@@ -44,6 +47,10 @@ const getApprovalTypeLabel = (value: string) =>
 const ApprovalWorkflowsPage = () => {
   const queryClient = useQueryClient()
   const { message } = AntdApp.useApp()
+  const { user } = useAuthStore()
+  const { selectedCompanyId } = useCompanyStore()
+  const isSuperAdmin = user?.role === 'super_admin'
+  const effectiveCompanyId = isSuperAdmin ? selectedCompanyId : undefined
   const [filterType, setFilterType] = useState<string>('all')
   const [drawerWorkflow, setDrawerWorkflow] = useState<Workflow | null>(null)
   const [editingWorkflow, setEditingWorkflow] = useState<Workflow | null>(null)
@@ -51,14 +58,19 @@ const ApprovalWorkflowsPage = () => {
   const [form] = Form.useForm<WorkflowPayload>()
 
   const workflowsQuery = useQuery({
-    queryKey: ['approval', 'workflows', filterType],
+    queryKey: ['approval', 'workflows', filterType, effectiveCompanyId],
     queryFn: () =>
-      fetchWorkflows(filterType !== 'all' ? { approvalType: filterType } : undefined),
+      fetchWorkflows({
+        approvalType: filterType !== 'all' ? filterType : undefined,
+        companyId: effectiveCompanyId,
+      }),
+    enabled: !isSuperAdmin || !!effectiveCompanyId,
   })
 
   const roleUsersQuery = useQuery({
-    queryKey: ['approval', 'role-users'],
-    queryFn: fetchRoleUsers,
+    queryKey: ['approval', 'role-users', effectiveCompanyId],
+    queryFn: () => fetchRoleUsers({ companyId: effectiveCompanyId }),
+    enabled: !isSuperAdmin || !!effectiveCompanyId,
   })
 
   const workflows = workflowsQuery.data?.workflows ?? []
@@ -109,11 +121,19 @@ const ApprovalWorkflowsPage = () => {
 
   const mutation = useMutation({
     mutationFn: (payload: WorkflowPayload) => {
+      if (isSuperAdmin && !effectiveCompanyId) {
+        message.error('请先选择要配置的公司')
+        return Promise.reject(new Error('missing company'))
+      }
       const normalizedNodes = (payload.nodes || []).map((node, index) => ({
         ...node,
         node_order: index + 1,
       }))
-      const finalPayload: WorkflowPayload = { ...payload, nodes: normalizedNodes }
+      const finalPayload: WorkflowPayload = {
+        ...payload,
+        nodes: normalizedNodes,
+        ...(isSuperAdmin ? { companyId: effectiveCompanyId } : {}),
+      }
       if (editingWorkflow) {
         return updateWorkflow(editingWorkflow.id, finalPayload)
       }
@@ -244,11 +264,23 @@ const ApprovalWorkflowsPage = () => {
             onChange={setFilterType}
             options={[{ value: 'all', label: '全部类型' }, ...APPROVAL_TYPES]}
           />
-          <Button type="primary" onClick={openCreateModal}>
+          <Button
+            type="primary"
+            onClick={openCreateModal}
+            disabled={isSuperAdmin && !effectiveCompanyId}
+          >
             新建流程
           </Button>
         </Space>
       </Flex>
+
+      {isSuperAdmin && !effectiveCompanyId && (
+        <Alert
+          type="warning"
+          message="请选择要配置审批流程的公司"
+          showIcon
+        />
+      )}
 
       <Card>
         <Table

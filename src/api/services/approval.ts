@@ -149,6 +149,7 @@ export interface WorkflowPayload {
   description?: string
   is_active: boolean
   nodes: WorkflowNodePayload[]
+  companyId?: number
 }
 
 export interface Workflow extends WorkflowPayload {
@@ -264,24 +265,42 @@ export const fetchTrendStats = (params: {
     }),
   )
 
-export const fetchWorkflows = (params?: { approvalType?: string }) =>
+export const fetchWorkflows = (params?: { approvalType?: string; companyId?: number }) =>
   unwrap<{ workflows: Workflow[] }>(
     client.get('/approval/workflows', {
-      params: params?.approvalType ? { approval_type: params.approvalType } : undefined,
+      params: {
+        approval_type: params?.approvalType,
+        company_id: params?.companyId,
+      },
     }),
   )
 
 export const fetchWorkflowDetail = (id: number) =>
   unwrap<{ workflow: Workflow }>(client.get(`/approval/workflows/${id}`))
 
+const transformWorkflowPayload = (payload: WorkflowPayload) => {
+  const { companyId, ...rest } = payload
+  return {
+    ...rest,
+    company_id: companyId,
+  }
+}
+
 export const createWorkflow = (payload: WorkflowPayload) =>
-  unwrap(client.post('/approval/workflows', payload))
+  unwrap(client.post('/approval/workflows', transformWorkflowPayload(payload)))
 
 export const updateWorkflow = (id: number, payload: WorkflowPayload) =>
-  unwrap(client.put(`/approval/workflows/${id}`, payload))
+  unwrap(client.put(`/approval/workflows/${id}`, transformWorkflowPayload(payload)))
 
 export const deleteWorkflow = (id: number) =>
   unwrap(client.delete(`/approval/workflows/${id}`))
 
-export const fetchRoleUsers = () =>
-  unwrap<{ role_users: RoleUsersMap }>(client.get('/approval/role_users'))
+export const fetchRoleUsers = (params?: { role?: string; companyId?: number }) =>
+  unwrap<{ role_users: RoleUsersMap }>(
+    client.get('/approval/role_users', {
+      params: {
+        role: params?.role,
+        company_id: params?.companyId,
+      },
+    }),
+  )

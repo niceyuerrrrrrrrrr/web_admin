@@ -282,6 +282,7 @@ const AppLayout = () => {
   return (
     <Layout className="app-layout">
       <Sider
+        className="app-sider"
         collapsible
         collapsed={collapsed}
         onCollapse={setCollapsed}
@@ -299,7 +300,7 @@ const AppLayout = () => {
           onClick={handleMenuClick}
         />
       </Sider>
-      <Layout>
+      <Layout className="app-main-layout">
         <Header className="app-header" style={{ background: colorBgContainer }}>
           <Title level={4} className="app-title">
             物流数字化运营中心

@@ -1,5 +1,24 @@
+html, body, #root {
+  height: 100%;
+}
+
 .app-layout {
-  min-height: 100vh;
+  height: 100vh;
+}
+
+.app-sider {
+  height: 100vh;
+  position: sticky;
+  top: 0;
+  left: 0;
+  overflow: auto;
+}
+
+.app-main-layout {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 
 .logo-wrapper {
@@ -36,8 +55,9 @@
 }
 
 .app-content {
+  flex: 1;
   padding: 24px;
-  min-height: calc(100vh - 56px);
+  overflow: auto;
   background: #f5f7fb;
 }
 
