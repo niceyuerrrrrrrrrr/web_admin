@@ -1,8 +1,10 @@
 import axios from 'axios'
 import useAuthStore from '../store/auth'
 
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://api.hodaruner.cn'
+
 const client = axios.create({
-  baseURL: (import.meta.env.VITE_API_BASE_URL || '') + '/api/v1',
+  baseURL: `${API_BASE_URL}/api/v1`,
   timeout: 15000,
   headers: {
     'Content-Type': 'application/json',
