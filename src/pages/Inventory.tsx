@@ -99,6 +99,7 @@ const InventoryPage = () => {
         warehouseId: statsFilters.warehouseId,
         beginDate: statsFilters.dateRange ? statsFilters.dateRange[0]?.format('YYYY-MM-DD') : undefined,
         endDate: statsFilters.dateRange ? statsFilters.dateRange[1]?.format('YYYY-MM-DD') : undefined,
+        companyId: effectiveCompanyId,
       }),
     enabled: !isSuperAdmin || !!effectiveCompanyId,
   })

@@ -108,13 +108,14 @@ export const createStockOperation = (data: {
   images?: string[]
 }) => unwrap(client.post('/inventory/operations', data))
 
-export const fetchInventoryStatistics = (params?: { warehouseId?: number; beginDate?: string; endDate?: string }) =>
+export const fetchInventoryStatistics = (params?: { warehouseId?: number; beginDate?: string; endDate?: string; companyId?: number }) =>
   unwrap<InventoryStats>(
     client.get('/inventory/statistics', {
       params: {
         warehouse_id: params?.warehouseId,
         begin_date: params?.beginDate,
         end_date: params?.endDate,
+        company_id: params?.companyId,
       },
     }),
   )
