@@ -49,6 +49,17 @@ const timeRangeOptions = [
   { label: '本年', value: 'year' },
 ]
 
+const formatWeight = (value?: number | string | null) => {
+  if (value === null || value === undefined) {
+    return '0.00'
+  }
+  const num = Number(value)
+  if (Number.isNaN(num)) {
+    return '0.00'
+  }
+  return num.toFixed(2)
+}
+
 const getDateRange = (timeRange: string) => {
   const now = dayjs()
   switch (timeRange) {
@@ -114,6 +125,7 @@ const DashboardPage = () => {
   })
 
   const statsData = ceoStatsQuery.data
+  const transportDetails = statsData?.transportDetails
 
   const transportCards = useMemo(() => {
     if (!statsData?.operation) return []
@@ -290,6 +302,305 @@ const DashboardPage = () => {
     </Card>
   )
 
+  const renderTransportDetailContent = () => {
+    if (!transportDetails) {
+      return null
+    }
+
+    if (transportDetails.tanker) {
+      const tanker = transportDetails.tanker
+      const loadingByCompany =
+        (tanker.loadingByCompany as Record<string, any>[]) || []
+      const loadingByMaterial =
+        (tanker.loadingByMaterial as Record<string, any>[]) || []
+      const waterTickets = tanker.waterTickets || {}
+      const waterTicketCompanyList =
+        (waterTickets.byCompany as Record<string, any>[]) || []
+      return (
+        <Space direction="vertical" size="large" style={{ width: '100%', marginTop: 24 }}>
+          <div>
+            <Title level={5}>罐车 · 按装料公司统计</Title>
+            <Table
+              size="small"
+              rowKey={(row: Record<string, any>) =>
+                row.company || Math.random().toString(36)
+              }
+              dataSource={loadingByCompany}
+              pagination={false}
+              locale={{ emptyText: '暂无装料公司数据' }}
+              columns={[
+                { title: '装料公司', dataIndex: 'company' },
+                { title: '运输单数量', dataIndex: 'orderCount', width: 140 },
+                {
+                  title: '运输总方量(吨)',
+                  dataIndex: 'totalVolume',
+                  render: (value) => formatWeight(value),
+                },
+                {
+                  title: '平均重量(吨)',
+                  dataIndex: 'avgWeight',
+                  render: (value) => formatWeight(value),
+                },
+              ]}
+            />
+          </div>
+          <div>
+            <Title level={5}>罐车 · 按材料统计</Title>
+            <Table
+              size="small"
+              rowKey={(row: Record<string, any>) =>
+                row.material || Math.random().toString(36)
+              }
+              dataSource={loadingByMaterial}
+              pagination={false}
+              locale={{ emptyText: '暂无材料数据' }}
+              columns={[
+                { title: '材料', dataIndex: 'material' },
+                { title: '运输单数量', dataIndex: 'orderCount', width: 140 },
+                {
+                  title: '运输总方量(吨)',
+                  dataIndex: 'totalVolume',
+                  render: (value) => formatWeight(value),
+                },
+                {
+                  title: '平均重量(吨)',
+                  dataIndex: 'avgWeight',
+                  render: (value) => formatWeight(value),
+                },
+              ]}
+            />
+          </div>
+          <div>
+            <Title level={5}>水票统计</Title>
+            <Row gutter={16} style={{ marginBottom: 12 }}>
+              <Col xs={24} sm={12} md={6}>
+                <Card>
+                  <Statistic
+                    title="水票总数量"
+                    value={waterTickets?.total || 0}
+                    suffix="张"
+                  />
+                </Card>
+              </Col>
+            </Row>
+            <Table
+              size="small"
+              rowKey={(row: Record<string, any>) =>
+                row.company || Math.random().toString(36)
+              }
+              dataSource={waterTicketCompanyList}
+              pagination={false}
+              locale={{ emptyText: '暂无水票数据' }}
+              columns={[
+                { title: '装料公司', dataIndex: 'company' },
+                { title: '水票数量', dataIndex: 'count' },
+              ]}
+            />
+          </div>
+        </Space>
+      )
+    }
+
+    if (transportDetails.trailer) {
+      const trailer = transportDetails.trailer
+      const loadingByCompany =
+        (trailer.loading?.byCompany as Record<string, any>[]) || []
+      const loadingByMaterial =
+        (trailer.loading?.byMaterial as Record<string, any>[]) || []
+      const unloadingByCompany =
+        (trailer.unloading?.byCompany as Record<string, any>[]) || []
+      const unloadingByMaterial =
+        (trailer.unloading?.byMaterial as Record<string, any>[]) || []
+      const matchedByCompany =
+        (trailer.matched?.byCompanyPair as Record<string, any>[]) || []
+      const matchedByMaterial =
+        (trailer.matched?.byMaterial as Record<string, any>[]) || []
+      return (
+        <Space direction="vertical" size="large" style={{ width: '100%', marginTop: 24 }}>
+          <div>
+            <Title level={5}>挂车 · 装料统计（按公司）</Title>
+            <Table
+              size="small"
+              rowKey={(row: Record<string, any>) =>
+                row.company || Math.random().toString(36)
+              }
+              dataSource={loadingByCompany}
+              pagination={false}
+              locale={{ emptyText: '暂无装料公司数据' }}
+              columns={[
+                { title: '装料公司', dataIndex: 'company' },
+                { title: '单据数量', dataIndex: 'orderCount', width: 120 },
+                {
+                  title: '总重量(吨)',
+                  dataIndex: 'totalWeight',
+                  render: (value) => formatWeight(value),
+                },
+                {
+                  title: '平均重量(吨)',
+                  dataIndex: 'avgWeight',
+                  render: (value) => formatWeight(value),
+                },
+              ]}
+            />
+          </div>
+          <div>
+            <Title level={5}>挂车 · 装料统计（按材料）</Title>
+            <Table
+              size="small"
+              rowKey={(row: Record<string, any>) =>
+                row.material || Math.random().toString(36)
+              }
+              dataSource={loadingByMaterial}
+              pagination={false}
+              locale={{ emptyText: '暂无装料材料数据' }}
+              columns={[
+                { title: '材料', dataIndex: 'material' },
+                { title: '单据数量', dataIndex: 'orderCount', width: 120 },
+                {
+                  title: '总重量(吨)',
+                  dataIndex: 'totalWeight',
+                  render: (value) => formatWeight(value),
+                },
+                {
+                  title: '平均重量(吨)',
+                  dataIndex: 'avgWeight',
+                  render: (value) => formatWeight(value),
+                },
+              ]}
+            />
+          </div>
+          <div>
+            <Title level={5}>挂车 · 卸货统计（按公司）</Title>
+            <Table
+              size="small"
+              rowKey={(row: Record<string, any>) =>
+                row.company || Math.random().toString(36)
+              }
+              dataSource={unloadingByCompany}
+              pagination={false}
+              locale={{ emptyText: '暂无卸货公司数据' }}
+              columns={[
+                { title: '卸货公司', dataIndex: 'company' },
+                { title: '单据数量', dataIndex: 'orderCount', width: 120 },
+                {
+                  title: '总重量(吨)',
+                  dataIndex: 'totalWeight',
+                  render: (value) => formatWeight(value),
+                },
+                {
+                  title: '平均重量(吨)',
+                  dataIndex: 'avgWeight',
+                  render: (value) => formatWeight(value),
+                },
+              ]}
+            />
+          </div>
+          <div>
+            <Title level={5}>挂车 · 卸货统计（按材料）</Title>
+            <Table
+              size="small"
+              rowKey={(row: Record<string, any>) =>
+                row.material || Math.random().toString(36)
+              }
+              dataSource={unloadingByMaterial}
+              pagination={false}
+              locale={{ emptyText: '暂无卸货材料数据' }}
+              columns={[
+                { title: '材料', dataIndex: 'material' },
+                { title: '单据数量', dataIndex: 'orderCount', width: 120 },
+                {
+                  title: '总重量(吨)',
+                  dataIndex: 'totalWeight',
+                  render: (value) => formatWeight(value),
+                },
+                {
+                  title: '平均重量(吨)',
+                  dataIndex: 'avgWeight',
+                  render: (value) => formatWeight(value),
+                },
+              ]}
+            />
+          </div>
+          <div>
+            <Title level={5}>挂车 · 装卸匹配（按公司）</Title>
+            <Table
+              size="small"
+              rowKey={(row: Record<string, any>) =>
+                `${row.loadingCompany}-${row.unloadingCompany}-${row.transportCount}`
+              }
+              dataSource={matchedByCompany}
+              pagination={false}
+              locale={{ emptyText: '暂无匹配运输数据' }}
+              columns={[
+                { title: '装料公司', dataIndex: 'loadingCompany' },
+                { title: '卸货公司', dataIndex: 'unloadingCompany' },
+                { title: '运输单数', dataIndex: 'transportCount', width: 120 },
+                {
+                  title: '总装料重量(吨)',
+                  dataIndex: 'totalLoadingWeight',
+                  render: (value) => formatWeight(value),
+                },
+                {
+                  title: '总卸货重量(吨)',
+                  dataIndex: 'totalUnloadingWeight',
+                  render: (value) => formatWeight(value),
+                },
+                {
+                  title: '总磅差(吨)',
+                  dataIndex: 'totalDiff',
+                  render: (value) => formatWeight(value),
+                },
+                {
+                  title: '平均磅差(吨)',
+                  dataIndex: 'avgDiff',
+                  render: (value) => formatWeight(value),
+                },
+              ]}
+            />
+          </div>
+          <div>
+            <Title level={5}>挂车 · 装卸匹配（按材料）</Title>
+            <Table
+              size="small"
+              rowKey={(row: Record<string, any>) =>
+                row.material || Math.random().toString(36)
+              }
+              dataSource={matchedByMaterial}
+              pagination={false}
+              locale={{ emptyText: '暂无材料匹配数据' }}
+              columns={[
+                { title: '材料', dataIndex: 'material' },
+                { title: '运输单数', dataIndex: 'transportCount', width: 120 },
+                {
+                  title: '总装料重量(吨)',
+                  dataIndex: 'totalLoadingWeight',
+                  render: (value) => formatWeight(value),
+                },
+                {
+                  title: '总卸货重量(吨)',
+                  dataIndex: 'totalUnloadingWeight',
+                  render: (value) => formatWeight(value),
+                },
+                {
+                  title: '总磅差(吨)',
+                  dataIndex: 'totalDiff',
+                  render: (value) => formatWeight(value),
+                },
+                {
+                  title: '平均磅差(吨)',
+                  dataIndex: 'avgDiff',
+                  render: (value) => formatWeight(value),
+                },
+              ]}
+            />
+          </div>
+        </Space>
+      )
+    }
+
+    return null
+  }
+
   return (
     <Space direction="vertical" size="large" style={{ width: '100%' }}>
       <Space
@@ -366,6 +677,7 @@ const DashboardPage = () => {
               </Col>
             )}
           </Row>
+          {renderTransportDetailContent()}
         </SectionCard>
 
         {/* 2. 充电数据 */}
