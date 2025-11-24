@@ -25,6 +25,7 @@ export interface ReportListParams {
   begin_date?: string
   end_date?: string
   keyword?: string
+  company_id?: number
 }
 
 export interface ReportPayload {
@@ -49,6 +50,7 @@ export const fetchReports = (params: ReportListParams) =>
         begin_date: params.begin_date,
         end_date: params.end_date,
         keyword: params.keyword,
+        company_id: params.company_id,
       },
     }),
   )
@@ -92,12 +94,13 @@ export const uploadReportImage = (file: File) => {
   )
 }
 
-export const fetchReportStats = (params?: { begin_date?: string; end_date?: string }) =>
+export const fetchReportStats = (params?: { begin_date?: string; end_date?: string; company_id?: number }) =>
   unwrap<ReportStats>(
     client.get('/report/stats/overview', {
       params: {
         begin_date: params?.begin_date,
         end_date: params?.end_date,
+        company_id: params?.company_id,
       },
     }),
   )

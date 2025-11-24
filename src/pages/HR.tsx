@@ -57,6 +57,9 @@ import {
   updateHRDraft,
 } from '../api/services/hr'
 import { fetchUsers, type User } from '../api/services/users'
+import useAuthStore from '../store/auth'
+import useCompanyStore from '../store/company'
+import CompanySelector from '../components/CompanySelector'
 
 const statusColors: Record<HRFormStatus, string> = {
   draft: 'default',
@@ -90,14 +93,21 @@ const fileToBase64 = (file: File) =>
 const HRPage = () => {
   const { message, modal } = AntdApp.useApp()
   const queryClient = useQueryClient()
+  const { user } = useAuthStore()
+  const { selectedCompanyId, setSelectedCompanyId } = useCompanyStore()
+
+  const isSuperAdmin = user?.role === 'super_admin' || user?.positionType === '超级管理员'
+  const effectiveCompanyId = isSuperAdmin ? selectedCompanyId : undefined
+  const showCompanyWarning = isSuperAdmin && !effectiveCompanyId
 
   const [activeTab, setActiveTab] = useState<'onboarding' | 'offboarding' | 'probation' | 'overview'>('overview')
-  const [filters, setFilters] = useState<{ form_type?: HRFormType; status?: HRFormStatus; page: number; page_size: number }>(
+  const [filters, setFilters] = useState<{ form_type?: HRFormType; status?: HRFormStatus; page: number; page_size: number; company_id?: number }>(
     {
       form_type: undefined,
       status: undefined,
       page: 1,
       page_size: 10,
+      company_id: effectiveCompanyId,
     },
   )
   const [selectedFormId, setSelectedFormId] = useState<string>()
@@ -124,10 +134,25 @@ const HRPage = () => {
     }
   }, [activeTab])
 
+  useEffect(() => {
+    setFilters((prev) => ({ ...prev, company_id: effectiveCompanyId, page: 1 }))
+  }, [effectiveCompanyId])
+
   const formsQuery = useQuery({
     queryKey: ['hr', 'forms', filters],
-    queryFn: () => fetchHRForms(filters),
+    queryFn: () => {
+      console.log('[HR] Fetching forms with filters:', filters)
+      return fetchHRForms(filters)
+    },
   })
+  
+  // 调试日志
+  useEffect(() => {
+    console.log('[HR] Current filters:', filters)
+    console.log('[HR] Effective company ID:', effectiveCompanyId)
+    console.log('[HR] Selected company ID:', selectedCompanyId)
+    console.log('[HR] Forms query data:', formsQuery.data)
+  }, [filters, effectiveCompanyId, selectedCompanyId, formsQuery.data])
 
   const detailQuery = useQuery({
     queryKey: ['hr', 'detail', selectedFormId],
@@ -634,7 +659,22 @@ const HRPage = () => {
           <h2 style={{ marginBottom: 4 }}>人事管理中心</h2>
           <span style={{ color: '#666' }}>覆盖员工档案、入离职流程、试用期跟进与电子签名</span>
         </div>
+        {isSuperAdmin && (
+          <CompanySelector
+            value={selectedCompanyId}
+            onChange={(id) => setSelectedCompanyId(id)}
+          />
+        )}
       </Flex>
+      {showCompanyWarning && (
+        <Alert
+          message="请先选择公司"
+          description="超级管理员需要先选择公司才能查看人事数据"
+          type="warning"
+          showIcon
+          closable
+        />
+      )}
 
       <Tabs
         activeKey={activeTab}

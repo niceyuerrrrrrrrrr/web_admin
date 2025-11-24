@@ -57,6 +57,8 @@ import {
   uploadReportImage,
 } from '../api/services/report'
 import { fetchUsers } from '../api/services/users'
+import useCompanyStore from '../store/company'
+import useAuthStore from '../store/auth'
 
 const { RangePicker } = DatePicker
 
@@ -73,6 +75,11 @@ const statusColors: Record<ReportStatus, string> = {
 const ReportsPage = () => {
   const { message, modal } = AntdApp.useApp()
   const queryClient = useQueryClient()
+  const { selectedCompanyId } = useCompanyStore()
+  const { user } = useAuthStore()
+  const isSuperAdmin = user?.role === 'super_admin' || user?.positionType === '超级管理员'
+  const effectiveCompanyId = isSuperAdmin ? selectedCompanyId : undefined
+  
   const [filters, setFilters] = useState<{
     status?: ReportStatus
     user_id?: number
@@ -101,7 +108,7 @@ const ReportsPage = () => {
   }
 
   const reportsQuery = useQuery({
-    queryKey: ['reports', filters],
+    queryKey: ['reports', filters, effectiveCompanyId],
     queryFn: () =>
       fetchReports({
         status: filters.status,
@@ -111,15 +118,17 @@ const ReportsPage = () => {
         page_size: filters.page_size,
         begin_date: filters.dateRange ? filters.dateRange[0].format('YYYY-MM-DD') : undefined,
         end_date: filters.dateRange ? filters.dateRange[1].format('YYYY-MM-DD') : undefined,
+        company_id: effectiveCompanyId,
       }),
   })
 
   const statsQuery = useQuery({
-    queryKey: ['reports', 'stats', filters.dateRange],
+    queryKey: ['reports', 'stats', filters.dateRange, effectiveCompanyId],
     queryFn: () =>
       fetchReportStats({
         begin_date: filters.dateRange ? filters.dateRange[0].format('YYYY-MM-DD') : undefined,
         end_date: filters.dateRange ? filters.dateRange[1].format('YYYY-MM-DD') : undefined,
+        company_id: effectiveCompanyId,
       }),
   })
 

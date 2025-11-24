@@ -36,6 +36,7 @@ export const fetchUsers = (params?: {
   phone?: string
   name?: string
   status?: string
+  company_id?: number
 }) =>
   unwrap<UserListResponse>(
     client.get('/users', {
@@ -45,6 +46,7 @@ export const fetchUsers = (params?: {
         phone: params?.phone,
         name: params?.name,
         status: params?.status,
+        company_id: params?.company_id,
       },
     }),
   )

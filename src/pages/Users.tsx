@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   Alert,
   App as AntdApp,
@@ -36,6 +36,9 @@ import {
   updateUser,
   type User,
 } from '../api/services/users'
+import useAuthStore from '../store/auth'
+import useCompanyStore from '../store/company'
+import CompanySelector from '../components/CompanySelector'
 
 const { Title, Paragraph, Text } = Typography
 
@@ -51,6 +54,11 @@ const POSITION_TYPES = [
 const UsersPage = () => {
   const queryClient = useQueryClient()
   const { message } = AntdApp.useApp()
+  const { user } = useAuthStore()
+  const { selectedCompanyId, setSelectedCompanyId } = useCompanyStore()
+
+  const isSuperAdmin = user?.role === 'super_admin' || user?.positionType === '超级管理员'
+  const effectiveCompanyId = isSuperAdmin ? selectedCompanyId : undefined
 
   const [filters, setFilters] = useState<{
     phone?: string
@@ -63,9 +71,16 @@ const UsersPage = () => {
   const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([])
   const [editForm] = Form.useForm()
 
+  // 当公司选择变化时，更新查询
+  useEffect(() => {
+    if (isSuperAdmin) {
+      queryClient.invalidateQueries({ queryKey: ['users', 'list'] })
+    }
+  }, [selectedCompanyId, isSuperAdmin, queryClient])
+
   // 获取用户列表
   const usersQuery = useQuery({
-    queryKey: ['users', 'list', filters],
+    queryKey: ['users', 'list', filters, effectiveCompanyId],
     queryFn: () =>
       fetchUsers({
         page: 1,
@@ -73,6 +88,7 @@ const UsersPage = () => {
         phone: filters.phone,
         name: filters.name,
         status: filters.status,
+        company_id: effectiveCompanyId,
       }),
   })
 
@@ -364,6 +380,14 @@ const UsersPage = () => {
           </Paragraph>
         </div>
         <Space>
+          {isSuperAdmin && (
+            <CompanySelector
+              value={selectedCompanyId}
+              onChange={setSelectedCompanyId}
+              allowClear
+              placeholder="选择公司（留空查看所有）"
+            />
+          )}
           <Button
             icon={<ReloadOutlined />}
             onClick={() => queryClient.invalidateQueries({ queryKey: ['users'] })}
@@ -402,6 +426,15 @@ const UsersPage = () => {
 
       <Card>
         <Space direction="vertical" size="large" style={{ width: '100%' }}>
+          {isSuperAdmin && !selectedCompanyId && (
+            <Alert
+              message="提示"
+              description="当前显示所有公司的用户。请选择公司以查看特定公司的用户。"
+              type="info"
+              showIcon
+              closable
+            />
+          )}
           <Form layout="inline" onFinish={handleSearch} onReset={handleReset}>
             <Form.Item name="name" label="姓名">
               <Input placeholder="请输入姓名" allowClear style={{ width: 200 }} />

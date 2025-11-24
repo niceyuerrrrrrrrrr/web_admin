@@ -27,6 +27,7 @@ export interface HRFormQuery {
   status?: HRFormStatus
   user_id?: number
   has_pdf?: boolean
+  company_id?: number
   page?: number
   page_size?: number
 }
@@ -39,6 +40,7 @@ export const fetchHRForms = (params: HRFormQuery) =>
         status: params.status,
         user_id: params.user_id,
         has_pdf: params.has_pdf,
+        company_id: params.company_id,
         page: params.page,
         page_size: params.page_size,
       },
