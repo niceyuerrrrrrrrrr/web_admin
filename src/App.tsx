@@ -81,13 +81,6 @@ const routeDefinitions = [
     element: <DashboardPage />,
   },
   {
-    key: 'statistics',
-    label: '数据统计',
-    path: '/statistics',
-    icon: <AreaChartOutlined />,
-    element: <StatisticsPage />,
-  },
-  {
     key: 'approvals',
     label: '审批管理',
     path: '/approvals',
@@ -347,6 +340,7 @@ function App() {
         {routeDefinitions.map((route) => (
           <Route key={route.key} path={route.path} element={route.element} />
         ))}
+        <Route path="/statistics" element={<StatisticsPage />} />
       </Route>
       <Route path="/login" element={<LoginPage />} />
       <Route path="*" element={<NotFoundPage />} />
