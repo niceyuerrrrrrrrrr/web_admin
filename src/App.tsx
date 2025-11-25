@@ -35,6 +35,7 @@ import {
   Space,
   theme,
 } from 'antd'
+import { useQuery } from '@tanstack/react-query'
 import {
   Navigate,
   Outlet,
@@ -76,6 +77,7 @@ import CompanySelector from './components/CompanySelector'
 import LoginPage from './pages/Login'
 import NotFoundPage from './pages/NotFound'
 import './App.css'
+import { fetchSystemConfig } from './api/services/systemConfig'
 
 const { Header, Sider, Content } = Layout
 const { Title, Text } = Typography
@@ -346,6 +348,14 @@ const AppLayout = () => {
     token: { colorBgContainer },
   } = theme.useToken()
 
+  const configQuery = useQuery({
+    queryKey: ['system-config-layout'],
+    queryFn: fetchSystemConfig,
+    staleTime: 5 * 60 * 1000,
+    retry: false,
+  })
+  const config = configQuery.data?.base
+
   const selectedKeys = useMemo(() => {
     const activeRoute = flattenRoutes(routeDefinitions).find((route: any) =>
       route.path && location.pathname.startsWith(route.path),
@@ -389,9 +399,23 @@ const AppLayout = () => {
         onCollapse={setCollapsed}
         width={224}
       >
-        <div className="logo-wrapper">
-          <span className="logo-mark">LOGI</span>
-          {!collapsed && <span className="logo-text">管理后台</span>}
+        <div className="logo-wrapper" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+          {config?.logo_url ? (
+            <img 
+              src={config.logo_url} 
+              alt="Logo" 
+              style={{ 
+                height: 32, 
+                width: 'auto', 
+                maxWidth: collapsed ? 32 : 120,
+                objectFit: 'contain' 
+              }} 
+            />
+          ) : (
+            <span className="logo-mark">LOGI</span>
+          )}
+          {!collapsed && !config?.logo_url && <span className="logo-text">{config?.system_name || '管理后台'}</span>}
+          {!collapsed && config?.logo_url && <span className="logo-text" style={{ fontSize: 16 }}>{config?.system_name}</span>}
         </div>
         <Menu
           theme="dark"
@@ -404,7 +428,7 @@ const AppLayout = () => {
       <Layout className="app-main-layout">
         <Header className="app-header" style={{ background: colorBgContainer }}>
           <Title level={4} className="app-title">
-            物流数字化运营中心
+            {config?.system_name || '物流数字化运营中心'}
           </Title>
           <Space size="middle" align="center">
             <GlobalCompanySelector />
