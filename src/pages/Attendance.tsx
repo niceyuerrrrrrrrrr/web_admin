@@ -60,6 +60,8 @@ import {
   type MakeupApplication,
 } from '../api/services/attendance'
 import { fetchUsers } from '../api/services/users'
+import useAuthStore from '../store/auth'
+import useCompanyStore from '../store/company'
 
 const { Title, Paragraph } = Typography
 const { RangePicker } = DatePicker
@@ -75,6 +77,11 @@ const getClockTypeColor = (type: string) => {
 const AttendancePage = () => {
   const queryClient = useQueryClient()
   const { message } = AntdApp.useApp()
+  const { user } = useAuthStore()
+  const { selectedCompanyId } = useCompanyStore()
+
+  const isSuperAdmin = user?.role === 'super_admin' || user?.positionType === '超级管理员'
+  const effectiveCompanyId = isSuperAdmin ? selectedCompanyId : undefined
 
   const [activeTab, setActiveTab] = useState('history')
   const [selectedUserId, setSelectedUserId] = useState<number | undefined>(undefined)
@@ -92,8 +99,8 @@ const AttendancePage = () => {
 
   // 获取用户列表
   const usersQuery = useQuery({
-    queryKey: ['users', 'list'],
-    queryFn: () => fetchUsers({ size: 1000 }),
+    queryKey: ['users', 'list', effectiveCompanyId],
+    queryFn: () => fetchUsers({ size: 1000, company_id: effectiveCompanyId }),
   })
 
   const users = usersQuery.data?.items || []
