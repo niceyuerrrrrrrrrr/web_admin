@@ -1,0 +1,14 @@
+{
+	"folders": [
+		{
+			"path": ".."
+		},
+		{
+			"path": "../../pythonProject"
+		},
+		{
+			"path": "../../../WeChatProjects/logistics"
+		}
+	],
+	"settings": {}
+}

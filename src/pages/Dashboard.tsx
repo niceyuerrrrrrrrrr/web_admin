@@ -10,13 +10,28 @@ import {
   Space,
   Spin,
   Statistic,
-  Table,
   Tag,
   Typography,
+  Progress,
+  List,
+  ConfigProvider,
+  theme,
+  Tabs,
+  Avatar,
+  Tooltip,
 } from 'antd'
-import type { ColumnsType } from 'antd/es/table'
-import { Column } from '@ant-design/charts'
-import { ReloadOutlined } from '@ant-design/icons'
+import { Area, Pie, Column, Bar, DualAxes } from '@ant-design/charts'
+import { 
+  ReloadOutlined, 
+  RiseOutlined, 
+  ArrowDownOutlined,
+  CarOutlined, 
+  UserOutlined, 
+  AccountBookOutlined,
+  ArrowRightOutlined,
+  ThunderboltFilled,
+  AuditOutlined
+} from '@ant-design/icons'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import dayjs from 'dayjs'
 import CompanySelector from '../components/CompanySelector'
@@ -25,67 +40,106 @@ import useCompanyStore from '../store/company'
 import { fetchCEOStatistics } from '../api/services/statistics'
 import { fetchManagerStats } from '../api/services/approval'
 
-const { Title, Paragraph, Text } = Typography
+const { Title, Text } = Typography
 
+// --- 类型定义 ---
 type ApprovalStatCard = {
   key: string
   typeName: string
   total: number
+  pending: number
+  processed: number
   status: { text: string; count: number }[]
 }
 
-const approvalSectionsOrder = [
-  'reimbursement',
-  'leave',
-  'report',
-  'material',
-  'purchase',
-] as const
-
-const timeRangeOptions = [
-  { label: '今日', value: 'today' },
-  { label: '本周', value: 'week' },
-  { label: '本月', value: 'month' },
-  { label: '本年', value: 'year' },
-]
-
+// --- 工具函数 ---
 const formatWeight = (value?: number | string | null) => {
-  if (value === null || value === undefined) {
-    return '0.00'
-  }
+  if (value === null || value === undefined) return '0.00'
   const num = Number(value)
-  if (Number.isNaN(num)) {
-    return '0.00'
-  }
-  return num.toFixed(2)
+  return Number.isNaN(num) ? '0.00' : num.toFixed(2)
 }
 
 const getDateRange = (timeRange: string) => {
   const now = dayjs()
   switch (timeRange) {
-    case 'today':
-      return {
-        beginDate: now.startOf('day').format('YYYY-MM-DD'),
-        endDate: now.endOf('day').format('YYYY-MM-DD'),
-      }
-    case 'week':
-      return {
-        beginDate: now.startOf('week').format('YYYY-MM-DD'),
-        endDate: now.endOf('week').format('YYYY-MM-DD'),
-      }
-    case 'year':
-      return {
-        beginDate: now.startOf('year').format('YYYY-MM-DD'),
-        endDate: now.endOf('year').format('YYYY-MM-DD'),
-      }
-    case 'month':
-    default:
-      return {
-        beginDate: now.startOf('month').format('YYYY-MM-DD'),
-        endDate: now.endOf('month').format('YYYY-MM-DD'),
-      }
+    case 'today': return { beginDate: now.startOf('day').format('YYYY-MM-DD'), endDate: now.endOf('day').format('YYYY-MM-DD') }
+    case 'week': return { beginDate: now.startOf('week').format('YYYY-MM-DD'), endDate: now.endOf('week').format('YYYY-MM-DD') }
+    case 'year': return { beginDate: now.startOf('year').format('YYYY-MM-DD'), endDate: now.endOf('year').format('YYYY-MM-DD') }
+    case 'month': default: return { beginDate: now.startOf('month').format('YYYY-MM-DD'), endDate: now.endOf('month').format('YYYY-MM-DD') }
   }
 }
+
+// --- 样式组件 ---
+const DashboardCard = ({ title, children, extra, style }: { title: string, children: React.ReactNode, extra?: React.ReactNode, style?: React.CSSProperties }) => (
+  <Card 
+    title={<span style={{ fontSize: 16, fontWeight: 600, color: '#00b96b', letterSpacing: 0.5 }}>{title}</span>} 
+    bordered={false}
+    extra={extra}
+    style={{ height: '100%', background: '#1f1f1f', borderRadius: 8, boxShadow: '0 4px 12px rgba(0,0,0,0.3)', ...style }}
+    headStyle={{ borderBottom: '1px solid #303030', minHeight: 48 }}
+    bodyStyle={{ padding: 20, height: 'calc(100% - 48px)', overflow: 'hidden', overflowY: 'auto' }}
+  >
+    {children}
+  </Card>
+)
+
+const KPICard = ({ title, value, suffix, icon, color, trend }: { title: string, value: string | number, suffix?: string, icon: React.ReactNode, color: string, trend?: number }) => (
+  <div style={{ 
+    background: `linear-gradient(135deg, ${color}15 0%, ${color}05 100%)`, 
+    padding: '24px', 
+    borderRadius: 12, 
+    border: `1px solid ${color}30`,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    height: 100,
+    position: 'relative',
+    overflow: 'hidden',
+    boxShadow: `0 4px 12px ${color}10`
+  }}>
+    <div style={{ zIndex: 1 }}>
+      <div style={{ color: 'rgba(255,255,255,0.65)', fontSize: 14, marginBottom: 8 }}>{title}</div>
+      <div style={{ fontSize: 32, fontWeight: 'bold', color: '#fff', lineHeight: 1, fontFamily: 'Helvetica Neue' }}>
+        {value} <span style={{ fontSize: 14, fontWeight: 'normal', color: 'rgba(255,255,255,0.45)', marginLeft: 4 }}>{suffix}</span>
+      </div>
+      {trend !== undefined && (
+        <div style={{ fontSize: 12, color: trend >= 0 ? '#ff4d4f' : '#52c41a', marginTop: 8, display: 'flex', alignItems: 'center' }}>
+          {trend >= 0 ? <RiseOutlined style={{ marginRight: 4 }}/> : <ArrowDownOutlined style={{ marginRight: 4 }}/>}
+          {Math.abs(trend)}% 环比
+        </div>
+      )}
+    </div>
+    <div style={{ 
+      width: 56, height: 56, borderRadius: '50%', 
+      background: `${color}20`, color: color,
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      fontSize: 28,
+      backdropFilter: 'blur(4px)'
+    }}>
+      {icon}
+    </div>
+    {/* 装饰背景 */}
+    <div style={{ position: 'absolute', right: -20, top: -20, width: 100, height: 100, background: `${color}10`, borderRadius: '50%', filter: 'blur(20px)' }} />
+  </div>
+)
+
+// 进度条排行榜项
+const RankItem = ({ rank, name, value, unit, max, color = '#1890ff' }: { rank: number, name: string, value: number, unit: string, max: number, color?: string }) => (
+  <div style={{ marginBottom: 16 }}>
+    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <div style={{ 
+          width: 20, height: 20, borderRadius: 4, 
+          background: rank <= 3 ? color : '#333', color: '#fff',
+          textAlign: 'center', lineHeight: '20px', fontSize: 12, fontWeight: 'bold'
+        }}>{rank}</div>
+        <Text style={{ color: 'rgba(255,255,255,0.9)', width: 140 }} ellipsis={{ tooltip: name }}>{name}</Text>
+      </div>
+      <Text style={{ color: color, fontWeight: 'bold' }}>{value} {unit}</Text>
+    </div>
+    <Progress percent={(value / max) * 100} showInfo={false} strokeColor={color} trailColor="#333" size="small" />
+  </div>
+)
 
 const DashboardPage = () => {
   const queryClient = useQueryClient()
@@ -93,740 +147,574 @@ const DashboardPage = () => {
   const { selectedCompanyId, setSelectedCompanyId } = useCompanyStore()
   const [timeRange, setTimeRange] = useState<string>('month')
 
-  const isSuperAdmin =
-    user?.role === 'super_admin' || user?.positionType === '超级管理员'
+  const isSuperAdmin = user?.role === 'super_admin' || user?.positionType === '超级管理员'
   const effectiveCompanyId = isSuperAdmin ? selectedCompanyId : undefined
   const shouldLoad = !isSuperAdmin || !!selectedCompanyId
-
-  const { beginDate, endDate } = useMemo(
-    () => getDateRange(timeRange),
-    [timeRange],
-  )
+  const { beginDate, endDate } = useMemo(() => getDateRange(timeRange), [timeRange])
 
   const ceoStatsQuery = useQuery({
     queryKey: ['data-screen-ceo', timeRange, effectiveCompanyId],
-    queryFn: () =>
-      fetchCEOStatistics({
-        timeRange,
-        companyId: effectiveCompanyId,
-      }),
+    queryFn: () => fetchCEOStatistics({ timeRange, companyId: effectiveCompanyId }),
     enabled: shouldLoad,
   })
 
   const approvalStatsQuery = useQuery({
     queryKey: ['data-screen-approvals', beginDate, endDate, effectiveCompanyId],
-    queryFn: () =>
-      fetchManagerStats({
-        beginDate,
-        endDate,
-        companyId: effectiveCompanyId,
-      }),
+    queryFn: () => fetchManagerStats({ beginDate, endDate, companyId: effectiveCompanyId }),
     enabled: shouldLoad,
   })
 
   const statsData = ceoStatsQuery.data
   const transportDetails = statsData?.transportDetails
+  const businessType = transportDetails?.businessType
 
-  const transportCards = useMemo(() => {
-    if (!statsData?.operation) return []
-    const operation = statsData.operation
-    return [
-      {
-        title: '运输订单',
-        value: operation.totalOrders ?? 0,
-        suffix: '单',
-      },
-      {
-        title: '运输重量',
-        value: operation.totalWeight ?? 0,
+  // --- 数据处理 ---
+  const kpis = useMemo(() => {
+    const op = statsData?.operation || {}
+    const personnel = statsData?.personnel || {}
+    const finance = statsData?.kpi || {}
+    
+    const baseKpis = [
+      { title: '运输订单总数', value: op.totalOrders || 0, suffix: '单', icon: <AccountBookOutlined />, color: '#1890ff', trend: finance.ordersTrend },
+      { title: '总运输重量', value: op.totalWeight ? Number(op.totalWeight).toFixed(1) : '0.0', suffix: '吨', icon: <RiseOutlined />, color: '#00b96b' },
+    ]
+
+    // 挂车模式特有指标：磅差
+    if (businessType === '挂车' && transportDetails?.trailer?.matched?.byCompanyPair) {
+      const matched = transportDetails.trailer.matched.byCompanyPair
+      const totalDiff = matched.reduce((sum: number, item: any) => sum + (item.totalDiff || 0), 0)
+      
+      baseKpis.push({
+        title: '累计磅差',
+        value: totalDiff > 0 ? `+${formatWeight(totalDiff)}` : formatWeight(totalDiff),
         suffix: '吨',
-        precision: 2,
-      },
-      {
-        title: '平均单次重量',
-        value: operation.avgWeightPerOrder ?? 0,
-        suffix: '吨/单',
-        precision: 2,
-      },
-      {
-        title: '故障事件',
-        value: operation.faultCount ?? 0,
-        suffix: '起',
-      },
-    ]
-  }, [statsData])
+        icon: <ThunderboltFilled />,
+        color: totalDiff < 0 ? '#ff4d4f' : '#52c41a', // 亏吨显示红色警告，盈吨显示绿色
+        trend: undefined
+      })
+    } else {
+      // 其他模式显示车辆使用率
+      baseKpis.push({ 
+        title: '车辆使用率', 
+        value: op.vehicleUtilization || 0, 
+        suffix: '%', 
+        icon: <CarOutlined />, 
+        color: '#722ed1',
+        trend: undefined
+      })
+    }
 
-  const chargingCards = useMemo(() => {
-    const breakdown = statsData?.business?.costBreakdown
-    if (!breakdown) return []
-    return [
-      {
-        title: '充电总费用',
-        value: breakdown.charging ?? 0,
-        suffix: '元',
-        precision: 2,
-      },
-      {
-        title: '报销费用',
-        value: breakdown.reimbursement ?? 0,
-        suffix: '元',
-        precision: 2,
-      },
-      {
-        title: '人工成本',
-        value: breakdown.salary ?? 0,
-        suffix: '元',
-        precision: 2,
-      },
-    ]
-  }, [statsData])
+    // 最后一个指标：司机出勤率
+    baseKpis.push({ title: '司机出勤率', value: personnel.attendanceRate || 0, suffix: '%', icon: <UserOutlined />, color: '#fa8c16', trend: undefined })
 
-  const chargingChartData = useMemo(() => {
-    const breakdown = statsData?.business?.costBreakdown
-    if (!breakdown) return []
-    return Object.entries(breakdown).map(([key, value]) => ({
-      type:
-        key === 'charging'
-          ? '充电'
-          : key === 'reimbursement'
-            ? '报销'
-            : key === 'salary'
-              ? '人工'
-              : key,
-      value: Number(value || 0),
-    }))
-  }, [statsData])
+    return baseKpis
+  }, [statsData, businessType, transportDetails])
 
   const approvalCards: ApprovalStatCard[] = useMemo(() => {
     const types = approvalStatsQuery.data?.types || []
-    const ordered = [...types].sort((a, b) => {
-      const indexA = approvalSectionsOrder.indexOf(a.key as any)
-      const indexB = approvalSectionsOrder.indexOf(b.key as any)
-      return (indexA === -1 ? 99 : indexA) - (indexB === -1 ? 99 : indexB)
-    })
-    return ordered.map((item) => ({
-      key: item.key,
-      typeName: item.type_name,
-      total: item.total,
-      status: item.status?.map((statusItem) => ({
-        text: statusItem.text,
-        count: statusItem.count,
-      })) || [],
-    }))
+    const order = ['reimbursement', 'leave', 'report', 'material', 'purchase']
+    
+    return [...types]
+      .sort((a, b) => order.indexOf(a.key) - order.indexOf(b.key))
+      .map((item) => {
+        // 解析状态，计算待办和已办
+        let pending = 0
+        let processed = 0
+        let approved = 0
+        let rejected = 0
+        
+        item.status?.forEach((s: any) => {
+          // 根据后端返回的状态文本或key判断
+          if (s.text === '待审批' || s.text === '待处理' || s.status === 'pending') {
+            pending += s.count
+          } else {
+            processed += s.count
+            if (s.text === '已通过' || s.text === '已完成' || s.status === 'approved') {
+              approved += s.count
+            } else if (s.text === '已拒绝' || s.text === '已驳回' || s.status === 'rejected') {
+              rejected += s.count
+            }
+          }
+        })
+
+        return {
+          key: item.key,
+          typeName: item.type_name,
+          total: item.total,
+          pending,
+          processed,
+          approved,
+          rejected,
+          status: item.status || [],
+        }
+      })
   }, [approvalStatsQuery.data])
 
-  const attendanceCards = useMemo(() => {
-    const personnel = statsData?.personnel
-    if (!personnel) return []
-    return [
-      {
-        title: '出勤率',
-        value: personnel.attendanceRate ?? 0,
-        suffix: '%',
-        precision: 1,
-      },
-      {
-        title: '迟到次数',
-        value: personnel.lateCount ?? 0,
-        suffix: '次',
-      },
-      {
-        title: '司机人数',
-        value: personnel.totalDrivers ?? 0,
-        suffix: '人',
-      },
-      {
-        title: '效率评分',
-        value: personnel.driverEfficiency ?? 0,
-        suffix: '%',
-        precision: 1,
-      },
-    ]
+  // 准备成本数据（过滤掉 0 值）
+  const costChartData = useMemo(() => {
+    const breakdown = statsData?.business?.costBreakdown || {}
+    return Object.entries(breakdown)
+      .map(([k, v]: any) => ({
+        type: k === 'salary' ? '人工' : k === 'charging' ? '电费' : '报销',
+        value: Number(v.amount || 0)
+      }))
+      .filter(item => item.value > 0)
   }, [statsData])
 
-  const vehicleCards = useMemo(() => {
-    const operation = statsData?.operation
-    if (!operation) return []
-    return [
-      {
-        title: '车辆总数',
-        value: operation.totalVehicles ?? 0,
-        suffix: '台',
-      },
-      {
-        title: '车辆使用率',
-        value: operation.vehicleUtilization ?? 0,
-        suffix: '%',
-        precision: 1,
-      },
-    ]
-  }, [statsData])
+  // --- 渲染辅助: 罐车视图 (图形化) ---
+  const renderTankerContent = () => {
+    const tanker = transportDetails?.tanker
+    if (!tanker) return <Empty description="暂无数据" image={Empty.PRESENTED_IMAGE_SIMPLE} />
 
-  const vehicleRanking =
-    (statsData?.details?.vehicleRanking as Record<string, any>[]) || []
-  const driverRanking =
-    (statsData?.details?.driverRanking as Record<string, any>[]) || []
+    const { loadingByCompany = [], loadingByMaterial = [], waterTickets = {} } = tanker
+    const waterTicketList = waterTickets.byCompany || []
 
-  const renderMetricCard = ({
-    title,
-    value,
-    suffix,
-    precision,
-  }: {
-    title: string
-    value: number
-    suffix?: string
-    precision?: number
-  }) => (
-    <Card>
-      <Statistic
-        title={title}
-        value={value}
-        precision={precision}
-        suffix={suffix}
-      />
-    </Card>
-  )
+    // 图表数据转换
+    const companyChartData = loadingByCompany.map((i: any) => ({ type: i.company, value: i.totalVolume })).sort((a:any,b:any) => b.value - a.value)
+    const materialChartData = loadingByMaterial.map((i: any) => ({ type: i.material, value: i.totalVolume })).sort((a:any,b:any) => b.value - a.value)
 
-  const renderApprovalCard = (card: ApprovalStatCard) => (
-    <Card key={card.key} title={card.typeName}>
-      <Statistic value={card.total} title="总申请数" />
-      <Space wrap style={{ marginTop: 12 }}>
-        {card.status.map((status) => (
-          <Tag key={status.text}>
-            {status.text}: {status.count}
-          </Tag>
-        ))}
-        {card.status.length === 0 && <Text type="secondary">暂无数据</Text>}
+    return (
+      <Row gutter={[24, 24]}>
+        <Col xs={24} lg={14}>
+          <DashboardCard title="各公司装料方量对比">
+            {companyChartData.length > 0 ? (
+              <Column 
+                data={companyChartData} 
+                xField="type" 
+                yField="value" 
+                color="#1890ff"
+                xAxis={{ label: { autoRotate: true, autoHide: false, style: { fill: '#fff' } } }}
+                yAxis={{ label: { style: { fill: '#fff' } } }}
+                label={{ position: 'top' }}
+                theme="dark"
+                height={240}
+                autoFit
+              />
+            ) : <Empty description="暂无数据" image={Empty.PRESENTED_IMAGE_SIMPLE} />}
+          </DashboardCard>
+        </Col>
+        <Col xs={24} lg={10}>
+          <DashboardCard title="装料材料占比">
+             {materialChartData.length > 0 ? (
+               <Pie 
+                data={materialChartData} 
+                angleField="value" 
+                colorField="type" 
+                radius={0.8} 
+                innerRadius={0.6}
+                label={{ 
+                  offset: 20,
+                  labelLine: {},
+                  content: ({ type, percent }: any) => `${type}\n${(percent * 100).toFixed(0)}%` 
+                }}
+                theme="dark"
+                legend={{ position: 'bottom' }}
+                color={['#00b96b', '#1890ff', '#fa8c16', '#722ed1', '#eb2f96']}
+                height={240}
+                autoFit
+               />
+             ) : <Empty description="暂无数据" image={Empty.PRESENTED_IMAGE_SIMPLE} />}
+          </DashboardCard>
+        </Col>
+        <Col span={24}>
+          <DashboardCard title={`水票统计 (总计: ${waterTickets.total || 0} 张)`}>
+             <Row gutter={48}>
+                {waterTicketList.length > 0 ? waterTicketList.map((item: any, idx: number) => (
+                  <Col xs={24} md={12} lg={8} key={idx}>
+                    <RankItem 
+                      rank={idx + 1} 
+                      name={item.company} 
+                      value={item.count} 
+                      unit="张" 
+                      max={Math.max(...waterTicketList.map((i:any)=>i.count))} 
+                      color="#00b96b"
+                    />
+                  </Col>
+                )) : <Empty description="暂无水票数据" image={Empty.PRESENTED_IMAGE_SIMPLE} />}
+             </Row>
+          </DashboardCard>
+        </Col>
+      </Row>
+    )
+  }
+
+  // --- 渲染辅助: 挂车视图 (图形化) ---
+  const renderTrailerContent = () => {
+    const trailer = transportDetails?.trailer
+    if (!trailer) return <Empty description="暂无数据" image={Empty.PRESENTED_IMAGE_SIMPLE} />
+    
+    const { loading = {}, unloading = {}, matched = {} } = trailer
+    const matchedPairs = matched.byCompanyPair || []
+    const matchedMaterials = matched.byMaterial || []
+    
+    // 准备材料分布数据
+    const loadingMaterials = (loading.byMaterial || []).map((i: any) => ({ type: i.material, value: i.totalWeight })).sort((a:any,b:any) => b.value - a.value)
+    const unloadingMaterials = (unloading.byMaterial || []).map((i: any) => ({ type: i.material, value: i.totalWeight })).sort((a:any,b:any) => b.value - a.value)
+
+    // 运输匹配 - 卡片化展示
+    const renderMatchedCards = () => (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+        {matchedPairs.length > 0 ? matchedPairs.map((pair: any, idx: number) => (
+           <div key={idx} style={{ background: '#262626', borderRadius: 8, padding: 16, borderLeft: `4px solid #1890ff` }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+                 <Space>
+                    <Tag color="blue">路线 {idx + 1}</Tag>
+                    <Text style={{ color: '#fff', fontSize: 15 }}>{pair.loadingCompany}</Text>
+                    <ArrowRightOutlined style={{ color: 'rgba(255,255,255,0.4)' }} />
+                    <Text style={{ color: '#fff', fontSize: 15 }}>{pair.unloadingCompany}</Text>
+                 </Space>
+                 <Statistic value={pair.transportCount} suffix="单" valueStyle={{ color: '#1890ff', fontSize: 18 }} />
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', background: '#141414', padding: '10px', borderRadius: 6 }}>
+                 <div>
+                   <div style={{ fontSize: 12, color: '#8c8c8c' }}>装料重</div>
+                   <div style={{ color: '#fff', fontWeight: 'bold' }}>{formatWeight(pair.totalLoadingWeight)} t</div>
+                 </div>
+                 <div>
+                   <div style={{ fontSize: 12, color: '#8c8c8c' }}>卸货重</div>
+                   <div style={{ color: '#fff', fontWeight: 'bold' }}>{formatWeight(pair.totalUnloadingWeight)} t</div>
+                 </div>
+                 <div>
+                   <div style={{ fontSize: 12, color: '#8c8c8c' }}>总磅差</div>
+                   <div style={{ color: pair.totalDiff < 0 ? '#ff4d4f' : '#52c41a', fontWeight: 'bold' }}>
+                     {pair.totalDiff > 0 ? '+' : ''}{formatWeight(pair.totalDiff)} t
+                   </div>
+                 </div>
+                 <div>
+                   <div style={{ fontSize: 12, color: '#8c8c8c' }}>平均磅差</div>
+                   <div style={{ color: pair.avgDiff < 0 ? '#ff4d4f' : '#52c41a', fontWeight: 'bold' }}>
+                     {pair.avgDiff > 0 ? '+' : ''}{formatWeight(pair.avgDiff)} t
+                   </div>
+                 </div>
+              </div>
+           </div>
+        )) : <Empty description="暂无匹配数据" image={Empty.PRESENTED_IMAGE_SIMPLE} />}
+      </div>
+    )
+
+    return (
+      <Space direction="vertical" size="large" style={{ width: '100%' }}>
+        <Tabs 
+          type="card" 
+          defaultActiveKey="matched" 
+          items={[
+            {
+              key: 'matched',
+              label: <span><ThunderboltFilled /> 核心匹配分析</span>,
+              children: (
+                 <Row gutter={[24, 24]}>
+                    <Col xs={24} lg={14}>
+                      <DashboardCard title="热门运输路线 (Top 5)">
+                         {renderMatchedCards()}
+                      </DashboardCard>
+                    </Col>
+                    <Col xs={24} lg={10}>
+                      <DashboardCard title="按材料匹配 (磅差分析)">
+                         {matchedMaterials.map((m: any, idx: number) => (
+                           <div key={idx} style={{ marginBottom: 20 }}>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
+                                <Text style={{ color: '#fff' }}>{m.material}</Text>
+                                <Text style={{ color: m.avgDiff < 0 ? '#ff4d4f' : '#52c41a' }}>平均磅差: {formatWeight(m.avgDiff)} t</Text>
+                              </div>
+                              <Tooltip title={`装: ${m.totalLoadingWeight}t / 卸: ${m.totalUnloadingWeight}t`}>
+                                <Progress 
+                                  percent={100} 
+                                  success={{ percent: (m.totalUnloadingWeight / Math.max(m.totalLoadingWeight, m.totalUnloadingWeight)) * 100, strokeColor: '#52c41a' }} 
+                                  strokeColor="#ff4d4f" // 实际上代表装料重（如果有亏吨，红条会露出来）
+                                  showInfo={false} 
+                                  size="small"
+                                  trailColor="#333"
+                                />
+                              </Tooltip>
+                           </div>
+                         ))}
+                         {matchedMaterials.length === 0 && <Empty description="暂无数据" image={Empty.PRESENTED_IMAGE_SIMPLE} />}
+                      </DashboardCard>
+                    </Col>
+                 </Row>
+              )
+            },
+            {
+              key: 'loading',
+              label: '装料分析',
+              children: (
+                <Row gutter={[24, 24]}>
+                  <Col xs={24} lg={14}>
+                    <DashboardCard title="装料公司排行 (Top 10)">
+                      {(loading.byCompany || []).slice(0, 10).map((item: any, idx: number) => (
+                        <RankItem 
+                          key={idx}
+                          rank={idx + 1} 
+                          name={item.company} 
+                          value={item.totalWeight} 
+                          unit="吨" 
+                          max={Math.max(...loading.byCompany.map((i:any)=>i.totalWeight))}
+                          color="#1890ff"
+                        />
+                      ))}
+                    </DashboardCard>
+                  </Col>
+                  <Col xs={24} lg={10}>
+                    <DashboardCard title="装料材料占比">
+                       {loadingMaterials.length > 0 ? (
+                         <Pie 
+                          data={loadingMaterials} 
+                          angleField="value" 
+                          colorField="type" 
+                          radius={0.8} 
+                          innerRadius={0.6}
+                          label={{ 
+                            offset: 20,
+                            labelLine: {},
+                            content: ({ type, percent }: any) => `${type}\n${(percent * 100).toFixed(0)}%` 
+                          }}
+                          theme="dark"
+                          legend={{ position: 'bottom' }}
+                          color={['#1890ff', '#00b96b', '#fa8c16', '#722ed1', '#eb2f96']}
+                          height={240}
+                          autoFit
+                         />
+                       ) : <Empty description="暂无数据" image={Empty.PRESENTED_IMAGE_SIMPLE} />}
+                    </DashboardCard>
+                  </Col>
+                </Row>
+              )
+            },
+            {
+              key: 'unloading',
+              label: '卸货分析',
+              children: (
+                <Row gutter={[24, 24]}>
+                  <Col xs={24} lg={14}>
+                    <DashboardCard title="卸货公司排行 (Top 10)">
+                      {(unloading.byCompany || []).slice(0, 10).map((item: any, idx: number) => (
+                        <RankItem 
+                          key={idx}
+                          rank={idx + 1} 
+                          name={item.company} 
+                          value={item.totalWeight} 
+                          unit="吨" 
+                          max={Math.max(...unloading.byCompany.map((i:any)=>i.totalWeight))}
+                          color="#722ed1"
+                        />
+                      ))}
+                    </DashboardCard>
+                  </Col>
+                  <Col xs={24} lg={10}>
+                    <DashboardCard title="卸货材料占比">
+                       {unloadingMaterials.length > 0 ? (
+                         <Pie 
+                          data={unloadingMaterials} 
+                          angleField="value" 
+                          colorField="type" 
+                          radius={0.8} 
+                          innerRadius={0.6}
+                          label={{ 
+                            offset: 20,
+                            labelLine: {},
+                            content: ({ type, percent }: any) => `${type}\n${(percent * 100).toFixed(0)}%` 
+                          }}
+                          theme="dark"
+                          legend={{ position: 'bottom' }}
+                          color={['#722ed1', '#fa8c16', '#00b96b', '#1890ff', '#eb2f96']}
+                          height={240}
+                          autoFit
+                         />
+                       ) : <Empty description="暂无数据" image={Empty.PRESENTED_IMAGE_SIMPLE} />}
+                    </DashboardCard>
+                  </Col>
+                </Row>
+              )
+            }
+          ]} 
+        />
       </Space>
-    </Card>
-  )
-
-  const renderTransportDetailContent = () => {
-    if (!transportDetails) {
-      return null
-    }
-
-    if (transportDetails.tanker) {
-      const tanker = transportDetails.tanker
-      const loadingByCompany =
-        (tanker.loadingByCompany as Record<string, any>[]) || []
-      const loadingByMaterial =
-        (tanker.loadingByMaterial as Record<string, any>[]) || []
-      const waterTickets = tanker.waterTickets || {}
-      const waterTicketCompanyList =
-        (waterTickets.byCompany as Record<string, any>[]) || []
-      return (
-        <Space direction="vertical" size="large" style={{ width: '100%', marginTop: 24 }}>
-          <div>
-            <Title level={5}>罐车 · 按装料公司统计</Title>
-            <Table
-              size="small"
-              rowKey={(row: Record<string, any>) =>
-                row.company || Math.random().toString(36)
-              }
-              dataSource={loadingByCompany}
-              pagination={false}
-              locale={{ emptyText: '暂无装料公司数据' }}
-              columns={[
-                { title: '装料公司', dataIndex: 'company' },
-                { title: '运输单数量', dataIndex: 'orderCount', width: 140 },
-                {
-                  title: '运输总方量(吨)',
-                  dataIndex: 'totalVolume',
-                  render: (value) => formatWeight(value),
-                },
-                {
-                  title: '平均重量(吨)',
-                  dataIndex: 'avgWeight',
-                  render: (value) => formatWeight(value),
-                },
-              ]}
-            />
-          </div>
-          <div>
-            <Title level={5}>罐车 · 按材料统计</Title>
-            <Table
-              size="small"
-              rowKey={(row: Record<string, any>) =>
-                row.material || Math.random().toString(36)
-              }
-              dataSource={loadingByMaterial}
-              pagination={false}
-              locale={{ emptyText: '暂无材料数据' }}
-              columns={[
-                { title: '材料', dataIndex: 'material' },
-                { title: '运输单数量', dataIndex: 'orderCount', width: 140 },
-                {
-                  title: '运输总方量(吨)',
-                  dataIndex: 'totalVolume',
-                  render: (value) => formatWeight(value),
-                },
-                {
-                  title: '平均重量(吨)',
-                  dataIndex: 'avgWeight',
-                  render: (value) => formatWeight(value),
-                },
-              ]}
-            />
-          </div>
-          <div>
-            <Title level={5}>水票统计</Title>
-            <Row gutter={16} style={{ marginBottom: 12 }}>
-              <Col xs={24} sm={12} md={6}>
-                <Card>
-                  <Statistic
-                    title="水票总数量"
-                    value={waterTickets?.total || 0}
-                    suffix="张"
-                  />
-                </Card>
-              </Col>
-            </Row>
-            <Table
-              size="small"
-              rowKey={(row: Record<string, any>) =>
-                row.company || Math.random().toString(36)
-              }
-              dataSource={waterTicketCompanyList}
-              pagination={false}
-              locale={{ emptyText: '暂无水票数据' }}
-              columns={[
-                { title: '装料公司', dataIndex: 'company' },
-                { title: '水票数量', dataIndex: 'count' },
-              ]}
-            />
-          </div>
-        </Space>
-      )
-    }
-
-    if (transportDetails.trailer) {
-      const trailer = transportDetails.trailer
-      const loadingByCompany =
-        (trailer.loading?.byCompany as Record<string, any>[]) || []
-      const loadingByMaterial =
-        (trailer.loading?.byMaterial as Record<string, any>[]) || []
-      const unloadingByCompany =
-        (trailer.unloading?.byCompany as Record<string, any>[]) || []
-      const unloadingByMaterial =
-        (trailer.unloading?.byMaterial as Record<string, any>[]) || []
-      const matchedByCompany =
-        (trailer.matched?.byCompanyPair as Record<string, any>[]) || []
-      const matchedByMaterial =
-        (trailer.matched?.byMaterial as Record<string, any>[]) || []
-      return (
-        <Space direction="vertical" size="large" style={{ width: '100%', marginTop: 24 }}>
-          <div>
-            <Title level={5}>挂车 · 装料统计（按公司）</Title>
-            <Table
-              size="small"
-              rowKey={(row: Record<string, any>) =>
-                row.company || Math.random().toString(36)
-              }
-              dataSource={loadingByCompany}
-              pagination={false}
-              locale={{ emptyText: '暂无装料公司数据' }}
-              columns={[
-                { title: '装料公司', dataIndex: 'company' },
-                { title: '单据数量', dataIndex: 'orderCount', width: 120 },
-                {
-                  title: '总重量(吨)',
-                  dataIndex: 'totalWeight',
-                  render: (value) => formatWeight(value),
-                },
-                {
-                  title: '平均重量(吨)',
-                  dataIndex: 'avgWeight',
-                  render: (value) => formatWeight(value),
-                },
-              ]}
-            />
-          </div>
-          <div>
-            <Title level={5}>挂车 · 装料统计（按材料）</Title>
-            <Table
-              size="small"
-              rowKey={(row: Record<string, any>) =>
-                row.material || Math.random().toString(36)
-              }
-              dataSource={loadingByMaterial}
-              pagination={false}
-              locale={{ emptyText: '暂无装料材料数据' }}
-              columns={[
-                { title: '材料', dataIndex: 'material' },
-                { title: '单据数量', dataIndex: 'orderCount', width: 120 },
-                {
-                  title: '总重量(吨)',
-                  dataIndex: 'totalWeight',
-                  render: (value) => formatWeight(value),
-                },
-                {
-                  title: '平均重量(吨)',
-                  dataIndex: 'avgWeight',
-                  render: (value) => formatWeight(value),
-                },
-              ]}
-            />
-          </div>
-          <div>
-            <Title level={5}>挂车 · 卸货统计（按公司）</Title>
-            <Table
-              size="small"
-              rowKey={(row: Record<string, any>) =>
-                row.company || Math.random().toString(36)
-              }
-              dataSource={unloadingByCompany}
-              pagination={false}
-              locale={{ emptyText: '暂无卸货公司数据' }}
-              columns={[
-                { title: '卸货公司', dataIndex: 'company' },
-                { title: '单据数量', dataIndex: 'orderCount', width: 120 },
-                {
-                  title: '总重量(吨)',
-                  dataIndex: 'totalWeight',
-                  render: (value) => formatWeight(value),
-                },
-                {
-                  title: '平均重量(吨)',
-                  dataIndex: 'avgWeight',
-                  render: (value) => formatWeight(value),
-                },
-              ]}
-            />
-          </div>
-          <div>
-            <Title level={5}>挂车 · 卸货统计（按材料）</Title>
-            <Table
-              size="small"
-              rowKey={(row: Record<string, any>) =>
-                row.material || Math.random().toString(36)
-              }
-              dataSource={unloadingByMaterial}
-              pagination={false}
-              locale={{ emptyText: '暂无卸货材料数据' }}
-              columns={[
-                { title: '材料', dataIndex: 'material' },
-                { title: '单据数量', dataIndex: 'orderCount', width: 120 },
-                {
-                  title: '总重量(吨)',
-                  dataIndex: 'totalWeight',
-                  render: (value) => formatWeight(value),
-                },
-                {
-                  title: '平均重量(吨)',
-                  dataIndex: 'avgWeight',
-                  render: (value) => formatWeight(value),
-                },
-              ]}
-            />
-          </div>
-          <div>
-            <Title level={5}>挂车 · 装卸匹配（按公司）</Title>
-            <Table
-              size="small"
-              rowKey={(row: Record<string, any>) =>
-                `${row.loadingCompany}-${row.unloadingCompany}-${row.transportCount}`
-              }
-              dataSource={matchedByCompany}
-              pagination={false}
-              locale={{ emptyText: '暂无匹配运输数据' }}
-              columns={[
-                { title: '装料公司', dataIndex: 'loadingCompany' },
-                { title: '卸货公司', dataIndex: 'unloadingCompany' },
-                { title: '运输单数', dataIndex: 'transportCount', width: 120 },
-                {
-                  title: '总装料重量(吨)',
-                  dataIndex: 'totalLoadingWeight',
-                  render: (value) => formatWeight(value),
-                },
-                {
-                  title: '总卸货重量(吨)',
-                  dataIndex: 'totalUnloadingWeight',
-                  render: (value) => formatWeight(value),
-                },
-                {
-                  title: '总磅差(吨)',
-                  dataIndex: 'totalDiff',
-                  render: (value) => formatWeight(value),
-                },
-                {
-                  title: '平均磅差(吨)',
-                  dataIndex: 'avgDiff',
-                  render: (value) => formatWeight(value),
-                },
-              ]}
-            />
-          </div>
-          <div>
-            <Title level={5}>挂车 · 装卸匹配（按材料）</Title>
-            <Table
-              size="small"
-              rowKey={(row: Record<string, any>) =>
-                row.material || Math.random().toString(36)
-              }
-              dataSource={matchedByMaterial}
-              pagination={false}
-              locale={{ emptyText: '暂无材料匹配数据' }}
-              columns={[
-                { title: '材料', dataIndex: 'material' },
-                { title: '运输单数', dataIndex: 'transportCount', width: 120 },
-                {
-                  title: '总装料重量(吨)',
-                  dataIndex: 'totalLoadingWeight',
-                  render: (value) => formatWeight(value),
-                },
-                {
-                  title: '总卸货重量(吨)',
-                  dataIndex: 'totalUnloadingWeight',
-                  render: (value) => formatWeight(value),
-                },
-                {
-                  title: '总磅差(吨)',
-                  dataIndex: 'totalDiff',
-                  render: (value) => formatWeight(value),
-                },
-                {
-                  title: '平均磅差(吨)',
-                  dataIndex: 'avgDiff',
-                  render: (value) => formatWeight(value),
-                },
-              ]}
-            />
-          </div>
-        </Space>
-      )
-    }
-
-    return null
+    )
   }
 
   return (
-    <Space direction="vertical" size="large" style={{ width: '100%' }}>
-      <Space
-        direction="vertical"
-        size="small"
-        style={{ width: '100%' }}
-      >
-        <FlexWrap>
+    <ConfigProvider
+      theme={{
+        algorithm: theme.darkAlgorithm,
+        token: {
+          colorPrimary: '#00b96b',
+          colorBgContainer: '#1f1f1f',
+          colorBgLayout: '#000000',
+        },
+      }}
+    >
+      <div style={{ padding: 24, minHeight: '100vh', background: '#000', margin: -24 }}>
+        {/* Header */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
           <div>
-            <Title level={3} style={{ marginBottom: 4 }}>
-              数据统计大屏
+            <Title level={2} style={{ color: '#fff', margin: 0, letterSpacing: 1, display: 'flex', alignItems: 'center', gap: 12 }}>
+              <span style={{ color: '#00b96b' }}>LOGI</span> 运营指挥中心
+              {businessType && <Tag color="blue" style={{ fontSize: 14, padding: '4px 10px' }}>{businessType}模式</Tag>}
             </Title>
-            <Paragraph type="secondary" style={{ margin: 0 }}>
-              覆盖运输、充电、审批、考勤、车辆、人员的综合运营数据。
-            </Paragraph>
+            <Text style={{ color: 'rgba(255,255,255,0.45)' }}>{dayjs().format('YYYY年MM月DD日 dddd')} | 实时监控物流运输、成本与人员效率</Text>
           </div>
           <Space>
             <Select
-              style={{ width: 140 }}
               value={timeRange}
-              options={timeRangeOptions}
               onChange={setTimeRange}
+              options={[
+                { label: '今日', value: 'today' },
+                { label: '本周', value: 'week' },
+                { label: '本月', value: 'month' },
+                { label: '本年', value: 'year' },
+              ]}
+              style={{ width: 120 }}
+              bordered={false}
+              className="glass-select"
+              dropdownStyle={{ background: '#1f1f1f' }}
             />
-            <Button
-              icon={<ReloadOutlined />}
+            <Button 
+              type="primary" 
+              icon={<ReloadOutlined />} 
               onClick={() => {
                 queryClient.invalidateQueries({ queryKey: ['data-screen-ceo'] })
-                queryClient.invalidateQueries({
-                  queryKey: ['data-screen-approvals'],
-                })
+                queryClient.invalidateQueries({ queryKey: ['data-screen-approvals'] })
               }}
+              ghost
             >
               刷新
             </Button>
             {isSuperAdmin && (
-              <CompanySelector
-                value={selectedCompanyId}
-                onChange={setSelectedCompanyId}
-                allowClear={false}
-                placeholder="请选择公司"
-              />
+              <CompanySelector value={selectedCompanyId} onChange={setSelectedCompanyId} />
             )}
           </Space>
-        </FlexWrap>
-        {isSuperAdmin && !selectedCompanyId && (
-          <Alert
-            showIcon
-            type="info"
-            message="请选择公司以查看对应的数据。"
-          />
-        )}
-      </Space>
+        </div>
 
-      {ceoStatsQuery.error && (
-        <Alert
-          showIcon
-          type="error"
-          message={(ceoStatsQuery.error as Error).message || '统计数据加载失败'}
-        />
-      )}
-
-      <Spin spinning={ceoStatsQuery.isLoading && shouldLoad}>
-        {/* 1. 运输数据 */}
-        <SectionCard title="运输数据">
-          <Row gutter={[16, 16]}>
-            {transportCards.map((card) => (
-              <Col xs={24} sm={12} md={6} key={card.title}>
-                {renderMetricCard(card)}
-              </Col>
-            ))}
-            {transportCards.length === 0 && (
-              <Col span={24}>
-                <Empty description="暂无运输数据" />
-              </Col>
-            )}
-          </Row>
-          {renderTransportDetailContent()}
-        </SectionCard>
-
-        {/* 2. 充电数据 */}
-        <SectionCard title="充电与成本数据">
-          <Row gutter={[16, 16]}>
-            {chargingCards.map((card) => (
-              <Col xs={24} sm={12} md={8} key={card.title}>
-                {renderMetricCard(card)}
+        <Spin spinning={ceoStatsQuery.isLoading && shouldLoad}>
+          {/* 1. 核心 KPI */}
+          <Row gutter={[24, 24]} style={{ marginBottom: 24 }}>
+            {kpis.map((kpi, idx) => (
+              <Col xs={24} sm={12} md={6} key={idx}>
+                <KPICard {...kpi} />
               </Col>
             ))}
           </Row>
-          <div style={{ height: 320, marginTop: 16 }}>
-            {chargingChartData.length > 0 ? (
-              <Column
-                data={chargingChartData}
-                xField="type"
-                yField="value"
-                columnWidthRatio={0.5}
-                color="#1890ff"
-                label={{ position: 'top' }}
-              />
-            ) : (
-              <Empty description="暂无成本数据" />
-            )}
-          </div>
-        </SectionCard>
 
-        {/* 3. 审批数据 */}
-        <SectionCard title="审批数据">
-          {approvalStatsQuery.error && (
-            <Alert
-              showIcon
-              type="error"
-              message={
-                (approvalStatsQuery.error as Error).message ||
-                '审批统计加载失败'
-              }
-            />
-          )}
-          <Row gutter={[16, 16]}>
-            {approvalCards.length > 0 ? (
-              approvalCards.map((card) => (
-                <Col xs={24} sm={12} md={8} key={card.key}>
-                  {renderApprovalCard(card)}
-                </Col>
-              ))
-            ) : (
-              <Col span={24}>
-                <Empty description="暂无审批统计" />
-              </Col>
-            )}
-          </Row>
-        </SectionCard>
-
-        {/* 4. 考勤数据 */}
-        <SectionCard title="考勤数据">
-          <Row gutter={[16, 16]}>
-            {attendanceCards.map((card) => (
-              <Col xs={24} sm={12} md={6} key={card.title}>
-                {renderMetricCard(card)}
-              </Col>
-            ))}
-            {attendanceCards.length === 0 && (
-              <Col span={24}>
-                <Empty description="暂无考勤数据" />
-              </Col>
-            )}
-          </Row>
-        </SectionCard>
-
-        {/* 5. 车辆数据 */}
-        <SectionCard title="车辆数据">
-          <Row gutter={[16, 16]} style={{ marginBottom: 16 }}>
-            {vehicleCards.map((card) => (
-              <Col xs={24} sm={12} md={6} key={card.title}>
-                {renderMetricCard(card)}
-              </Col>
-            ))}
-          </Row>
-          <Table
-            size="small"
-            rowKey={(record) =>
-              record.vehicle_no || record.name || record.rank
+          {/* 2. 核心运输数据 (业务视图) */}
+          <div style={{ marginBottom: 24 }}>
+            {businessType === '罐车' ? renderTankerContent() : 
+             businessType === '挂车' ? renderTrailerContent() : 
+             <div style={{ padding: 40, textAlign: 'center', background: '#1f1f1f', borderRadius: 8 }}>
+               <Empty description={<span style={{ color: '#fff' }}>请选择公司或该类公司无业务类型定义</span>} />
+             </div>
             }
-            dataSource={vehicleRanking}
-            pagination={false}
-            locale={{ emptyText: '暂无车辆排行数据' }}
-            columns={[
-              { title: '车辆', dataIndex: 'vehicle_no', width: 120 },
-              { title: '出勤次数', dataIndex: 'orders', width: 100 },
-              {
-                title: '运输重量(吨)',
-                dataIndex: 'weight',
-                render: (value: number) => (value || 0).toFixed(1),
-              },
-            ]}
-          />
-        </SectionCard>
+          </div>
 
-        {/* 6. 人员数据 */}
-        <SectionCard title="人员数据">
-          <Table
-            size="small"
-            rowKey={(record) => record.name || record.rank}
-            dataSource={driverRanking}
-            pagination={false}
-            locale={{ emptyText: '暂无司机排行数据' }}
-            columns={[
-              { title: '排名', dataIndex: 'rank', width: 80 },
-              { title: '司机', dataIndex: 'name' },
-              { title: '运单数', dataIndex: 'orders', width: 120 },
-              {
-                title: '运输重量(吨)',
-                dataIndex: 'weight',
-                width: 140,
-                render: (value: number) => (value || 0).toFixed(1),
-              },
-            ]}
-          />
-        </SectionCard>
-      </Spin>
-    </Space>
+          {/* 3. 辅助模块 */}
+          <Row gutter={[24, 24]}>
+            {/* 充电数据 */}
+            <Col xs={24} md={8}>
+              <DashboardCard title="充电成本分析">
+                 <div style={{ height: 220, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                    <Row gutter={[16, 24]}>
+                      <Col span={12}>
+                         <Statistic 
+                           title={<span style={{ color: 'rgba(255,255,255,0.45)' }}>总充电量</span>}
+                           value={statsData?.business?.chargingStats?.totalVolume || 0}
+                           precision={2}
+                           suffix={<span style={{ fontSize: 14 }}>kWh</span>}
+                           valueStyle={{ color: '#1890ff', fontSize: 20, fontWeight: 'bold' }}
+                         />
+                      </Col>
+                      <Col span={12}>
+                         <Statistic 
+                           title={<span style={{ color: 'rgba(255,255,255,0.45)' }}>总金额</span>}
+                           value={statsData?.business?.chargingStats?.totalAmount || 0}
+                           precision={2}
+                           suffix={<span style={{ fontSize: 14 }}>元</span>}
+                           valueStyle={{ color: '#1890ff', fontSize: 20, fontWeight: 'bold' }}
+                         />
+                      </Col>
+                      <Col span={12}>
+                         <Statistic 
+                           title={<span style={{ color: 'rgba(255,255,255,0.45)' }}>平均单次</span>}
+                           value={statsData?.business?.chargingStats?.avgAmount || 0}
+                           precision={2}
+                           suffix={<span style={{ fontSize: 12 }}>元</span>}
+                           valueStyle={{ color: '#fff', fontSize: 18 }}
+                         />
+                      </Col>
+                      <Col span={12}>
+                         <Statistic 
+                           title={<span style={{ color: 'rgba(255,255,255,0.45)' }}>平均单价</span>}
+                           value={statsData?.business?.chargingStats?.avgPrice || 0}
+                           precision={2}
+                           suffix={<span style={{ fontSize: 12 }}>元/度</span>}
+                           valueStyle={{ color: '#fff', fontSize: 18 }}
+                         />
+                      </Col>
+                      <Col span={12}>
+                         <Statistic 
+                           title={<span style={{ color: 'rgba(255,255,255,0.45)' }}>最高单价</span>}
+                           value={statsData?.business?.chargingStats?.maxPrice || 0}
+                           precision={2}
+                           suffix={<span style={{ fontSize: 12 }}>元/度</span>}
+                           valueStyle={{ color: '#ff4d4f', fontSize: 16 }}
+                         />
+                      </Col>
+                      <Col span={12}>
+                         <Statistic 
+                           title={<span style={{ color: 'rgba(255,255,255,0.45)' }}>最低单价</span>}
+                           value={statsData?.business?.chargingStats?.minPrice || 0}
+                           precision={2}
+                           suffix={<span style={{ fontSize: 12 }}>元/度</span>}
+                           valueStyle={{ color: '#52c41a', fontSize: 16 }}
+                         />
+                      </Col>
+                    </Row>
+                 </div>
+              </DashboardCard>
+            </Col>
+
+            {/* 审批数据 */}
+            <Col xs={24} md={8}>
+              <DashboardCard title="待办审批">
+                 <div style={{ height: 220, overflowY: 'auto' }}>
+                   {approvalCards.map((item) => (
+                     <div key={item.key} style={{ marginBottom: 12, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px', background: '#262626', borderRadius: 6 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                          <Avatar style={{ backgroundColor: '#1890ff' }} icon={<AuditOutlined />} size="small" />
+                          <Text style={{ color: '#fff' }}>{item.typeName}</Text>
+                        </div>
+                        <div style={{ textAlign: 'right' }}>
+                           <div style={{ fontSize: 18, fontWeight: 'bold', color: '#fff' }}>{item.pending}</div>
+                           <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.45)' }}>待处理</div>
+                        </div>
+                     </div>
+                   ))}
+                 </div>
+              </DashboardCard>
+            </Col>
+
+             {/* 资源概览 */}
+             <Col xs={24} md={8}>
+              <DashboardCard title="资源状态">
+                 <Row gutter={[12, 24]} style={{ marginTop: 12 }}>
+                   <Col span={12}>
+                     <Statistic title="车辆总数" value={statsData?.operation?.totalVehicles || 0} valueStyle={{ color: '#fff' }} suffix="台" />
+                   </Col>
+                   <Col span={12}>
+                     <Statistic title="故障待处理" value={statsData?.operation?.faultCount || 0} valueStyle={{ color: '#ff4d4f' }} suffix="起" />
+                   </Col>
+                   <Col span={12}>
+                     <Statistic title="在岗司机" value={statsData?.personnel?.totalDrivers || 0} valueStyle={{ color: '#fff' }} suffix="人" />
+                   </Col>
+                   <Col span={12}>
+                     <Statistic title="今日迟到" value={statsData?.personnel?.todayLateCount || 0} valueStyle={{ color: '#fa8c16' }} suffix="人" />
+                   </Col>
+                 </Row>
+              </DashboardCard>
+            </Col>
+          </Row>
+        </Spin>
+      </div>
+    </ConfigProvider>
   )
 }
-
-const SectionCard = ({
-  title,
-  children,
-}: {
-  title: string
-  children: React.ReactNode
-}) => (
-  <Card title={title} bordered={false}>
-    {children}
-  </Card>
-)
-
-const FlexWrap = ({ children }: { children: React.ReactNode }) => (
-  <div
-    style={{
-      display: 'flex',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-      flexWrap: 'wrap',
-      gap: 16,
-    }}
-  >
-    {children}
-  </div>
-)
 
 export default DashboardPage
