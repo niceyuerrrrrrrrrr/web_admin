@@ -58,6 +58,7 @@ import CompaniesPage from './pages/Companies'
 import HRPage from './pages/HR'
 import LeavePage from './pages/Leave'
 import ReportsPage from './pages/Reports'
+import PurchasesPage from './pages/Purchases'
 import NoticesPage from './pages/Notices'
 import DocumentsPage from './pages/Documents'
 import SettingsPage from './pages/Settings'
@@ -98,6 +99,36 @@ const routeDefinitions = [
         path: '/approval-workflows',
         element: <ApprovalWorkflowsPage />,
       },
+      {
+        key: 'reimbursements',
+        label: '报销管理',
+        path: '/reimbursements',
+        element: <ReimbursementsPage />,
+      },
+      {
+        key: 'purchases',
+        label: '采购管理',
+        path: '/purchases',
+        element: <PurchasesPage />,
+      },
+      {
+        key: 'leave',
+        label: '请假管理',
+        path: '/leave',
+        element: <LeavePage />,
+      },
+      {
+        key: 'material-requests',
+        label: '物品领用',
+        path: '/material-requests',
+        element: <MaterialRequestsPage />,
+      },
+      {
+        key: 'reports',
+        label: '故障上报',
+        path: '/reports',
+        element: <ReportsPage />,
+      },
     ]
   },
   {
@@ -120,13 +151,6 @@ const routeDefinitions = [
     ],
   },
   {
-    key: 'reimbursements',
-    label: '报销管理',
-    path: '/reimbursements',
-    icon: <DollarOutlined />,
-    element: <ReimbursementsPage />,
-  },
-  {
     key: 'charging',
     label: '充电管理',
     path: '/charging',
@@ -141,13 +165,6 @@ const routeDefinitions = [
     element: <InventoryPage />,
   },
   {
-    key: 'material-requests',
-    label: '物品领用',
-    path: '/material-requests',
-    icon: <AppstoreOutlined />,
-    element: <MaterialRequestsPage />,
-  },
-  {
     key: 'material-pricing',
     label: '材料定价',
     path: '/material-pricing',
@@ -160,20 +177,6 @@ const routeDefinitions = [
     path: '/attendance',
     icon: <ClockCircleOutlined />,
     element: <AttendancePage />,
-  },
-  {
-    key: 'leave',
-    label: '请假管理',
-    path: '/leave',
-    icon: <ScheduleOutlined />,
-    element: <LeavePage />,
-  },
-  {
-    key: 'reports',
-    label: '故障上报',
-    path: '/reports',
-    icon: <BugOutlined />,
-    element: <ReportsPage />,
   },
   {
     key: 'notices',

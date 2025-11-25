@@ -4,7 +4,6 @@ import {
   App as AntdApp,
   Button,
   Card,
-  Col,
   DatePicker,
   Descriptions,
   Divider,
@@ -15,13 +14,10 @@ import {
   Input,
   InputNumber,
   Modal,
-  Row,
   Select,
   Space,
-  Statistic,
   Table,
   Tag,
-  Tabs,
   Timeline,
   Typography,
 } from 'antd'
@@ -30,29 +26,26 @@ import {
   CheckCircleOutlined,
   CloseCircleOutlined,
   CommentOutlined,
-  DollarOutlined,
   FileSearchOutlined,
   PlusOutlined,
   ReloadOutlined,
 } from '@ant-design/icons'
-import { Line, Pie } from '@ant-design/charts'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import dayjs from 'dayjs'
 import {
-  REIMBURSEMENT_STATUS_OPTIONS,
+  PURCHASE_STATUS_OPTIONS,
   addComment,
-  approveReimbursement,
-  createReimbursement,
+  approvePurchase,
+  createPurchase,
   fetchApprovalFlow,
   fetchApprovalHistory,
   fetchComments,
-  fetchReimbursementDetail,
-  fetchReimbursementStats,
-  fetchReimbursements,
-  submitReimbursement,
-} from '../api/services/reimbursements'
+  fetchPurchaseDetail,
+  fetchPurchases,
+  submitPurchase,
+} from '../api/services/purchases'
 import { fetchUsers } from '../api/services/users'
-import type { ReimbursementRecord, ReimbursementStats } from '../api/types'
+import type { PurchaseRecord } from '../api/types'
 import useAuthStore from '../store/auth'
 import useCompanyStore from '../store/company'
 
@@ -60,15 +53,15 @@ const { Title, Paragraph, Text } = Typography
 const { RangePicker } = DatePicker
 
 const categoryOptions = [
-  '交通',
-  '餐饮',
-  '住宿',
-  '办公',
-  '采购',
+  '办公用品',
+  '设备采购',
+  '原材料',
+  '车辆配件',
+  '维修服务',
   '其他',
 ].map((item) => ({ label: item, value: item }))
 
-const ReimbursementsPage = () => {
+const PurchasesPage = () => {
   const queryClient = useQueryClient()
   const { message } = AntdApp.useApp()
   const { user } = useAuthStore()
@@ -82,12 +75,11 @@ const ReimbursementsPage = () => {
     status?: string
     keyword?: string
     applicantId?: number
-    category?: string
     dateRange?: [dayjs.Dayjs, dayjs.Dayjs]
   }>({
     dateRange: [dayjs().subtract(29, 'day'), dayjs()],
   })
-  const [selectedRecord, setSelectedRecord] = useState<ReimbursementRecord | null>(null)
+  const [selectedRecord, setSelectedRecord] = useState<PurchaseRecord | null>(null)
   const [detailDrawerOpen, setDetailDrawerOpen] = useState(false)
   const [createModalOpen, setCreateModalOpen] = useState(false)
   const [actionModal, setActionModal] = useState<{ type: 'approve' | 'reject' | null }>({ type: null })
@@ -106,9 +98,9 @@ const ReimbursementsPage = () => {
   }, [createModalOpen, createForm, user])
 
   const listQuery = useQuery({
-    queryKey: ['reimbursements', filters, effectiveCompanyId],
+    queryKey: ['purchases', filters, effectiveCompanyId],
     queryFn: () =>
-      fetchReimbursements({
+      fetchPurchases({
         status: filters.status,
         keyword: filters.keyword,
         userId: filters.applicantId,
@@ -119,54 +111,42 @@ const ReimbursementsPage = () => {
     enabled: !isSuperAdmin || !!effectiveCompanyId,
   })
 
-  const statsQuery = useQuery({
-    queryKey: ['reimbursements', 'stats', filters, effectiveCompanyId],
-    queryFn: () =>
-      fetchReimbursementStats({
-        beginDate: filters.dateRange ? filters.dateRange[0]?.format('YYYY-MM-DD') : undefined,
-        endDate: filters.dateRange ? filters.dateRange[1]?.format('YYYY-MM-DD') : undefined,
-        userId: filters.applicantId,
-        companyId: effectiveCompanyId,
-      }),
-  })
-
   const usersQuery = useQuery({
-    queryKey: ['users', 'for-reimbursements'],
+    queryKey: ['users', 'for-purchases'],
     queryFn: () => fetchUsers({ size: 200 }),
   })
 
   const detailQuery = useQuery({
-    queryKey: ['reimbursements', 'detail', selectedRecord?.id],
-    queryFn: () => fetchReimbursementDetail(selectedRecord!.id),
+    queryKey: ['purchases', 'detail', selectedRecord?.id],
+    queryFn: () => fetchPurchaseDetail(selectedRecord!.id),
     enabled: !!selectedRecord && detailDrawerOpen,
   })
 
   const approvalFlowQuery = useQuery({
-    queryKey: ['reimbursements', 'approval-flow', selectedRecord?.id],
+    queryKey: ['purchases', 'approval-flow', selectedRecord?.id],
     queryFn: () => fetchApprovalFlow(selectedRecord!.id),
     enabled: !!selectedRecord && detailDrawerOpen,
   })
 
   const approvalHistoryQuery = useQuery({
-    queryKey: ['reimbursements', 'history', selectedRecord?.id],
+    queryKey: ['purchases', 'history', selectedRecord?.id],
     queryFn: () => fetchApprovalHistory(selectedRecord!.id),
     enabled: !!selectedRecord && detailDrawerOpen,
   })
 
   const commentsQuery = useQuery({
-    queryKey: ['reimbursements', 'comments', selectedRecord?.id],
+    queryKey: ['purchases', 'comments', selectedRecord?.id],
     queryFn: () => fetchComments(selectedRecord!.id),
     enabled: !!selectedRecord && detailDrawerOpen,
   })
 
   const createMutation = useMutation({
-    mutationFn: createReimbursement,
+    mutationFn: createPurchase,
     onSuccess: () => {
-      message.success('报销单创建成功')
+      message.success('采购申请创建成功')
       createForm.resetFields()
       setCreateModalOpen(false)
-      queryClient.invalidateQueries({ queryKey: ['reimbursements'] })
-      queryClient.invalidateQueries({ queryKey: ['reimbursements', 'stats'] })
+      queryClient.invalidateQueries({ queryKey: ['purchases'] })
     },
     onError: (error) => {
       message.error((error as Error).message || '创建失败')
@@ -174,10 +154,10 @@ const ReimbursementsPage = () => {
   })
 
   const submitMutation = useMutation({
-    mutationFn: submitReimbursement,
+    mutationFn: submitPurchase,
     onSuccess: () => {
       message.success('已提交审批')
-      queryClient.invalidateQueries({ queryKey: ['reimbursements'] })
+      queryClient.invalidateQueries({ queryKey: ['purchases'] })
     },
     onError: (error) => {
       message.error((error as Error).message || '提交失败')
@@ -186,15 +166,14 @@ const ReimbursementsPage = () => {
 
   const approveMutation = useMutation({
     mutationFn: (params: { id: number; action: 'approve' | 'reject'; comment?: string }) =>
-      approveReimbursement(params.id, { action: params.action, comment: params.comment }),
+      approvePurchase(params.id, { action: params.action, comment: params.comment }),
     onSuccess: () => {
       message.success('审批处理成功')
       setActionModal({ type: null })
-      queryClient.invalidateQueries({ queryKey: ['reimbursements'] })
-      queryClient.invalidateQueries({ queryKey: ['reimbursements', 'detail', selectedRecord?.id] })
-      queryClient.invalidateQueries({ queryKey: ['reimbursements', 'approval-flow', selectedRecord?.id] })
-      queryClient.invalidateQueries({ queryKey: ['reimbursements', 'history', selectedRecord?.id] })
-      queryClient.invalidateQueries({ queryKey: ['reimbursements', 'stats'] })
+      queryClient.invalidateQueries({ queryKey: ['purchases'] })
+      queryClient.invalidateQueries({ queryKey: ['purchases', 'detail', selectedRecord?.id] })
+      queryClient.invalidateQueries({ queryKey: ['purchases', 'approval-flow', selectedRecord?.id] })
+      queryClient.invalidateQueries({ queryKey: ['purchases', 'history', selectedRecord?.id] })
     },
     onError: (error) => {
       message.error((error as Error).message || '审批失败')
@@ -206,21 +185,19 @@ const ReimbursementsPage = () => {
     onSuccess: () => {
       message.success('评论成功')
       commentForm.resetFields()
-      queryClient.invalidateQueries({ queryKey: ['reimbursements', 'comments', selectedRecord?.id] })
+      queryClient.invalidateQueries({ queryKey: ['purchases', 'comments', selectedRecord?.id] })
     },
     onError: (error) => {
       message.error((error as Error).message || '评论失败')
     },
   })
 
-  const reimbursements = listQuery.data?.records || []
-  const stats = statsQuery.data as ReimbursementStats | undefined
+  const records = listQuery.data?.records || []
 
   const handleFilters = (values: any) => {
     const nextFilters = { ...filters }
     nextFilters.status = values.status
     nextFilters.keyword = values.keyword
-    nextFilters.category = values.category
     nextFilters.applicantId = values.applicantId
     nextFilters.dateRange = values.dateRange
     setFilters(nextFilters)
@@ -232,12 +209,12 @@ const ReimbursementsPage = () => {
     })
   }
 
-  const openDetail = (record: ReimbursementRecord) => {
+  const openDetail = (record: PurchaseRecord) => {
     setSelectedRecord(record)
     setDetailDrawerOpen(true)
   }
 
-  const columns: ColumnsType<ReimbursementRecord> = useMemo(
+  const columns: ColumnsType<PurchaseRecord> = useMemo(
     () => [
       {
         title: '编号',
@@ -245,7 +222,7 @@ const ReimbursementsPage = () => {
         width: 80,
       },
       {
-        title: '报销人',
+        title: '申请人',
         dataIndex: 'applicant_name',
         width: 140,
       },
@@ -259,6 +236,11 @@ const ReimbursementsPage = () => {
         title: '类别',
         dataIndex: 'category',
         width: 120,
+      },
+      {
+        title: '供应商',
+        dataIndex: 'supplier',
+        width: 150,
       },
       {
         title: '项目/备注',
@@ -331,52 +313,13 @@ const ReimbursementsPage = () => {
     [canApprove, submitMutation, user],
   )
 
-  const summaryCards = useMemo(() => {
-    if (!stats) return []
-    return [
-      {
-        title: '总报销金额',
-        value: stats.total_amount,
-        prefix: <DollarOutlined />,
-        formatter: (value: number) => `¥ ${value.toFixed(2)}`,
-      },
-      {
-        title: '报销单数量',
-        value: stats.total_count,
-        prefix: <FileSearchOutlined />,
-      },
-      {
-        title: '平均金额',
-        value: stats.average_amount,
-        prefix: <DollarOutlined />,
-        formatter: (value: number) => `¥ ${value.toFixed(2)}`,
-      },
-      {
-        title: '待审核金额',
-        value: stats.status_summary.reviewing.amount,
-        prefix: <ReloadOutlined />,
-        formatter: (value: number) => `¥ ${value.toFixed(2)}`,
-      },
-    ]
-  }, [stats])
-
-  const categoryChartData = (stats?.category_stats || []).map((item) => ({
-    type: item.category,
-    value: item.amount,
-  }))
-
-  const trendChartData = (stats?.monthly_trend || []).map((item) => ({
-    month: item.month,
-    amount: item.amount,
-  }))
-
   const handleCreate = () => {
     createForm.validateFields().then((values) => {
       createMutation.mutate({
         user_id: values.user_id,
         amount: values.amount,
         category: values.category,
-        merchant: values.merchant,
+        supplier: values.supplier,
         date: values.date.format('YYYY-MM-DD'),
         remark: values.remark,
         project: values.project,
@@ -399,202 +342,92 @@ const ReimbursementsPage = () => {
       <Flex justify="space-between" align="center" wrap gap={16}>
         <div>
           <Title level={3} style={{ marginBottom: 4 }}>
-            报销管理中心
+            采购管理
           </Title>
           <Paragraph type="secondary" style={{ margin: 0 }}>
-            查看报销申请、执行审批、统计分析及规则配置。
+            处理公司采购申请、审批流程及记录查询。
           </Paragraph>
         </div>
         <Space>
-          <Button icon={<ReloadOutlined />} onClick={() => queryClient.invalidateQueries({ queryKey: ['reimbursements'] })}>
+          <Button icon={<ReloadOutlined />} onClick={() => queryClient.invalidateQueries({ queryKey: ['purchases'] })}>
             刷新
           </Button>
           <Button type="primary" icon={<PlusOutlined />} onClick={() => setCreateModalOpen(true)}>
-            新建报销
+            新建采购
           </Button>
         </Space>
       </Flex>
 
       {showCompanyWarning && (
-        <Alert type="warning" message="请选择要查看的公司后再查看报销数据" showIcon />
+        <Alert type="warning" message="请选择要查看的公司后再查看采购数据" showIcon />
       )}
 
-      <Tabs
-        items={[
-          {
-            key: 'list',
-            label: '报销列表',
-            children: (
-              <Space direction="vertical" size="large" style={{ width: '100%' }}>
-                {statsQuery.error && (
-                  <Alert type="error" showIcon message={(statsQuery.error as Error).message || '统计数据加载失败'} />
-                )}
+      <Card>
+        <Form
+          layout="inline"
+          initialValues={{
+            status: filters.status,
+            keyword: filters.keyword,
+            applicantId: filters.applicantId,
+            dateRange: filters.dateRange,
+          }}
+          onFinish={handleFilters}
+          onReset={handleReset}
+        >
+          <Form.Item name="keyword" label="关键字">
+            <Input placeholder="供应商/备注/项目" allowClear style={{ width: 200 }} />
+          </Form.Item>
+          <Form.Item name="status" label="状态">
+            <Select allowClear placeholder="请选择状态" options={PURCHASE_STATUS_OPTIONS} style={{ width: 150 }} />
+          </Form.Item>
+          <Form.Item name="applicantId" label="申请人">
+            <Select
+              allowClear
+              showSearch
+              placeholder="选择申请人"
+              options={(usersQuery.data?.items || []).map((item) => ({
+                value: item.id,
+                label: `${item.name || item.nickname || '用户'} (${item.phone || item.id})`,
+              }))}
+              style={{ width: 220 }}
+              filterOption={(input, option) => (option?.label as string).toLowerCase().includes(input.toLowerCase())}
+            />
+          </Form.Item>
+          <Form.Item name="dateRange" label="日期范围">
+            <RangePicker allowEmpty style={{ width: 280 }} />
+          </Form.Item>
+          <Form.Item>
+            <Space>
+              <Button type="primary" htmlType="submit">
+                查询
+              </Button>
+              <Button htmlType="reset">重置</Button>
+            </Space>
+          </Form.Item>
+        </Form>
+      </Card>
 
-                {statsQuery.isLoading ? null : (
-                  <Row gutter={16}>
-                    {summaryCards.map((card) => (
-                      <Col xs={24} sm={12} md={6} key={card.title}>
-                        <Card>
-                          <Statistic
-                            title={card.title}
-                            value={card.value}
-                            prefix={card.prefix}
-                            valueRender={(valueNode) =>
-                              typeof card.value === 'number' && card.formatter
-                                ? card.formatter(card.value)
-                                : valueNode
-                            }
-                          />
-                        </Card>
-                      </Col>
-                    ))}
-                  </Row>
-                )}
-
-                <Card>
-                  <Form
-                    layout="inline"
-                    initialValues={{
-                      status: filters.status,
-                      keyword: filters.keyword,
-                      applicantId: filters.applicantId,
-                      category: filters.category,
-                      dateRange: filters.dateRange,
-                    }}
-                    onFinish={handleFilters}
-                    onReset={handleReset}
-                  >
-                    <Form.Item name="keyword" label="关键字">
-                      <Input placeholder="商户/备注/项目" allowClear style={{ width: 200 }} />
-                    </Form.Item>
-                    <Form.Item name="status" label="状态">
-                      <Select allowClear placeholder="请选择状态" options={REIMBURSEMENT_STATUS_OPTIONS} style={{ width: 150 }} />
-                    </Form.Item>
-                    <Form.Item name="category" label="类别">
-                      <Select allowClear placeholder="请选择类别" style={{ width: 150 }} options={categoryOptions} />
-                    </Form.Item>
-                    <Form.Item name="applicantId" label="报销人">
-                      <Select
-                        allowClear
-                        showSearch
-                        placeholder="选择报销人"
-                        options={(usersQuery.data?.items || []).map((item) => ({
-                          value: item.id,
-                          label: `${item.name || item.nickname || '用户'} (${item.phone || item.id})`,
-                        }))}
-                        style={{ width: 220 }}
-                        filterOption={(input, option) => (option?.label as string).toLowerCase().includes(input.toLowerCase())}
-                      />
-                    </Form.Item>
-                    <Form.Item name="dateRange" label="日期范围">
-                      <RangePicker allowEmpty style={{ width: 280 }} />
-                    </Form.Item>
-                    <Form.Item>
-                      <Space>
-                        <Button type="primary" htmlType="submit">
-                          查询
-                        </Button>
-                        <Button htmlType="reset">重置</Button>
-                      </Space>
-                    </Form.Item>
-                  </Form>
-                </Card>
-
-                <Card>
-                  {listQuery.error && (
-                    <Alert type="error" showIcon message={(listQuery.error as Error).message || '数据加载失败'} style={{ marginBottom: 16 }} />
-                  )}
-                  <Table
-                    rowKey="id"
-                    columns={columns}
-                    dataSource={reimbursements}
-                    loading={listQuery.isLoading}
-                    pagination={{
-                      total: listQuery.data?.total || 0,
-                      pageSize: 20,
-                      showTotal: (total) => `共 ${total} 条`,
-                    }}
-                    scroll={{ x: 1200 }}
-                  />
-                </Card>
-
-                <Row gutter={16}>
-                  <Col span={12}>
-                    <Card title="按类别统计">
-                      {categoryChartData.length > 0 ? (
-                        <Pie
-                          data={categoryChartData}
-                          angleField="value"
-                          colorField="type"
-                          radius={0.9}
-                          label={{ 
-                            content: (data: any) => {
-                              const item = data.data || data
-                              return `${item.category}: ${item.amount}`
-                            } 
-                          }}
-                        />
-                      ) : (
-                        <Alert type="info" message="暂无分类数据" showIcon />
-                      )}
-                    </Card>
-                  </Col>
-                  <Col span={12}>
-                    <Card title="金额趋势">
-                      {trendChartData.length > 0 ? (
-                        <Line data={trendChartData} xField="month" yField="amount" smooth point={{ size: 4 }} />
-                      ) : (
-                        <Alert type="info" message="暂无趋势数据" showIcon />
-                      )}
-                    </Card>
-                  </Col>
-                </Row>
-              </Space>
-            ),
-          },
-          {
-            key: 'rules',
-            label: '报销规则配置',
-            children: (
-              <Card>
-                <Paragraph>
-                  可以在此配置报销类别、单笔限额、审批流程等规则。当前版本提供占位表单（保存到本地状态，可根据需求接入后端配置）。
-                </Paragraph>
-                <Form
-                  labelCol={{ span: 4 }}
-                  wrapperCol={{ span: 12 }}
-                  initialValues={{ limit: 1000, needInvoice: true }}
-                  onFinish={() => message.success('规则保存成功（示例）')}
-                >
-                  <Form.Item label="单笔金额上限" name="limit" rules={[{ required: true }]}>
-                    <InputNumber min={100} max={100000} addonAfter="元" style={{ width: 200 }} />
-                  </Form.Item>
-                  <Form.Item label="允许类别" name="allowedCategories">
-                    <Select mode="multiple" options={categoryOptions} allowClear />
-                  </Form.Item>
-                  <Form.Item label="需要发票" name="needInvoice" valuePropName="checked">
-                    <Select
-                      options={[
-                        { label: '需要', value: true },
-                        { label: '不需要', value: false },
-                      ]}
-                    />
-                  </Form.Item>
-                  <Form.Item wrapperCol={{ offset: 4 }}>
-                    <Button type="primary" htmlType="submit">
-                      保存规则
-                    </Button>
-                  </Form.Item>
-                </Form>
-              </Card>
-            ),
-          },
-        ]}
-      />
+      <Card>
+        {listQuery.error && (
+          <Alert type="error" showIcon message={(listQuery.error as Error).message || '数据加载失败'} style={{ marginBottom: 16 }} />
+        )}
+        <Table
+          rowKey="id"
+          columns={columns}
+          dataSource={records}
+          loading={listQuery.isLoading}
+          pagination={{
+            total: listQuery.data?.total || 0,
+            pageSize: 20,
+            showTotal: (total) => `共 ${total} 条`,
+          }}
+          scroll={{ x: 1200 }}
+        />
+      </Card>
 
       <Drawer
         width={720}
-        title={`报销详情 #${selectedRecord?.id || ''}`}
+        title={`采购详情 #${selectedRecord?.id || ''}`}
         open={detailDrawerOpen}
         onClose={() => {
           setDetailDrawerOpen(false)
@@ -607,11 +440,11 @@ const ReimbursementsPage = () => {
           <Space direction="vertical" size="large" style={{ width: '100%' }}>
             <Card>
               <Descriptions column={2}>
-                <Descriptions.Item label="报销人">{detailQuery.data.applicant_name || detailQuery.data.user_name}</Descriptions.Item>
+                <Descriptions.Item label="申请人">{detailQuery.data.applicant_name || detailQuery.data.user_name}</Descriptions.Item>
                 <Descriptions.Item label="金额">¥ {detailQuery.data.amount.toFixed(2)}</Descriptions.Item>
                 <Descriptions.Item label="类别">{detailQuery.data.category}</Descriptions.Item>
                 <Descriptions.Item label="日期">{detailQuery.data.date}</Descriptions.Item>
-                <Descriptions.Item label="商户">{detailQuery.data.merchant || '-'}</Descriptions.Item>
+                <Descriptions.Item label="供应商">{detailQuery.data.supplier || '-'}</Descriptions.Item>
                 <Descriptions.Item label="项目">{detailQuery.data.project || '-'}</Descriptions.Item>
                 <Descriptions.Item label="状态">
                   <Tag>{detailQuery.data.status}</Tag>
@@ -714,12 +547,12 @@ const ReimbursementsPage = () => {
         )}
       </Drawer>
 
-      <Modal title="新建报销" open={createModalOpen} onCancel={() => setCreateModalOpen(false)} onOk={handleCreate} confirmLoading={createMutation.isPending}>
+      <Modal title="新建采购申请" open={createModalOpen} onCancel={() => setCreateModalOpen(false)} onOk={handleCreate} confirmLoading={createMutation.isPending}>
         <Form form={createForm} layout="vertical">
-          <Form.Item name="user_id" label="报销人" rules={[{ required: true, message: '请选择报销人' }]}>
+          <Form.Item name="user_id" label="申请人" rules={[{ required: true, message: '请选择申请人' }]}>
             <Select
               showSearch
-              placeholder="选择报销人"
+              placeholder="选择申请人"
               options={(usersQuery.data?.items || []).map((item) => ({
                 value: item.id,
                 label: `${item.name || item.nickname || '用户'} (${item.phone || item.id})`,
@@ -736,21 +569,21 @@ const ReimbursementsPage = () => {
           <Form.Item name="date" label="日期" rules={[{ required: true, message: '请选择日期' }]}>
             <DatePicker style={{ width: '100%' }} />
           </Form.Item>
-          <Form.Item name="merchant" label="商户">
-            <Input placeholder="商户名称" />
+          <Form.Item name="supplier" label="供应商">
+            <Input placeholder="供应商名称" />
           </Form.Item>
           <Form.Item name="project" label="项目">
             <Input placeholder="关联项目" />
           </Form.Item>
           <Form.Item name="remark" label="备注">
-            <Input.TextArea rows={3} placeholder="补充说明" />
+            <Input.TextArea rows={3} placeholder="采购原因/补充说明" />
           </Form.Item>
         </Form>
       </Modal>
 
       <Modal
         open={!!actionModal.type}
-        title={actionModal.type === 'approve' ? '通过报销' : '拒绝报销'}
+        title={actionModal.type === 'approve' ? '通过申请' : '拒绝申请'}
         onCancel={() => setActionModal({ type: null })}
         onOk={() => {
           const form = document.getElementById('action-comment-form') as HTMLFormElement
@@ -768,5 +601,4 @@ const ReimbursementsPage = () => {
   )
 }
 
-export default ReimbursementsPage
-
+export default PurchasesPage

@@ -300,6 +300,56 @@ export interface ReimbursementComment {
   created_at?: string
 }
 
+// 采购管理
+export type PurchaseStatus = 'submitted' | 'reviewing' | 'approved' | 'rejected'
+
+export interface PurchaseRecord {
+  id: number
+  user_id: number
+  applicant_name?: string
+  approver_name?: string
+  amount: number
+  category: string
+  supplier?: string
+  date: string
+  remark?: string
+  project?: string
+  status: PurchaseStatus
+  images?: string[]
+  created_at?: string
+  updated_at?: string
+}
+
+export interface PurchaseListResponse {
+  records: PurchaseRecord[]
+  total: number
+  page: number
+  page_size: number
+  total_pages: number
+}
+
+export interface PurchaseDetail extends PurchaseRecord {
+  user_name?: string
+}
+
+export interface PurchaseApprovalNode {
+  id: number
+  approver_name: string
+  role: string
+  status: string
+  status_text: string
+  approval_time?: string
+  comment?: string
+}
+
+export interface PurchaseComment {
+  id: number
+  user_name: string
+  content: string
+  images?: string[]
+  created_at?: string
+}
+
 // 物品领用
 export type MaterialRequestStatus = 'submitted' | 'reviewing' | 'approved' | 'rejected'
 
