@@ -46,6 +46,8 @@ import {
   markNoticeRead,
   updateNotice,
 } from '../api/services/notice'
+import useAuthStore from '../store/auth'
+import useCompanyStore from '../store/company'
 
 const { RangePicker } = DatePicker
 
@@ -58,6 +60,12 @@ const statusColorMap: Record<NoticeStatus, string> = {
 const NoticesPage = () => {
   const { message, modal } = AntdApp.useApp()
   const queryClient = useQueryClient()
+  const { user } = useAuthStore()
+  const { selectedCompanyId } = useCompanyStore()
+
+  const isSuperAdmin = user?.role === 'super_admin' || user?.positionType === '超级管理员'
+  const effectiveCompanyId = isSuperAdmin ? selectedCompanyId : undefined
+
   const [filters, setFilters] = useState<{
     status?: NoticeStatus
     notice_type?: string
@@ -81,7 +89,7 @@ const NoticesPage = () => {
   })
 
   const listQuery = useQuery({
-    queryKey: ['notice', 'list', filters],
+    queryKey: ['notice', 'list', filters, effectiveCompanyId],
     queryFn: () =>
       fetchNotices({
         status: filters.status,
@@ -89,15 +97,17 @@ const NoticesPage = () => {
         is_urgent: filters.is_urgent,
         page: filters.page,
         page_size: filters.page_size,
+        company_id: effectiveCompanyId,
       }),
   })
 
   const statsQuery = useQuery({
-    queryKey: ['notice', 'stats', filters.dateRange],
+    queryKey: ['notice', 'stats', filters.dateRange, effectiveCompanyId],
     queryFn: () =>
       fetchNoticeStats({
         begin_date: filters.dateRange ? filters.dateRange[0].format('YYYY-MM-DD') : undefined,
         end_date: filters.dateRange ? filters.dateRange[1].format('YYYY-MM-DD') : undefined,
+        company_id: effectiveCompanyId,
       }),
   })
 

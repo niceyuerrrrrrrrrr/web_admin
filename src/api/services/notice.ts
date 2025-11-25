@@ -15,6 +15,7 @@ export interface NoticeListParams {
   is_urgent?: boolean
   page?: number
   page_size?: number
+  company_id?: number
 }
 
 export interface NoticePayload {
@@ -40,6 +41,7 @@ export const fetchNotices = (params: NoticeListParams) =>
         is_urgent: params.is_urgent,
         page: params.page ?? 1,
         page_size: params.page_size ?? 20,
+        company_id: params.company_id,
       },
     }),
   )
@@ -66,12 +68,13 @@ export const deleteNotice = (noticeId: number) => unwrap(client.delete(`/notice/
 
 export const markNoticeRead = (noticeId: number) => unwrap(client.post(`/notice/${noticeId}/read`, {}))
 
-export const fetchNoticeStats = (params?: { begin_date?: string; end_date?: string }) =>
+export const fetchNoticeStats = (params?: { begin_date?: string; end_date?: string; company_id?: number }) =>
   unwrap<NoticeStats>(
     client.get('/notice/stats/overview', {
       params: {
         begin_date: params?.begin_date,
         end_date: params?.end_date,
+        company_id: params?.company_id,
       },
     }),
   )
