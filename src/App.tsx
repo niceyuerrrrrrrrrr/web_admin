@@ -45,6 +45,7 @@ import ApprovalsPage from './pages/Approvals'
 import ApprovalWorkflowsPage from './pages/ApprovalWorkflows'
 import AttendancePage from './pages/Attendance'
 import ReceiptsPage from './pages/Receipts'
+import ReceiptAnalytics from './pages/ReceiptAnalytics'
 import ReimbursementsPage from './pages/Reimbursements'
 import ChargingStationsPage from './pages/ChargingStations'
 import InventoryPage from './pages/Inventory'
@@ -102,9 +103,21 @@ const routeDefinitions = [
   {
     key: 'receipts',
     label: '票据管理',
-    path: '/receipts',
     icon: <FileTextOutlined />,
-    element: <ReceiptsPage />,
+    children: [
+      {
+        key: 'receipt-list',
+        label: '票据列表',
+        path: '/receipts/list',
+        element: <ReceiptsPage />,
+      },
+      {
+        key: 'receipt-analytics',
+        label: '票据分析',
+        path: '/receipts/analytics',
+        element: <ReceiptAnalytics />,
+      },
+    ],
   },
   {
     key: 'reimbursements',

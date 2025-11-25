@@ -21,6 +21,9 @@ export interface User {
   lastLoginAt?: string
   loginCount?: number
   registerTime?: string
+  company_id?: number
+  company_name?: string
+  company_business_type?: string
 }
 
 export interface UserListResponse {

@@ -10,6 +10,7 @@ export type ReceiptType = 'loading' | 'unloading' | 'charging' | 'water'
 
 export interface LoadingReceipt {
   id: number
+  user_id: number
   type: 'loading'
   company?: string
   driver_name?: string
@@ -22,11 +23,13 @@ export interface LoadingReceipt {
   loading_time?: string
   unloading_time?: string
   thumb_url?: string
+  task_id?: string
   created_at?: string
 }
 
 export interface UnloadingReceipt {
   id: number
+  user_id: number
   type: 'unloading'
   company?: string
   driver_name?: string

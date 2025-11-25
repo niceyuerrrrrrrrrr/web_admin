@@ -1,10 +1,9 @@
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   Alert,
   App as AntdApp,
   Button,
   Card,
-  Col,
   DatePicker,
   Descriptions,
   Drawer,
@@ -15,13 +14,10 @@ import {
   Input,
   InputNumber,
   Modal,
-  Row,
   Select,
   Space,
-  Statistic,
   Table,
   Tabs,
-  Tag,
   Typography,
 } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
@@ -37,6 +33,7 @@ import {
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import * as XLSX from 'xlsx'
 import { RECEIPT_TYPES, fetchReceipts, updateChargingReceipt, updateWaterTicket, deleteWaterTicket } from '../api/services/receipts'
+import { fetchCompanyDetail } from '../api/services/companies'
 import { fetchUsers } from '../api/services/users'
 import type { Receipt, ReceiptType } from '../api/types'
 import useAuthStore from '../store/auth'
@@ -57,7 +54,7 @@ const ReceiptsPage = () => {
   const isSuperAdmin = user?.role === 'super_admin' || user?.positionType === '超级管理员'
   const effectiveCompanyId = isSuperAdmin ? selectedCompanyId : undefined
 
-  const [activeTab, setActiveTab] = useState<ReceiptType | 'stats'>('loading')
+  const [activeTab, setActiveTab] = useState<ReceiptType>('loading')
   const [filters, setFilters] = useState<{
     receiptType?: ReceiptType
     startDate?: string
@@ -74,6 +71,34 @@ const ReceiptsPage = () => {
   const [editForm] = Form.useForm()
   const showCompanyWarning = isSuperAdmin && !effectiveCompanyId
 
+  // 获取当前公司信息以判断业务类型
+  const companyQuery = useQuery({
+    queryKey: ['company', effectiveCompanyId],
+    queryFn: () => fetchCompanyDetail(effectiveCompanyId!),
+    enabled: !!effectiveCompanyId,
+  })
+  const businessType = companyQuery.data?.business_type
+
+  // 根据业务类型过滤可用的票据类型标签页
+  const availableTabs = useMemo(() => {
+    if (businessType === '罐车') {
+      // 罐车：装料单、充电单、水票
+      return RECEIPT_TYPES.filter(t => ['loading', 'charging', 'water'].includes(t.value))
+    }
+    if (businessType === '挂车') {
+      // 挂车：装料单、卸货单、充电单
+      return RECEIPT_TYPES.filter(t => ['loading', 'unloading', 'charging'].includes(t.value))
+    }
+    return RECEIPT_TYPES
+  }, [businessType])
+
+  // 如果当前选中的标签页不在可用列表中，自动切换到第一个可用标签页
+  useEffect(() => {
+    if (availableTabs.length > 0 && !availableTabs.find(t => t.value === activeTab)) {
+      setActiveTab(availableTabs[0].value)
+    }
+  }, [availableTabs, activeTab])
+
   // 获取用户列表
   const usersQuery = useQuery({
     queryKey: ['users', 'list', effectiveCompanyId],
@@ -89,7 +114,7 @@ const ReceiptsPage = () => {
     queryFn: () =>
       fetchReceipts({
         userId: selectedUserId,
-        receiptType: activeTab === 'stats' ? undefined : activeTab,
+        receiptType: activeTab,
         startDate: filters.startDate,
         endDate: filters.endDate,
         companyId: effectiveCompanyId,
@@ -97,21 +122,7 @@ const ReceiptsPage = () => {
     enabled: !isSuperAdmin || !!effectiveCompanyId,
   })
 
-  // 获取所有票据数据（用于统计）
-  const allReceiptsQuery = useQuery<Receipt[]>({
-    queryKey: ['receipts', 'all', filters, selectedUserId, effectiveCompanyId],
-    queryFn: () =>
-      fetchReceipts({
-        userId: selectedUserId,
-        receiptType: undefined,
-        startDate: filters.startDate,
-        endDate: filters.endDate,
-        companyId: effectiveCompanyId,
-      }),
-    enabled: activeTab === 'stats' && (!isSuperAdmin || !!effectiveCompanyId),
-  })
-
-  const receipts = activeTab === 'stats' ? allReceiptsQuery.data || [] : receiptsQuery.data || []
+  const receipts = receiptsQuery.data || []
 
   // 编辑充电单
   const updateChargingMutation = useMutation({
@@ -156,40 +167,7 @@ const ReceiptsPage = () => {
     },
   })
 
-  // 统计数据
-  const stats = useMemo(() => {
-    const total = receipts.length
-    const byType: Record<ReceiptType, number> = {
-      loading: 0,
-      unloading: 0,
-      charging: 0,
-      water: 0,
-    }
-    let totalAmount = 0
-    let totalEnergy = 0
-    let totalWeight = 0
-
-    receipts.forEach((receipt) => {
-      byType[receipt.type] = (byType[receipt.type] || 0) + 1
-
-      if (receipt.type === 'charging') {
-        const charging = receipt as Receipt & { amount?: number; energy_kwh?: number }
-        totalAmount += charging.amount || 0
-        totalEnergy += charging.energy_kwh || 0
-      } else if (receipt.type === 'loading' || receipt.type === 'unloading') {
-        const weightReceipt = receipt as Receipt & { net_weight?: number }
-        totalWeight += weightReceipt.net_weight || 0
-      }
-    })
-
-    return {
-      total,
-      byType,
-      totalAmount,
-      totalEnergy,
-      totalWeight,
-    }
-  }, [receipts])
+  // 统计数据移除
 
   const handleSearch = (values: {
     receiptType?: ReceiptType
@@ -458,8 +436,7 @@ const ReceiptsPage = () => {
     [openDetail],
   )
 
-  const getColumns = (type: ReceiptType | 'stats'): ColumnsType<Receipt> => {
-    if (type === 'stats') return loadingColumns
+  const getColumns = (type: ReceiptType): ColumnsType<Receipt> => {
     switch (type) {
       case 'loading':
         return loadingColumns
@@ -977,58 +954,13 @@ const ReceiptsPage = () => {
         <Alert type="warning" message="请选择要查看的公司后再查看票据数据" showIcon />
       )}
 
-      {/* 统计卡片 */}
-      <Row gutter={16}>
-        <Col xs={24} sm={12} md={6}>
-          <Card>
-            <Statistic title="总票据数" value={stats.total} loading={receiptsQuery.isLoading} />
-          </Card>
-        </Col>
-        <Col xs={24} sm={12} md={6}>
-          <Card>
-            <Statistic
-              title="总金额(元)"
-              value={stats.totalAmount}
-              precision={2}
-              loading={receiptsQuery.isLoading}
-            />
-          </Card>
-        </Col>
-        <Col xs={24} sm={12} md={6}>
-          <Card>
-            <Statistic
-              title="总电量(kWh)"
-              value={stats.totalEnergy}
-              precision={2}
-              loading={receiptsQuery.isLoading}
-            />
-          </Card>
-        </Col>
-        <Col xs={24} sm={12} md={6}>
-          <Card>
-            <Statistic
-              title="总重量(t)"
-              value={stats.totalWeight}
-              precision={2}
-              loading={receiptsQuery.isLoading}
-            />
-          </Card>
-        </Col>
-      </Row>
-
       <Card>
         <Tabs
           activeKey={activeTab}
-          onChange={(key) => setActiveTab(key as ReceiptType | 'stats')}
-          items={[
-            ...RECEIPT_TYPES.map((type) => ({
+          onChange={(key) => setActiveTab(key as ReceiptType)}
+          items={availableTabs.map((type) => ({
             key: type.value,
-            label: (
-              <Space>
-                <span>{type.label}</span>
-                <Tag>{stats.byType[type.value] || 0}</Tag>
-              </Space>
-            ),
+            label: type.label,
             children: (
               <Space direction="vertical" size="large" style={{ width: '100%' }}>
                 <Form layout="inline" onFinish={handleSearch} onReset={handleReset}>
@@ -1064,14 +996,10 @@ const ReceiptsPage = () => {
                   columns={getColumns(activeTab)}
                   dataSource={receipts}
                   loading={receiptsQuery.isLoading}
-                  rowSelection={
-                    activeTab !== 'stats'
-                      ? {
-                          selectedRowKeys,
-                          onChange: setSelectedRowKeys,
-                        }
-                      : undefined
-                  }
+                  rowSelection={{
+                    selectedRowKeys,
+                    onChange: setSelectedRowKeys,
+                  }}
                   pagination={{
                     total: receipts.length,
                     pageSize: 10,
@@ -1082,78 +1010,7 @@ const ReceiptsPage = () => {
                 />
               </Space>
             ),
-          })),
-          {
-            key: 'stats',
-            label: '统计分析',
-            children: (
-              <Space direction="vertical" size="large" style={{ width: '100%' }}>
-                <Row gutter={16}>
-                  <Col xs={24} lg={12}>
-                    <Card title="按类型统计" size="small">
-                      <Table
-                        size="small"
-                        columns={[
-                          { title: '类型', dataIndex: 'type', render: (v) => getReceiptTypeLabel(v) },
-                          { title: '数量', dataIndex: 'count' },
-                        ]}
-                        dataSource={Object.entries(stats.byType).map(([type, count]) => ({
-                          key: type,
-                          type: type as ReceiptType,
-                          count,
-                        }))}
-                        pagination={false}
-                      />
-                    </Card>
-                  </Col>
-                  <Col xs={24} lg={12}>
-                    <Card title="按车辆统计" size="small">
-                      <Table
-                        size="small"
-                        columns={[
-                          { title: '车牌号', dataIndex: 'vehicle' },
-                          { title: '数量', dataIndex: 'count' },
-                        ]}
-                        dataSource={Object.entries(
-                          receipts.reduce((acc, receipt) => {
-                            const vehicle = receipt.vehicle_no || '未知'
-                            acc[vehicle] = (acc[vehicle] || 0) + 1
-                            return acc
-                          }, {} as Record<string, number>),
-                        )
-                          .map(([vehicle, count]) => ({ key: vehicle, vehicle, count }))
-                          .sort((a, b) => (b.count as number) - (a.count as number))
-                          .slice(0, 10)}
-                        pagination={false}
-                      />
-                    </Card>
-                  </Col>
-                </Row>
-                <Card title="按司机统计" size="small">
-                  <Table
-                    size="small"
-                    columns={[
-                      { title: '司机姓名', dataIndex: 'driver' },
-                      { title: '数量', dataIndex: 'count' },
-                    ]}
-                    dataSource={Object.entries(
-                      receipts.reduce((acc, receipt) => {
-                        const driver =
-                          (receipt as Receipt & { driver_name?: string }).driver_name || '未知'
-                        acc[driver] = (acc[driver] || 0) + 1
-                        return acc
-                      }, {} as Record<string, number>),
-                    )
-                      .map(([driver, count]) => ({ key: driver, driver, count }))
-                      .sort((a, b) => (b.count as number) - (a.count as number))
-                      .slice(0, 10)}
-                    pagination={false}
-                  />
-                </Card>
-              </Space>
-            ),
-          },
-        ]}
+          }))}
         />
       </Card>
 
