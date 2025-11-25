@@ -52,6 +52,8 @@ import ReceiptsPage from './pages/Receipts'
 import ReceiptAnalytics from './pages/ReceiptAnalytics'
 import ReimbursementsPage from './pages/Reimbursements'
 import ChargingStationsPage from './pages/ChargingStations'
+import ChargingList from './pages/ChargingList'
+import ChargingStats from './pages/ChargingStats'
 import InventoryPage from './pages/Inventory'
 import MaterialRequestsPage from './pages/MaterialRequests'
 import MaterialPricingPage from './pages/MaterialPricing'
@@ -169,9 +171,27 @@ const routeDefinitions = [
       {
         key: 'charging',
         label: '充电管理',
-        path: '/charging',
         icon: <AimOutlined />,
-        element: <ChargingStationsPage />,
+        children: [
+          {
+            key: 'charging-list',
+            label: '充电单列表',
+            path: '/charging/list',
+            element: <ChargingList />,
+          },
+          {
+            key: 'charging-stats',
+            label: '数据分析',
+            path: '/charging/stats',
+            element: <ChargingStats />,
+          },
+          {
+            key: 'charging-stations',
+            label: '充电站管理',
+            path: '/charging/stations',
+            element: <ChargingStationsPage />,
+          },
+        ],
       },
     ]
   },

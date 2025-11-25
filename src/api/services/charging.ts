@@ -126,3 +126,36 @@ export const calculateChargingCost = (data: {
   charging_receipt_id?: number
 }) => unwrap<ChargingCostResult>(client.post('/charging-pricing/calculate', data))
 
+export interface ChargingStatsOverview {
+  summary: {
+    total_energy: number
+    total_amount: number
+    avg_price: number
+  }
+  by_driver: Array<{
+    id: number
+    name: string
+    energy: number
+    amount: number
+    count: number
+    avg_price: number
+  }>
+  by_vehicle: Array<{
+    vehicle_no: string
+    energy: number
+    amount: number
+    count: number
+    avg_price: number
+  }>
+}
+
+export const fetchChargingStatsOverview = (params: { timeRange: string; companyId?: number }) =>
+  unwrap<ChargingStatsOverview>(
+    client.get('/statistics/charging/overview', {
+      params: {
+        time_range: params.timeRange,
+        company_id: params.companyId,
+      },
+    }),
+  )
+
