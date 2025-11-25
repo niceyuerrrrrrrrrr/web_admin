@@ -22,7 +22,9 @@ import {
   Tag,
   Timeline,
   Typography,
+  Segmented,
 } from 'antd'
+import { UnorderedListOutlined, AppstoreOutlined } from '@ant-design/icons'
 import ApprovalAnalytics from './ApprovalAnalytics'
 import useCompanyStore from '../store/company'
 import type { ColumnsType } from 'antd/es/table'
@@ -130,6 +132,7 @@ const ApprovalsPage = () => {
   const [actionForm] = Form.useForm()
   const [managerForm] = Form.useForm()
 
+  const [viewMode, setViewMode] = useState<'list' | 'dashboard'>('list')
   const { selectedCompanyId } = useCompanyStore() // 从全局状态读取
   const [pendingFilters, setPendingFilters] = useState<{ approvalType?: string }>({})
   const [historyFilters, setHistoryFilters] = useState<HistoryFilters>({ status: 'all' })
@@ -749,21 +752,29 @@ const ApprovalsPage = () => {
             统一查看并处理报销、采购、请假、物品领用等审批任务。
           </Paragraph>
         </div>
-        <Button
-          type="primary"
-          onClick={() => {
-            queryClient.invalidateQueries({ queryKey: ['approval', 'pending'] })
-            queryClient.invalidateQueries({ queryKey: ['approval', 'history'] })
-            queryClient.invalidateQueries({ queryKey: ['approval', 'stats'] })
-            queryClient.invalidateQueries({ queryKey: ['approval', 'manager'] })
-            queryClient.invalidateQueries({ queryKey: ['approval', 'trend'] })
-          }}
-        >
-          刷新数据
-        </Button>
+        <Space>
+          <Segmented
+            options={[
+              { label: '作业模式', value: 'list', icon: <UnorderedListOutlined /> },
+              { label: '看板模式', value: 'dashboard', icon: <AppstoreOutlined /> },
+            ]}
+            value={viewMode}
+            onChange={(val) => setViewMode(val as 'list' | 'dashboard')}
+          />
+          <Button
+            type="primary"
+            onClick={() => {
+              queryClient.invalidateQueries({ queryKey: ['approval'] })
+            }}
+          >
+            刷新数据
+          </Button>
+        </Space>
       </Flex>
 
-      <Card title="待审批中心" bordered={false}>
+      {viewMode === 'list' ? (
+        <>
+          <Card title="待审批中心" bordered={false}>
         <Row gutter={[16, 16]}>
           {statCards.map((card) => (
             <Col xs={24} sm={12} md={8} lg={6} key={card.title}>
@@ -868,12 +879,12 @@ const ApprovalsPage = () => {
                 </Space>
               ),
             },
-          ]}
-        />
-      </Card>
-
-      {/* 新的专业数据分析页面 */}
-      <ApprovalAnalytics />
+          ]} />
+          </Card>
+        </>
+      ) : (
+        <ApprovalAnalytics />
+      )}
 
       <Drawer
         title={

@@ -34,6 +34,10 @@ import {
   fetchTrendStats,
   type ApprovalManagerStats,
   type ApprovalTrendStats,
+  fetchApprovalEfficiency,
+  fetchApprovalRanking,
+  type ApprovalEfficiencyResponse,
+  type ApprovalRankingResponse,
 } from '../api/services/approval'
 import useCompanyStore from '../store/company'
 
@@ -97,6 +101,26 @@ const ApprovalAnalytics = () => {
         groupBy: groupBy,
         companyId: selectedCompanyId,
       }),
+  })
+
+  // 获取效率数据
+  const efficiencyQuery = useQuery<ApprovalEfficiencyResponse>({
+    queryKey: ['approval', 'efficiency', dateRange[0].format('YYYY-MM-DD'), dateRange[1].format('YYYY-MM-DD'), selectedCompanyId],
+    queryFn: () => fetchApprovalEfficiency({
+      beginDate: dateRange[0].format('YYYY-MM-DD'),
+      endDate: dateRange[1].format('YYYY-MM-DD'),
+      companyId: selectedCompanyId
+    }),
+  })
+
+  // 获取排行榜数据
+  const rankingQuery = useQuery<ApprovalRankingResponse>({
+    queryKey: ['approval', 'ranking', dateRange[0].format('YYYY-MM-DD'), dateRange[1].format('YYYY-MM-DD'), selectedCompanyId],
+    queryFn: () => fetchApprovalRanking({
+      beginDate: dateRange[0].format('YYYY-MM-DD'),
+      endDate: dateRange[1].format('YYYY-MM-DD'),
+      companyId: selectedCompanyId
+    }),
   })
 
   const stats = managerQuery.data
@@ -307,23 +331,15 @@ const ApprovalAnalytics = () => {
 
   // 效率分析数据
   const efficiencyData = useMemo(() => {
-    if (!stats) return { avgProcessTime: 0, fastestType: '-', slowestType: '-', overdueCount: 0 }
+    if (!efficiencyQuery.data) return { avgProcessTime: 0, fastestType: '-', slowestType: '-', overdueCount: 0 }
     
-    // 计算平均处理时长（示例数据，实际需要后端支持）
-    const avgProcessTime = 2.5 // 小时
-    
-    // 找出最快和最慢的类型（按通过率）
-    const validTypes = stats.types.filter((t: any) => t.total > 0)
-    const sortedByRate = [...validTypes].sort((a: any, b: any) => {
-      const rateA = a.total > 0 ? (a.status.find((s: any) => s.status === 'approved')?.count || 0) / a.total : 0
-      const rateB = b.total > 0 ? (b.status.find((s: any) => s.status === 'approved')?.count || 0) / b.total : 0
-      return rateB - rateA
-    })
-    const fastestType = sortedByRate[0]?.type_name || '-'
-    const slowestType = sortedByRate[sortedByRate.length - 1]?.type_name || '-'
-    
-    return { avgProcessTime, fastestType, slowestType, overdueCount: 3 }
-  }, [stats])
+    return { 
+      avgProcessTime: efficiencyQuery.data.avg_process_time, 
+      fastestType: efficiencyQuery.data.fastest_type, 
+      slowestType: efficiencyQuery.data.slowest_type, 
+      overdueCount: 0 // TODO: 待后端支持SLA统计
+    }
+  }, [efficiencyQuery.data])
 
   // 类型对比堆叠柱状图
   const typeComparisonData = useMemo(() => {
@@ -481,8 +497,10 @@ const ApprovalAnalytics = () => {
               onClick={() => {
                 managerQuery.refetch()
                 trendQuery.refetch()
+                efficiencyQuery.refetch()
+                rankingQuery.refetch()
               }}
-              loading={managerQuery.isFetching || trendQuery.isFetching}
+              loading={managerQuery.isFetching || trendQuery.isFetching || efficiencyQuery.isFetching || rankingQuery.isFetching}
             >
               刷新
             </Button>
@@ -582,11 +600,13 @@ const ApprovalAnalytics = () => {
                         radius={0.8}
                         innerRadius={0.6}
                         label={{
+                          offset: 20,
+                          style: {
+                            fontWeight: 'bold',
+                          },
                           formatter: (data: any) => {
                             if (!data) return ''
-                            const type = data.type || ''
-                            const value = data.value || 0
-                            return `${type}: ${value}条`
+                            return `${data.type || '未知'}: ${data.value || 0}条`
                           },
                         }}
                         statistic={{
@@ -633,7 +653,12 @@ const ApprovalAnalytics = () => {
                         }}
                         label={{
                           position: 'top',
-                          style: { fill: '#000', opacity: 0.6 },
+                          style: {
+                            fill: '#000000',
+                            opacity: 1,
+                            fontWeight: 'bold',
+                            fontSize: 12,
+                          },
                         }}
                         legend={false}
                         height={350}
@@ -735,6 +760,46 @@ const ApprovalAnalytics = () => {
                   <Empty description="暂无数据" style={{ padding: '60px 0' }} />
                 )}
               </Card>
+            ),
+          },
+          {
+            key: 'ranking',
+            label: '排行榜',
+            children: (
+              <Row gutter={[16, 16]}>
+                <Col xs={24} lg={12}>
+                  <Card title="申请活跃榜 (Top 10)" bordered={false}>
+                    <Table
+                      dataSource={rankingQuery.data?.applicant_ranking || []}
+                      columns={[
+                        { title: '排名', key: 'rank', render: (_, __, index) => index + 1, width: 60 },
+                        { title: '申请人', dataIndex: 'user_name', key: 'user_name' },
+                        { title: '申请单数', dataIndex: 'count', key: 'count', sorter: (a: any, b: any) => a.count - b.count },
+                      ]}
+                      pagination={false}
+                      size="small"
+                      rowKey="user_id"
+                      loading={rankingQuery.isLoading}
+                    />
+                  </Card>
+                </Col>
+                <Col xs={24} lg={12}>
+                  <Card title="审批金额榜 (Top 10)" bordered={false}>
+                    <Table
+                      dataSource={rankingQuery.data?.amount_ranking || []}
+                      columns={[
+                        { title: '排名', key: 'rank', render: (_, __, index) => index + 1, width: 60 },
+                        { title: '申请人', dataIndex: 'user_name', key: 'user_name' },
+                        { title: '涉及金额', dataIndex: 'amount', key: 'amount', render: (val: number) => `¥${val.toFixed(2)}`, sorter: (a: any, b: any) => a.amount - b.amount },
+                      ]}
+                      pagination={false}
+                      size="small"
+                      rowKey="user_id"
+                      loading={rankingQuery.isLoading}
+                    />
+                  </Card>
+                </Col>
+              </Row>
             ),
           },
           {

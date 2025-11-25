@@ -304,3 +304,52 @@ export const fetchRoleUsers = (params?: { role?: string; companyId?: number }) =
       },
     }),
   )
+
+export interface ApprovalEfficiencyResponse {
+  avg_process_time: number
+  fastest_type: string
+  slowest_type: string
+  details: {
+    type: string
+    type_name: string
+    avg_hours: number
+    count: number
+  }[]
+}
+
+export interface ApprovalRankingResponse {
+  applicant_ranking: {
+    user_id: number
+    user_name: string
+    count: number
+    amount: number
+  }[]
+  amount_ranking: {
+    user_id: number
+    user_name: string
+    count: number
+    amount: number
+  }[]
+}
+
+export const fetchApprovalEfficiency = (params: { beginDate?: string; endDate?: string; companyId?: number }) =>
+  unwrap<ApprovalEfficiencyResponse>(
+    client.get('/approval/stats/efficiency', {
+      params: {
+        begin_date: params.beginDate,
+        end_date: params.endDate,
+        company_id: params.companyId,
+      },
+    }),
+  )
+
+export const fetchApprovalRanking = (params: { beginDate?: string; endDate?: string; companyId?: number }) =>
+  unwrap<ApprovalRankingResponse>(
+    client.get('/approval/stats/ranking', {
+      params: {
+        begin_date: params.beginDate,
+        end_date: params.endDate,
+        company_id: params.companyId,
+      },
+    }),
+  )

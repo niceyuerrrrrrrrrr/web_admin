@@ -81,18 +81,23 @@ const routeDefinitions = [
     element: <DashboardPage />,
   },
   {
-    key: 'approvals',
+    key: 'approval-center',
     label: '审批管理',
-    path: '/approvals',
     icon: <CheckSquareOutlined />,
-    element: <ApprovalsPage />,
-  },
-  {
-    key: 'approval-workflows',
-    label: '审批配置',
-    path: '/approval-workflows',
-    icon: <BranchesOutlined />,
-    element: <ApprovalWorkflowsPage />,
+    children: [
+      {
+        key: 'approvals',
+        label: '审批列表',
+        path: '/approvals',
+        element: <ApprovalsPage />,
+      },
+      {
+        key: 'approval-workflows',
+        label: '流程配置',
+        path: '/approval-workflows',
+        element: <ApprovalWorkflowsPage />,
+      },
+    ]
   },
   {
     key: 'receipts',
@@ -245,6 +250,18 @@ const GlobalCompanySelector = () => {
   )
 }
 
+const flattenRoutes = (routes: any[]): any[] => {
+  let flat: any[] = []
+  routes.forEach(route => {
+    if (route.children) {
+      flat = flat.concat(flattenRoutes(route.children))
+    } else {
+      flat.push(route)
+    }
+  })
+  return flat
+}
+
 const AppLayout = () => {
   const [collapsed, setCollapsed] = useState(false)
   const location = useLocation()
@@ -255,19 +272,27 @@ const AppLayout = () => {
   } = theme.useToken()
 
   const selectedKeys = useMemo(() => {
-    const activeRoute = routeDefinitions.find((route) =>
-      location.pathname.startsWith(route.path),
+    const activeRoute = flattenRoutes(routeDefinitions).find((route: any) =>
+      route.path && location.pathname.startsWith(route.path),
     )
     return [activeRoute?.key ?? 'dashboard']
   }, [location.pathname])
 
-  const menuItems: MenuProps['items'] = routeDefinitions.map(
-    ({ key, label, icon }) => ({ key, label, icon }),
-  )
+  const menuItems: MenuProps['items'] = routeDefinitions.map((item: any) => {
+    if (item.children) {
+      return {
+        key: item.key,
+        label: item.label,
+        icon: item.icon,
+        children: item.children.map((child: any) => ({ key: child.key, label: child.label, icon: child.icon }))
+      }
+    }
+    return { key: item.key, label: item.label, icon: item.icon }
+  })
 
   const handleMenuClick: MenuProps['onClick'] = ({ key }) => {
-    const route = routeDefinitions.find((item) => item.key === key)
-    if (route) {
+    const route = flattenRoutes(routeDefinitions).find((item: any) => item.key === key)
+    if (route && route.path) {
       navigate(route.path)
     }
   }
@@ -337,7 +362,7 @@ function App() {
     <Routes>
       <Route element={<AppLayout />}>
         <Route path="/" element={<Navigate to="/dashboard" replace />} />
-        {routeDefinitions.map((route) => (
+        {flattenRoutes(routeDefinitions).map((route: any) => (
           <Route key={route.key} path={route.path} element={route.element} />
         ))}
         <Route path="/statistics" element={<StatisticsPage />} />
