@@ -21,7 +21,7 @@ import {
   Tabs,
   Tag,
 } from 'antd'
-import { Column, Line, Pie } from '@ant-design/charts'
+import { Area, Column, Pie } from '@ant-design/charts'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import dayjs from 'dayjs'
 import type { ColumnsType } from 'antd/es/table'
@@ -256,8 +256,18 @@ const NoticesPage = () => {
   ]
 
   const stats = statsQuery.data as NoticeStats | undefined
-  const typeData = stats?.by_type.map((item) => ({ type: item.notice_type, value: item.count })) || []
-  const statusData = stats?.by_status.map((item) => ({ status: item.status, value: item.count })) || []
+  
+  const getStatusLabel = (status: string) => {
+    const map: Record<string, string> = { draft: '草稿', published: '已发布', archived: '已归档' }
+    return map[status] || status
+  }
+  const getTypeLabel = (type: string) => {
+    const map: Record<string, string> = { normal: '普通', urgent: '紧急', announcement: '公告' }
+    return map[type] || type
+  }
+
+  const typeData = stats?.by_type.map((item) => ({ type: getTypeLabel(item.notice_type), value: item.count })) || []
+  const statusData = stats?.by_status.map((item) => ({ status: getStatusLabel(item.status), value: item.count })) || []
   const recentData = stats?.recent
     ?.map((item) => ({
       date: item.date,
@@ -271,10 +281,26 @@ const NoticesPage = () => {
     angleField: 'value',
     colorField: 'type',
     radius: 0.8,
+    innerRadius: 0.64,
     label: {
-      content: (data: any) => {
-        const item = data.data || data
-        return `${item.type}: ${item.value}`
+      type: 'inner',
+      offset: '-50%',
+      content: '{value}',
+      style: {
+        textAlign: 'center',
+        fontSize: 14,
+      },
+    },
+    interactions: [{ type: 'element-active' }],
+    statistic: {
+      title: false,
+      content: {
+        style: {
+          whiteSpace: 'pre-wrap',
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
+        },
+        content: '总数\n' + (stats?.summary.total || 0),
       },
     },
   }
@@ -283,14 +309,32 @@ const NoticesPage = () => {
     data: statusData,
     xField: 'status',
     yField: 'value',
+    seriesField: 'status',
     columnWidthRatio: 0.5,
+    label: {
+      position: 'middle',
+      style: {
+        fill: '#FFFFFF',
+        opacity: 0.6,
+      },
+    },
+    color: ({ status }: any) => {
+      if (status === '已发布') return '#52c41a'
+      if (status === '草稿') return '#faad14'
+      if (status === '已归档') return '#722ed1'
+      return '#1890ff'
+    },
   }
 
-  const lineConfig = {
+  const areaConfig = {
     data: recentData || [],
     xField: 'date',
     yField: 'count',
     smooth: true,
+    areaStyle: {
+      fill: 'l(270) 0:#ffffff 0.5:#7ec2f3 1:#1890ff',
+    },
+    color: '#1890ff',
   }
 
   const selectedDetail = detailQuery.data
@@ -426,7 +470,7 @@ const NoticesPage = () => {
                 <Row gutter={16}>
                   <Col span={12}>
                     <Card title="最近发布趋势">
-                      <Line {...lineConfig} />
+                      <Area {...areaConfig} />
                     </Card>
                   </Col>
                   <Col span={12}>
