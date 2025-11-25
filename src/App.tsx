@@ -333,17 +333,25 @@ const AppLayout = () => {
     return [activeRoute?.key ?? 'dashboard']
   }, [location.pathname])
 
-  const menuItems: MenuProps['items'] = routeDefinitions.map((item: any) => {
-    if (item.children) {
+  const generateMenuItems = (routes: any[]): MenuProps['items'] => {
+    return routes.map((item: any) => {
+      if (item.children) {
+        return {
+          key: item.key,
+          label: item.label,
+          icon: item.icon,
+          children: generateMenuItems(item.children),
+        }
+      }
       return {
         key: item.key,
         label: item.label,
         icon: item.icon,
-        children: item.children.map((child: any) => ({ key: child.key, label: child.label, icon: child.icon }))
       }
-    }
-    return { key: item.key, label: item.label, icon: item.icon }
-  })
+    })
+  }
+
+  const menuItems = useMemo(() => generateMenuItems(routeDefinitions), [])
 
   const handleMenuClick: MenuProps['onClick'] = ({ key }) => {
     const route = flattenRoutes(routeDefinitions).find((item: any) => item.key === key)
