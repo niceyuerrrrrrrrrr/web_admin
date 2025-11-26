@@ -405,9 +405,9 @@ const AppLayout = () => {
               src={config.logo_url} 
               alt="Logo" 
               style={{ 
-                height: 32, 
+                height: 48, 
                 width: 'auto', 
-                maxWidth: collapsed ? 32 : 120,
+                maxWidth: collapsed ? 48 : 160,
                 objectFit: 'contain' 
               }} 
             />
@@ -415,7 +415,7 @@ const AppLayout = () => {
             <span className="logo-mark">LOGI</span>
           )}
           {!collapsed && !config?.logo_url && <span className="logo-text">{config?.system_name || '管理后台'}</span>}
-          {!collapsed && config?.logo_url && <span className="logo-text" style={{ fontSize: 16 }}>{config?.system_name}</span>}
+          {!collapsed && config?.logo_url && <span className="logo-text" style={{ fontSize: 18 }}>{config?.system_name}</span>}
         </div>
         <Menu
           theme="dark"
