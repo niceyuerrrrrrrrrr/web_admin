@@ -4,6 +4,7 @@ import {
   App as AntdApp,
   Button,
   Card,
+  DatePicker,
   Descriptions,
   Drawer,
   Flex,
@@ -127,11 +128,23 @@ const UsersPage = () => {
   const openEdit = useCallback((user: User) => {
     setSelectedUser(user)
     editForm.setFieldsValue({
-      name: user.name || user.nickname,
+      nickname: user.nickname,
+      username: user.username,
+      name: user.name,
       phone: user.phone,
-      plateNumber: user.plateNumber,
+      email: user.email,
+      plate: user.plate || user.plateNumber,
       positionType: user.position_type,
+      role: user.role,
       status: user.status === 'active',
+      company: user.company,
+      company_name: user.company_name,
+      company_business_type: user.company_business_type,
+      bank_card: user.bank_card,
+      bank_name: user.bank_name,
+      card_holder: user.card_holder,
+      onboard_date: user.onboard_date ? dayjs(user.onboard_date) : null,
+      app_lang: user.app_lang,
     })
     setEditDrawerOpen(true)
   }, [editForm])
@@ -262,12 +275,20 @@ const UsersPage = () => {
         title: 'ID',
         dataIndex: 'id',
         width: 80,
+        fixed: 'left',
       },
       {
-        title: '姓名',
-        dataIndex: 'name',
+        title: '姓名/昵称',
+        dataIndex: 'nickname',
         width: 120,
-        render: (value, record) => value || record.nickname || '-',
+        fixed: 'left',
+        render: (value, record) => record.name || value || '-',
+      },
+      {
+        title: '用户名',
+        dataIndex: 'username',
+        width: 120,
+        render: (value) => value || <Text type="secondary">-</Text>,
       },
       {
         title: '手机号',
@@ -275,13 +296,19 @@ const UsersPage = () => {
         width: 130,
       },
       {
-        title: '车牌号',
-        dataIndex: 'plateNumber',
-        width: 120,
+        title: '邮箱',
+        dataIndex: 'email',
+        width: 180,
         render: (value) => value || <Text type="secondary">-</Text>,
       },
       {
-        title: '角色',
+        title: '车牌号',
+        dataIndex: 'plate',
+        width: 120,
+        render: (value, record) => value || record.plateNumber || <Text type="secondary">-</Text>,
+      },
+      {
+        title: '职位类型',
         dataIndex: 'position_type',
         width: 120,
         render: (value) => {
@@ -293,9 +320,86 @@ const UsersPage = () => {
             统计员: 'blue',
             车队长: 'green',
             司机: 'default',
+            超级管理员: 'purple',
           }
           return <Tag color={colorMap[value] || 'default'}>{value}</Tag>
         },
+      },
+      {
+        title: '系统角色',
+        dataIndex: 'role',
+        width: 120,
+        render: (value) => {
+          if (!value) return <Text type="secondary">-</Text>
+          const colorMap: Record<string, string> = {
+            super_admin: 'purple',
+            admin: 'red',
+            manager: 'orange',
+            user: 'blue',
+            driver: 'default',
+          }
+          return <Tag color={colorMap[value] || 'default'}>{value}</Tag>
+        },
+      },
+      {
+        title: '公司',
+        dataIndex: 'company_name',
+        width: 150,
+        render: (value, record) => value || record.company || <Text type="secondary">-</Text>,
+      },
+      {
+        title: '业务类型',
+        dataIndex: 'company_business_type',
+        width: 100,
+        render: (value) => {
+          if (!value) return <Text type="secondary">-</Text>
+          return <Tag color={value === '罐车' ? 'blue' : 'green'}>{value}</Tag>
+        },
+      },
+      {
+        title: '银行卡',
+        dataIndex: 'bank_card',
+        width: 150,
+        render: (value) => value ? `****${value.slice(-4)}` : <Text type="secondary">-</Text>,
+      },
+      {
+        title: '开户行',
+        dataIndex: 'bank_name',
+        width: 120,
+        render: (value) => value || <Text type="secondary">-</Text>,
+      },
+      {
+        title: '持卡人',
+        dataIndex: 'card_holder',
+        width: 100,
+        render: (value) => value || <Text type="secondary">-</Text>,
+      },
+      {
+        title: '微信OpenID',
+        dataIndex: 'wx_openid',
+        width: 120,
+        render: (value) => value ? `${value.slice(0, 8)}...` : <Text type="secondary">-</Text>,
+      },
+      {
+        title: '入职日期',
+        dataIndex: 'onboard_date',
+        width: 120,
+        render: (value) => value ? dayjs(value).format('YYYY-MM-DD') : <Text type="secondary">-</Text>,
+      },
+      {
+        title: '最后登录',
+        dataIndex: 'last_login_at',
+        width: 150,
+        render: (value, record) => {
+          const loginTime = value || record.lastLoginAt
+          return loginTime ? dayjs(loginTime).format('MM-DD HH:mm') : <Text type="secondary">-</Text>
+        },
+      },
+      {
+        title: '登录次数',
+        dataIndex: 'login_count',
+        width: 100,
+        render: (value, record) => (value || record.loginCount || 0),
       },
       {
         title: '状态',
@@ -306,6 +410,15 @@ const UsersPage = () => {
           return (
             <Tag color={isActive ? 'success' : 'error'}>{isActive ? '启用' : '禁用'}</Tag>
           )
+        },
+      },
+      {
+        title: '创建时间',
+        dataIndex: 'created_at',
+        width: 150,
+        render: (value, record) => {
+          const createTime = value || record.registerTime
+          return createTime ? dayjs(createTime).format('MM-DD HH:mm') : <Text type="secondary">-</Text>
         },
       },
       {
@@ -359,11 +472,32 @@ const UsersPage = () => {
   const handleEditSubmit = () => {
     editForm.validateFields().then((values) => {
       updateUserMutation.mutate({
+        // 基础信息
+        nickname: values.nickname,
+        username: values.username,
         name: values.name,
         phone: values.phone,
-        plateNumber: values.plateNumber,
-        positionType: values.positionType,
+        email: values.email,
+        app_lang: values.app_lang,
         status: values.status ? 'active' : 'inactive',
+        
+        // 业务信息
+        plate: values.plate,
+        plateNumber: values.plate, // 兼容字段
+        position_type: values.positionType,
+        positionType: values.positionType, // 兼容字段
+        role: values.role,
+        onboard_date: values.onboard_date ? values.onboard_date.format('YYYY-MM-DD') : null,
+        
+        // 公司信息
+        company: values.company,
+        company_name: values.company_name,
+        company_business_type: values.company_business_type,
+        
+        // 银行信息
+        bank_card: values.bank_card,
+        bank_name: values.bank_name,
+        card_holder: values.card_holder,
       })
     })
   }
@@ -486,7 +620,7 @@ const UsersPage = () => {
               showSizeChanger: true,
               showTotal: (total) => `共 ${total} 个用户`,
             }}
-            scroll={{ x: 1200 }}
+            scroll={{ x: 2400 }}
           />
         </Space>
       </Card>
@@ -494,37 +628,124 @@ const UsersPage = () => {
       {/* 详情Drawer */}
       <Drawer
         title={`用户详情 - ${selectedUser?.name || selectedUser?.nickname || selectedUser?.id}`}
-        width={600}
+        width={800}
         open={detailDrawerOpen}
         onClose={closeDetail}
         loading={userDetailQuery.isLoading}
       >
         {userDetail && (
-          <Descriptions column={1} bordered>
-            <Descriptions.Item label="用户ID">{userDetail.id}</Descriptions.Item>
-            <Descriptions.Item label="姓名">{userDetail.name || userDetail.nickname || '-'}</Descriptions.Item>
-            <Descriptions.Item label="手机号">{userDetail.phone || '-'}</Descriptions.Item>
-            <Descriptions.Item label="车牌号">{userDetail.plateNumber || '-'}</Descriptions.Item>
-            <Descriptions.Item label="角色">
-              <Tag>{userDetail.position_type || '未设置'}</Tag>
-            </Descriptions.Item>
-            <Descriptions.Item label="状态">
-              <Tag color={userDetail.status === 'active' ? 'success' : 'error'}>
-                {userDetail.status === 'active' ? '启用' : '禁用'}
-              </Tag>
-            </Descriptions.Item>
-            <Descriptions.Item label="最后登录时间">
-              {(userDetail as any).lastLoginAt
-                ? dayjs((userDetail as any).lastLoginAt).format('YYYY-MM-DD HH:mm:ss')
-                : '-'}
-            </Descriptions.Item>
-            <Descriptions.Item label="登录次数">{(userDetail as any).loginCount || 0}</Descriptions.Item>
-            <Descriptions.Item label="注册时间">
-              {(userDetail as any).registerTime
-                ? dayjs((userDetail as any).registerTime).format('YYYY-MM-DD HH:mm:ss')
-                : '-'}
-            </Descriptions.Item>
-          </Descriptions>
+          <Space direction="vertical" size="large" style={{ width: '100%' }}>
+            {/* 基础信息 */}
+            <Card title="基础信息" size="small">
+              <Descriptions column={2} bordered size="small">
+                <Descriptions.Item label="用户ID">{userDetail.id}</Descriptions.Item>
+                <Descriptions.Item label="用户名">{userDetail.username || '-'}</Descriptions.Item>
+                <Descriptions.Item label="昵称">{userDetail.nickname || '-'}</Descriptions.Item>
+                <Descriptions.Item label="姓名">{userDetail.name || '-'}</Descriptions.Item>
+                <Descriptions.Item label="手机号">{userDetail.phone || '-'}</Descriptions.Item>
+                <Descriptions.Item label="邮箱">{userDetail.email || '-'}</Descriptions.Item>
+                <Descriptions.Item label="状态">
+                  <Tag color={userDetail.status === 'active' ? 'success' : 'error'}>
+                    {userDetail.status === 'active' ? '启用' : '禁用'}
+                  </Tag>
+                </Descriptions.Item>
+                <Descriptions.Item label="语言设置">{userDetail.app_lang || '-'}</Descriptions.Item>
+              </Descriptions>
+            </Card>
+
+            {/* 业务信息 */}
+            <Card title="业务信息" size="small">
+              <Descriptions column={2} bordered size="small">
+                <Descriptions.Item label="车牌号">{userDetail.plate || userDetail.plateNumber || '-'}</Descriptions.Item>
+                <Descriptions.Item label="职位类型">
+                  <Tag color="blue">{userDetail.position_type || '未设置'}</Tag>
+                </Descriptions.Item>
+                <Descriptions.Item label="系统角色">
+                  <Tag color="purple">{userDetail.role || '未设置'}</Tag>
+                </Descriptions.Item>
+                <Descriptions.Item label="入职日期">
+                  {userDetail.onboard_date ? dayjs(userDetail.onboard_date).format('YYYY-MM-DD') : '-'}
+                </Descriptions.Item>
+                <Descriptions.Item label="微信OpenID">
+                  {userDetail.wx_openid ? (
+                    <Text copyable={{ text: userDetail.wx_openid }}>
+                      {userDetail.wx_openid.slice(0, 12)}...
+                    </Text>
+                  ) : '-'}
+                </Descriptions.Item>
+                <Descriptions.Item label="头像">
+                  {userDetail.avatar ? (
+                    <img src={userDetail.avatar} alt="头像" style={{ width: 40, height: 40, borderRadius: 4 }} />
+                  ) : '-'}
+                </Descriptions.Item>
+              </Descriptions>
+            </Card>
+
+            {/* 公司信息 */}
+            <Card title="公司信息" size="small">
+              <Descriptions column={2} bordered size="small">
+                <Descriptions.Item label="公司ID">{userDetail.company_id || '-'}</Descriptions.Item>
+                <Descriptions.Item label="公司名称">{userDetail.company_name || userDetail.company || '-'}</Descriptions.Item>
+                <Descriptions.Item label="业务类型" span={2}>
+                  {userDetail.company_business_type ? (
+                    <Tag color={userDetail.company_business_type === '罐车' ? 'blue' : 'green'}>
+                      {userDetail.company_business_type}
+                    </Tag>
+                  ) : '-'}
+                </Descriptions.Item>
+              </Descriptions>
+            </Card>
+
+            {/* 银行信息 */}
+            <Card title="银行信息" size="small">
+              <Descriptions column={2} bordered size="small">
+                <Descriptions.Item label="银行卡号">
+                  {userDetail.bank_card ? (
+                    <Text copyable={{ text: userDetail.bank_card }}>
+                      ****{userDetail.bank_card.slice(-4)}
+                    </Text>
+                  ) : '-'}
+                </Descriptions.Item>
+                <Descriptions.Item label="开户银行">{userDetail.bank_name || '-'}</Descriptions.Item>
+                <Descriptions.Item label="持卡人姓名" span={2}>{userDetail.card_holder || '-'}</Descriptions.Item>
+              </Descriptions>
+            </Card>
+
+            {/* 系统信息 */}
+            <Card title="系统信息" size="small">
+              <Descriptions column={2} bordered size="small">
+                <Descriptions.Item label="最后登录时间">
+                  {userDetail.last_login_at || (userDetail as any).lastLoginAt
+                    ? dayjs(userDetail.last_login_at || (userDetail as any).lastLoginAt).format('YYYY-MM-DD HH:mm:ss')
+                    : '-'}
+                </Descriptions.Item>
+                <Descriptions.Item label="登录次数">
+                  {userDetail.login_count || (userDetail as any).loginCount || 0}
+                </Descriptions.Item>
+                <Descriptions.Item label="创建时间">
+                  {userDetail.created_at || (userDetail as any).registerTime
+                    ? dayjs(userDetail.created_at || (userDetail as any).registerTime).format('YYYY-MM-DD HH:mm:ss')
+                    : '-'}
+                </Descriptions.Item>
+                <Descriptions.Item label="更新时间">
+                  {userDetail.updated_at ? dayjs(userDetail.updated_at).format('YYYY-MM-DD HH:mm:ss') : '-'}
+                </Descriptions.Item>
+                <Descriptions.Item label="创建者ID">{userDetail.created_by_id || '-'}</Descriptions.Item>
+                <Descriptions.Item label="更新者ID">{userDetail.updated_by_id || '-'}</Descriptions.Item>
+                <Descriptions.Item label="排序">{userDetail.sort || '-'}</Descriptions.Item>
+                <Descriptions.Item label="密码修改时区">{userDetail.password_change_tz || '-'}</Descriptions.Item>
+              </Descriptions>
+            </Card>
+
+            {/* 系统设置 */}
+            {userDetail.system_settings && (
+              <Card title="系统设置" size="small">
+                <pre style={{ background: '#f5f5f5', padding: 16, borderRadius: 4, fontSize: 12 }}>
+                  {JSON.stringify(userDetail.system_settings, null, 2)}
+                </pre>
+              </Card>
+            )}
+          </Space>
         )}
       </Drawer>
 
@@ -544,21 +765,86 @@ const UsersPage = () => {
         }
       >
         <Form form={editForm} layout="vertical">
-          <Form.Item name="name" label="姓名" rules={[{ required: true, message: '请输入姓名' }]}>
-            <Input placeholder="请输入姓名" />
-          </Form.Item>
-          <Form.Item name="phone" label="手机号" rules={[{ required: true, message: '请输入手机号' }]}>
-            <Input placeholder="请输入手机号" />
-          </Form.Item>
-          <Form.Item name="plateNumber" label="车牌号">
-            <Input placeholder="请输入车牌号" />
-          </Form.Item>
-          <Form.Item name="positionType" label="角色">
-            <Select placeholder="请选择角色" options={POSITION_TYPES} />
-          </Form.Item>
-          <Form.Item name="status" label="状态" valuePropName="checked">
-            <Switch checkedChildren="启用" unCheckedChildren="禁用" />
-          </Form.Item>
+          <Space direction="vertical" size="large" style={{ width: '100%' }}>
+            {/* 基础信息 */}
+            <Card title="基础信息" size="small">
+              <Form.Item name="nickname" label="昵称" rules={[{ required: true, message: '请输入昵称' }]}>
+                <Input placeholder="请输入昵称" />
+              </Form.Item>
+              <Form.Item name="username" label="用户名">
+                <Input placeholder="请输入用户名" />
+              </Form.Item>
+              <Form.Item name="name" label="真实姓名">
+                <Input placeholder="请输入真实姓名" />
+              </Form.Item>
+              <Form.Item name="phone" label="手机号" rules={[{ required: true, message: '请输入手机号' }]}>
+                <Input placeholder="请输入手机号" />
+              </Form.Item>
+              <Form.Item name="email" label="邮箱" rules={[{ type: 'email', message: '请输入正确的邮箱格式' }]}>
+                <Input placeholder="请输入邮箱" />
+              </Form.Item>
+              <Form.Item name="app_lang" label="语言设置">
+                <Select placeholder="请选择语言" options={[
+                  { value: 'zh-CN', label: '简体中文' },
+                  { value: 'en-US', label: 'English' },
+                ]} />
+              </Form.Item>
+              <Form.Item name="status" label="状态" valuePropName="checked">
+                <Switch checkedChildren="启用" unCheckedChildren="禁用" />
+              </Form.Item>
+            </Card>
+
+            {/* 业务信息 */}
+            <Card title="业务信息" size="small">
+              <Form.Item name="plate" label="车牌号">
+                <Input placeholder="请输入车牌号" />
+              </Form.Item>
+              <Form.Item name="positionType" label="职位类型">
+                <Select placeholder="请选择职位类型" options={POSITION_TYPES} />
+              </Form.Item>
+              <Form.Item name="role" label="系统角色">
+                <Select placeholder="请选择系统角色" options={[
+                  { value: 'super_admin', label: '超级管理员' },
+                  { value: 'admin', label: '管理员' },
+                  { value: 'manager', label: '经理' },
+                  { value: 'user', label: '普通用户' },
+                  { value: 'driver', label: '司机' },
+                ]} />
+              </Form.Item>
+              <Form.Item name="onboard_date" label="入职日期">
+                <DatePicker placeholder="请选择入职日期" style={{ width: '100%' }} />
+              </Form.Item>
+            </Card>
+
+            {/* 公司信息 */}
+            <Card title="公司信息" size="small">
+              <Form.Item name="company" label="公司名称（旧字段）">
+                <Input placeholder="请输入公司名称" />
+              </Form.Item>
+              <Form.Item name="company_name" label="公司名称">
+                <Input placeholder="请输入公司名称" />
+              </Form.Item>
+              <Form.Item name="company_business_type" label="业务类型">
+                <Select placeholder="请选择业务类型" options={[
+                  { value: '罐车', label: '罐车' },
+                  { value: '挂车', label: '挂车' },
+                ]} />
+              </Form.Item>
+            </Card>
+
+            {/* 银行信息 */}
+            <Card title="银行信息" size="small">
+              <Form.Item name="bank_card" label="银行卡号">
+                <Input placeholder="请输入银行卡号" />
+              </Form.Item>
+              <Form.Item name="bank_name" label="开户银行">
+                <Input placeholder="请输入开户银行" />
+              </Form.Item>
+              <Form.Item name="card_holder" label="持卡人姓名">
+                <Input placeholder="请输入持卡人姓名" />
+              </Form.Item>
+            </Card>
+          </Space>
         </Form>
       </Drawer>
     </Space>

@@ -10,20 +10,52 @@ const unwrap = async <T>(promise: Promise<{ data: ApiResponse<T> }>) => {
 }
 
 export interface User {
+  // 基础字段
   id: number
-  name?: string
+  created_at?: string
+  updated_at?: string
   nickname?: string
+  username?: string
+  email?: string
   phone?: string
-  plateNumber?: string
+  password?: string
+  password_change_tz?: number
+  app_lang?: string
+  reset_token?: string
+  system_settings?: any
+  sort?: number
+  created_by_id?: number
+  updated_by_id?: number
+  
+  // 业务相关字段
+  plate?: string
+  plateNumber?: string // 兼容字段
   position_type?: string
-  positionType?: string
+  positionType?: string // 兼容字段
   status?: string
-  lastLoginAt?: string
-  loginCount?: number
-  registerTime?: string
+  last_login_at?: string
+  lastLoginAt?: string // 兼容字段
+  login_count?: number
+  loginCount?: number // 兼容字段
+  onboard_date?: string
+  wx_openid?: string
+  role?: string
+  
+  // 公司相关字段
+  company?: string
   company_id?: number
   company_name?: string
   company_business_type?: string
+  
+  // 银行信息字段
+  bank_card?: string
+  bank_name?: string
+  card_holder?: string
+  
+  // 其他字段
+  avatar?: string
+  name?: string // 兼容字段，通常映射到nickname
+  registerTime?: string // 兼容字段，通常映射到created_at
 }
 
 export interface UserListResponse {

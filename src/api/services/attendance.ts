@@ -9,6 +9,28 @@ const unwrap = async <T>(promise: Promise<{ data: ApiResponse<T> }>) => {
   return response.data.data
 }
 
+export interface CompanyAttendanceSummary {
+  summary: {
+    should: number
+    attended: number
+    late: number
+    absent: number
+    attendanceRate: number
+  }
+  list: Array<{
+    userId: number
+    name: string
+    attendedDays: number
+    lateDays: number
+    missedDays: number
+    status: string
+  }>
+  period: {
+    start: string
+    end: string
+  }
+}
+
 // 打卡记录
 export interface AttendanceRecord {
   attendance_id: string
@@ -133,6 +155,22 @@ export const fetchAttendanceStatistics = (params: {
         user_id: params.userId,
         start_date: params.startDate,
         end_date: params.endDate,
+      },
+    }),
+  )
+
+/**
+ * 获取公司级考勤汇总
+ */
+export const fetchCompanyAttendanceSummary = (params: {
+  timeRange?: 'today' | 'week' | 'month' | 'year'
+  companyId?: number
+}) =>
+  unwrap<CompanyAttendanceSummary>(
+    client.get('/attendance/company-summary', {
+      params: {
+        time_range: params.timeRange,
+        company_id: params.companyId,
       },
     }),
   )

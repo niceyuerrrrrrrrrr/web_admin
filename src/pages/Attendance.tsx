@@ -49,6 +49,7 @@ import {
   fetchAttendanceFences,
   fetchAttendanceHistory,
   fetchAttendanceStatistics,
+  fetchCompanyAttendanceSummary,
   fetchMakeupApplications,
   fetchTodayShifts,
   resolveAlert,
@@ -57,6 +58,7 @@ import {
   type AttendanceFence,
   type AttendanceRecord,
   type AttendanceShift,
+  type CompanyAttendanceSummary,
   type MakeupApplication,
 } from '../api/services/attendance'
 import { fetchUsers } from '../api/services/users'
@@ -84,7 +86,9 @@ const AttendancePage = () => {
   const effectiveCompanyId = isSuperAdmin ? selectedCompanyId : undefined
 
   const [activeTab, setActiveTab] = useState('history')
-  const [selectedUserId, setSelectedUserId] = useState<number | undefined>(undefined)
+  const [selectedUserId, setSelectedUserId] = useState<number | 'all' | undefined>('all')
+  const [summaryRange, setSummaryRange] = useState<'today' | 'week' | 'month' | 'year'>('month')
+  
   const [filters, setFilters] = useState<{
     startDate?: string
     endDate?: string
@@ -104,49 +108,69 @@ const AttendancePage = () => {
   })
 
   const users = usersQuery.data?.items || []
-  const userId = selectedUserId || users[0]?.id || 1
+  
+  const showCompanySummary = selectedUserId === 'all'
+  const resolvedUserId = showCompanySummary ? (users[0]?.id || 1) : (selectedUserId || users[0]?.id || 1)
+  const userQueriesEnabled = !showCompanySummary && !!resolvedUserId
 
   // 获取打卡历史
   const historyQuery = useQuery({
-    queryKey: ['attendance', 'history', userId, filters],
+    queryKey: ['attendance', 'history', resolvedUserId, filters],
     queryFn: () =>
       fetchAttendanceHistory({
-        userId,
+        userId: resolvedUserId!,
         startDate: filters.startDate,
         endDate: filters.endDate,
         page: 1,
         pageSize: 100,
       }),
+    enabled: userQueriesEnabled,
   })
 
   // 获取今日班次
   const todayShiftsQuery = useQuery({
-    queryKey: ['attendance', 'today-shifts', userId],
-    queryFn: () => fetchTodayShifts({ userId }),
+    queryKey: ['attendance', 'today-shifts', resolvedUserId],
+    queryFn: () => fetchTodayShifts({ userId: resolvedUserId! }),
+    enabled: userQueriesEnabled,
   })
 
   // 获取考勤统计
   const statisticsQuery = useQuery({
-    queryKey: ['attendance', 'statistics', userId, filters],
+    queryKey: ['attendance', 'statistics', resolvedUserId, filters],
     queryFn: () =>
       fetchAttendanceStatistics({
-        userId,
+        userId: resolvedUserId!,
         startDate: filters.startDate,
         endDate: filters.endDate,
       }),
+    enabled: userQueriesEnabled,
   })
 
   // 获取告警记录
   const alertsQuery = useQuery({
-    queryKey: ['attendance', 'alerts', userId],
-    queryFn: () => fetchAttendanceAlerts({ userId, isResolved: false }),
+    queryKey: ['attendance', 'alerts', resolvedUserId],
+    queryFn: () => fetchAttendanceAlerts({ userId: resolvedUserId!, isResolved: false }),
+    enabled: userQueriesEnabled,
   })
 
   // 获取电子围栏
   const fencesQuery = useQuery({
-    queryKey: ['attendance', 'fences', userId],
-    queryFn: () => fetchAttendanceFences({ userId }),
+    queryKey: ['attendance', 'fences', resolvedUserId],
+    queryFn: () => fetchAttendanceFences({ userId: resolvedUserId! }),
+    enabled: userQueriesEnabled,
   })
+
+  // 获取公司考勤汇总
+  const companySummaryQuery = useQuery({
+    queryKey: ['attendance', 'company-summary', summaryRange, effectiveCompanyId],
+    queryFn: () =>
+      fetchCompanyAttendanceSummary({
+        timeRange: summaryRange,
+        companyId: effectiveCompanyId,
+      }),
+    enabled: showCompanySummary,
+  })
+  const companySummary = companySummaryQuery.data
 
   // 获取补卡申请
   const makeupQuery = useQuery({
@@ -160,6 +184,43 @@ const AttendancePage = () => {
   const alerts = alertsQuery.data?.alerts || []
   const fences = fencesQuery.data?.fences || []
   const makeupApplications = makeupQuery.data?.applications || []
+
+  const companySummaryColumns: ColumnsType<CompanyAttendanceSummary['list'][number]> = useMemo(
+    () => [
+      {
+        title: '姓名',
+        dataIndex: 'name',
+        width: 200,
+      },
+      {
+        title: '出勤天数',
+        dataIndex: 'attendedDays',
+        width: 120,
+      },
+      {
+        title: '迟到天数',
+        dataIndex: 'lateDays',
+        width: 120,
+      },
+      {
+        title: '缺勤天数',
+        dataIndex: 'missedDays',
+        width: 120,
+      },
+      {
+        title: '状态',
+        dataIndex: 'status',
+        width: 120,
+        render: (value: string) => ({
+          正常: <Tag color="success">正常</Tag>,
+          迟到: <Tag color="warning">迟到</Tag>,
+          缺勤: <Tag color="error">缺勤</Tag>,
+          未排班: <Tag>未排班</Tag>,
+        }[value] || <Tag>{value}</Tag>),
+      },
+    ],
+    [],
+  )
 
   // 解决告警
   const resolveAlertMutation = useMutation({
@@ -606,16 +667,22 @@ const AttendancePage = () => {
             style={{ width: 200 }}
             placeholder="选择员工"
             value={selectedUserId}
-            onChange={setSelectedUserId}
+            onChange={(value) => setSelectedUserId(value)}
             showSearch
             allowClear
             filterOption={(input, option) =>
               (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
             }
-            options={users.map((user) => ({
-              value: user.id,
-              label: `${user.name || user.nickname || '用户'} (${user.phone || user.id})`,
-            }))}
+            options={[
+              {
+                value: 'all',
+                label: '全部员工（公司汇总）',
+              },
+              ...users.map((user) => ({
+                value: user.id,
+                label: `${user.name || user.nickname || '用户'} (${user.phone || user.id})`,
+              })),
+            ]}
             loading={usersQuery.isLoading}
             notFoundContent={usersQuery.isLoading ? '加载中...' : '暂无用户'}
           />
@@ -631,8 +698,65 @@ const AttendancePage = () => {
         </Space>
       </Flex>
 
-      {/* 统计卡片 */}
-      {statistics && (
+      {/* 公司汇总视图 */}
+      {showCompanySummary && companySummary && (
+        <Card
+          title="全员考勤汇总"
+          extra={
+            <Select
+              value={summaryRange}
+              onChange={setSummaryRange}
+              options={[
+                { value: 'today', label: '今日' },
+                { value: 'week', label: '本周' },
+                { value: 'month', label: '本月' },
+                { value: 'year', label: '本年' },
+              ]}
+              style={{ width: 120 }}
+            />
+          }
+        >
+          <Row gutter={16}>
+            <Col xs={24} sm={12} md={6}>
+              <Card bordered={false}>
+                <Statistic title="应到人数" value={companySummary.summary.should} loading={companySummaryQuery.isLoading} />
+              </Card>
+            </Col>
+            <Col xs={24} sm={12} md={6}>
+              <Card bordered={false}>
+                <Statistic title="实到人数" value={companySummary.summary.attended} loading={companySummaryQuery.isLoading} />
+              </Card>
+            </Col>
+            <Col xs={24} sm={12} md={6}>
+              <Card bordered={false}>
+                <Statistic title="迟到天数" value={companySummary.summary.late} loading={companySummaryQuery.isLoading} />
+              </Card>
+            </Col>
+            <Col xs={24} sm={12} md={6}>
+              <Card bordered={false}>
+                <Statistic
+                  title="出勤率"
+                  value={companySummary.summary.attendanceRate}
+                  suffix="%"
+                  precision={1}
+                  loading={companySummaryQuery.isLoading}
+                />
+              </Card>
+            </Col>
+          </Row>
+          <Table
+            style={{ marginTop: 24 }}
+            rowKey="userId"
+            columns={companySummaryColumns}
+            dataSource={companySummary.list}
+            loading={companySummaryQuery.isLoading}
+            pagination={false}
+          />
+        </Card>
+      )}
+
+      {/* 个人统计卡片 */}
+      {!showCompanySummary && statistics && (
         <Row gutter={16}>
           <Col xs={24} sm={12} md={6}>
             <Card>
@@ -679,7 +803,7 @@ const AttendancePage = () => {
       )}
 
       {/* 告警提示 */}
-      {alerts.length > 0 && (
+      {!showCompanySummary && alerts.length > 0 && (
         <Alert
           message={`有 ${alerts.length} 条未解决的告警记录`}
           type="warning"
@@ -693,261 +817,263 @@ const AttendancePage = () => {
         />
       )}
 
-      <Card>
-        <Tabs
-          activeKey={activeTab}
-          onChange={setActiveTab}
-          items={[
-            {
-              key: 'history',
-              label: '打卡记录',
-              children: (
-                <Space direction="vertical" size="large" style={{ width: '100%' }}>
-                  <Form layout="inline" onFinish={handleSearch} onReset={handleReset}>
-                    <Form.Item name="dateRange" label="日期范围">
-                      <RangePicker allowClear />
-                    </Form.Item>
-                    <Form.Item>
-                      <Space>
-                        <Button type="primary" htmlType="submit">
-                          查询
-                        </Button>
-                        <Button htmlType="reset">重置</Button>
-                      </Space>
-                    </Form.Item>
-                  </Form>
+      {!showCompanySummary && (
+        <Card>
+          <Tabs
+            activeKey={activeTab}
+            onChange={setActiveTab}
+            items={[
+              {
+                key: 'history',
+                label: '打卡记录',
+                children: (
+                  <Space direction="vertical" size="large" style={{ width: '100%' }}>
+                    <Form layout="inline" onFinish={handleSearch} onReset={handleReset}>
+                      <Form.Item name="dateRange" label="日期范围">
+                        <RangePicker allowClear />
+                      </Form.Item>
+                      <Form.Item>
+                        <Space>
+                          <Button type="primary" htmlType="submit">
+                            查询
+                          </Button>
+                          <Button htmlType="reset">重置</Button>
+                        </Space>
+                      </Form.Item>
+                    </Form>
 
-                  {historyQuery.error && (
-                    <Alert
-                      type="error"
-                      showIcon
-                      message={(historyQuery.error as Error).message || '数据加载失败'}
-                    />
-                  )}
+                    {historyQuery.error && (
+                      <Alert
+                        type="error"
+                        showIcon
+                        message={(historyQuery.error as Error).message || '数据加载失败'}
+                      />
+                    )}
 
-                  <Table
-                    rowKey="attendance_id"
-                    columns={historyColumns}
-                    dataSource={records}
-                    loading={historyQuery.isLoading}
-                    pagination={{
-                      total: historyQuery.data?.total || 0,
-                      pageSize: 10,
-                      showSizeChanger: true,
-                      showTotal: (total) => `共 ${total} 条`,
-                    }}
-                    scroll={{ x: 1000 }}
-                  />
-                </Space>
-              ),
-            },
-            {
-              key: 'today',
-              label: (
-                <Space>
-                  <span>今日班次</span>
-                  {shifts.length > 0 && <Badge count={shifts.length} />}
-                </Space>
-              ),
-              children: (
-                <Space direction="vertical" size="large" style={{ width: '100%' }}>
-                  {todayShiftsQuery.error && (
-                    <Alert
-                      type="error"
-                      showIcon
-                      message={(todayShiftsQuery.error as Error).message || '数据加载失败'}
-                    />
-                  )}
-
-                  <Table
-                    rowKey="id"
-                    columns={shiftsColumns}
-                    dataSource={shifts}
-                    loading={todayShiftsQuery.isLoading}
-                    pagination={false}
-                    locale={{ emptyText: <Empty description="今日暂无班次记录" /> }}
-                  />
-                </Space>
-              ),
-            },
-            {
-              key: 'statistics',
-              label: '考勤统计',
-              children: (
-                <Space direction="vertical" size="large" style={{ width: '100%' }}>
-                  <Form layout="inline" onFinish={handleSearch} onReset={handleReset}>
-                    <Form.Item name="dateRange" label="统计区间">
-                      <RangePicker allowClear />
-                    </Form.Item>
-                    <Form.Item>
-                      <Space>
-                        <Button type="primary" htmlType="submit">
-                          查询
-                        </Button>
-                        <Button htmlType="reset">重置</Button>
-                      </Space>
-                    </Form.Item>
-                  </Form>
-
-                  {statisticsQuery.error && (
-                    <Alert
-                      type="error"
-                      showIcon
-                      message={(statisticsQuery.error as Error).message || '数据加载失败'}
-                    />
-                  )}
-
-                  {statistics && (
-                    <Row gutter={16}>
-                      <Col xs={24} lg={12}>
-                        <Card title="出勤统计" size="small">
-                          <Descriptions column={1} bordered size="small">
-                            <Descriptions.Item label="总天数">{statistics.total_days}</Descriptions.Item>
-                            <Descriptions.Item label="工作天数">{statistics.work_days}</Descriptions.Item>
-                            <Descriptions.Item label="缺勤天数">{statistics.absent_days}</Descriptions.Item>
-                            <Descriptions.Item label="出勤率">
-                              {statistics.attendance_rate.toFixed(1)}%
-                            </Descriptions.Item>
-                          </Descriptions>
-                        </Card>
-                      </Col>
-                      <Col xs={24} lg={12}>
-                        <Card title="工作时长统计" size="small">
-                          <Descriptions column={1} bordered size="small">
-                            <Descriptions.Item label="总工作时长">
-                              {Math.floor(statistics.total_work_minutes / 60)}小时
-                              {statistics.total_work_minutes % 60}分钟
-                            </Descriptions.Item>
-                            <Descriptions.Item label="平均工作时长">
-                              {Math.floor(statistics.average_work_minutes / 60)}小时
-                              {statistics.average_work_minutes % 60}分钟
-                            </Descriptions.Item>
-                            <Descriptions.Item label="迟到次数">
-                              <Tag color="warning">{statistics.late_count}</Tag>
-                            </Descriptions.Item>
-                            <Descriptions.Item label="早退次数">
-                              <Tag color="error">{statistics.early_leave_count}</Tag>
-                            </Descriptions.Item>
-                          </Descriptions>
-                        </Card>
-                      </Col>
-                    </Row>
-                  )}
-                </Space>
-              ),
-            },
-            {
-              key: 'alerts',
-              label: (
-                <Space>
-                  <span>异常告警</span>
-                  {alerts.length > 0 && <Badge count={alerts.length} />}
-                </Space>
-              ),
-              children: (
-                <Space direction="vertical" size="large" style={{ width: '100%' }}>
-                  {alertsQuery.error && (
-                    <Alert
-                      type="error"
-                      showIcon
-                      message={(alertsQuery.error as Error).message || '数据加载失败'}
-                    />
-                  )}
-
-                  <Table
-                    rowKey="id"
-                    columns={alertsColumns}
-                    dataSource={alerts}
-                    loading={alertsQuery.isLoading}
-                    pagination={false}
-                    locale={{ emptyText: <Empty description="暂无告警记录" /> }}
-                  />
-                </Space>
-              ),
-            },
-            {
-              key: 'fences',
-              label: '电子围栏',
-              children: (
-                <Space direction="vertical" size="large" style={{ width: '100%' }}>
-                  <Flex justify="space-between">
-                    <Button
-                      type="primary"
-                      icon={<PlusOutlined />}
-                      onClick={() => {
-                        setEditingFence(null)
-                        fenceForm.resetFields()
-                        setFenceModalOpen(true)
+                    <Table
+                      rowKey="attendance_id"
+                      columns={historyColumns}
+                      dataSource={records}
+                      loading={historyQuery.isLoading}
+                      pagination={{
+                        total: historyQuery.data?.total || 0,
+                        pageSize: 10,
+                        showSizeChanger: true,
+                        showTotal: (total) => `共 ${total} 条`,
                       }}
-                    >
-                      新建围栏
-                    </Button>
-                  </Flex>
-
-                  {fencesQuery.error && (
-                    <Alert
-                      type="error"
-                      showIcon
-                      message={(fencesQuery.error as Error).message || '数据加载失败'}
+                      scroll={{ x: 1000 }}
                     />
-                  )}
+                  </Space>
+                ),
+              },
+              {
+                key: 'today',
+                label: (
+                  <Space>
+                    <span>今日班次</span>
+                    {shifts.length > 0 && <Badge count={shifts.length} />}
+                  </Space>
+                ),
+                children: (
+                  <Space direction="vertical" size="large" style={{ width: '100%' }}>
+                    {todayShiftsQuery.error && (
+                      <Alert
+                        type="error"
+                        showIcon
+                        message={(todayShiftsQuery.error as Error).message || '数据加载失败'}
+                      />
+                    )}
 
-                  <Table
-                    rowKey="id"
-                    columns={fencesColumns}
-                    dataSource={fences}
-                    loading={fencesQuery.isLoading}
-                    pagination={false}
-                    locale={{ emptyText: <Empty description="暂无电子围栏配置" /> }}
-                  />
-                </Space>
-              ),
-            },
-            {
-              key: 'makeup',
-              label: (
-                <Space>
-                  <span>补卡审批</span>
-                  {makeupApplications.filter((a) => a.status === 'pending').length > 0 && (
-                    <Badge count={makeupApplications.filter((a) => a.status === 'pending').length} />
-                  )}
-                </Space>
-              ),
-              children: (
-                <Space direction="vertical" size="large" style={{ width: '100%' }}>
-                  <Select
-                    style={{ width: 200 }}
-                    value={makeupStatusFilter}
-                    onChange={setMakeupStatusFilter}
-                    options={[
-                      { value: 'pending', label: '待审批' },
-                      { value: 'approved', label: '已批准' },
-                      { value: 'rejected', label: '已拒绝' },
-                    ]}
-                  />
-
-                  {makeupQuery.error && (
-                    <Alert
-                      type="error"
-                      showIcon
-                      message={(makeupQuery.error as Error).message || '数据加载失败'}
+                    <Table
+                      rowKey="id"
+                      columns={shiftsColumns}
+                      dataSource={shifts}
+                      loading={todayShiftsQuery.isLoading}
+                      pagination={false}
+                      locale={{ emptyText: <Empty description="今日暂无班次记录" /> }}
                     />
-                  )}
+                  </Space>
+                ),
+              },
+              {
+                key: 'statistics',
+                label: '考勤统计',
+                children: (
+                  <Space direction="vertical" size="large" style={{ width: '100%' }}>
+                    <Form layout="inline" onFinish={handleSearch} onReset={handleReset}>
+                      <Form.Item name="dateRange" label="统计区间">
+                        <RangePicker allowClear />
+                      </Form.Item>
+                      <Form.Item>
+                        <Space>
+                          <Button type="primary" htmlType="submit">
+                            查询
+                          </Button>
+                          <Button htmlType="reset">重置</Button>
+                        </Space>
+                      </Form.Item>
+                    </Form>
 
-                  <Table
-                    rowKey="id"
-                    columns={makeupColumns}
-                    dataSource={makeupApplications}
-                    loading={makeupQuery.isLoading}
-                    pagination={false}
-                    locale={{ emptyText: <Empty description="暂无补卡申请" /> }}
-                  />
-                </Space>
-              ),
-            },
-          ]}
-        />
-      </Card>
+                    {statisticsQuery.error && (
+                      <Alert
+                        type="error"
+                        showIcon
+                        message={(statisticsQuery.error as Error).message || '数据加载失败'}
+                      />
+                    )}
+
+                    {statistics && (
+                      <Row gutter={16}>
+                        <Col xs={24} lg={12}>
+                          <Card title="出勤统计" size="small">
+                            <Descriptions column={1} bordered size="small">
+                              <Descriptions.Item label="总天数">{statistics.total_days}</Descriptions.Item>
+                              <Descriptions.Item label="工作天数">{statistics.work_days}</Descriptions.Item>
+                              <Descriptions.Item label="缺勤天数">{statistics.absent_days}</Descriptions.Item>
+                              <Descriptions.Item label="出勤率">
+                                {statistics.attendance_rate.toFixed(1)}%
+                              </Descriptions.Item>
+                            </Descriptions>
+                          </Card>
+                        </Col>
+                        <Col xs={24} lg={12}>
+                          <Card title="工作时长统计" size="small">
+                            <Descriptions column={1} bordered size="small">
+                              <Descriptions.Item label="总工作时长">
+                                {Math.floor(statistics.total_work_minutes / 60)}小时
+                                {statistics.total_work_minutes % 60}分钟
+                              </Descriptions.Item>
+                              <Descriptions.Item label="平均工作时长">
+                                {Math.floor(statistics.average_work_minutes / 60)}小时
+                                {statistics.average_work_minutes % 60}分钟
+                              </Descriptions.Item>
+                              <Descriptions.Item label="迟到次数">
+                                <Tag color="warning">{statistics.late_count}</Tag>
+                              </Descriptions.Item>
+                              <Descriptions.Item label="早退次数">
+                                <Tag color="error">{statistics.early_leave_count}</Tag>
+                              </Descriptions.Item>
+                            </Descriptions>
+                          </Card>
+                        </Col>
+                      </Row>
+                    )}
+                  </Space>
+                ),
+              },
+              {
+                key: 'alerts',
+                label: (
+                  <Space>
+                    <span>异常告警</span>
+                    {alerts.length > 0 && <Badge count={alerts.length} />}
+                  </Space>
+                ),
+                children: (
+                  <Space direction="vertical" size="large" style={{ width: '100%' }}>
+                    {alertsQuery.error && (
+                      <Alert
+                        type="error"
+                        showIcon
+                        message={(alertsQuery.error as Error).message || '数据加载失败'}
+                      />
+                    )}
+
+                    <Table
+                      rowKey="id"
+                      columns={alertsColumns}
+                      dataSource={alerts}
+                      loading={alertsQuery.isLoading}
+                      pagination={false}
+                      locale={{ emptyText: <Empty description="暂无告警记录" /> }}
+                    />
+                  </Space>
+                ),
+              },
+              {
+                key: 'fences',
+                label: '电子围栏',
+                children: (
+                  <Space direction="vertical" size="large" style={{ width: '100%' }}>
+                    <Flex justify="space-between">
+                      <Button
+                        type="primary"
+                        icon={<PlusOutlined />}
+                        onClick={() => {
+                          setEditingFence(null)
+                          fenceForm.resetFields()
+                          setFenceModalOpen(true)
+                        }}
+                      >
+                        新建围栏
+                      </Button>
+                    </Flex>
+
+                    {fencesQuery.error && (
+                      <Alert
+                        type="error"
+                        showIcon
+                        message={(fencesQuery.error as Error).message || '数据加载失败'}
+                      />
+                    )}
+
+                    <Table
+                      rowKey="id"
+                      columns={fencesColumns}
+                      dataSource={fences}
+                      loading={fencesQuery.isLoading}
+                      pagination={false}
+                      locale={{ emptyText: <Empty description="暂无电子围栏配置" /> }}
+                    />
+                  </Space>
+                ),
+              },
+              {
+                key: 'makeup',
+                label: (
+                  <Space>
+                    <span>补卡审批</span>
+                    {makeupApplications.filter((a) => a.status === 'pending').length > 0 && (
+                      <Badge count={makeupApplications.filter((a) => a.status === 'pending').length} />
+                    )}
+                  </Space>
+                ),
+                children: (
+                  <Space direction="vertical" size="large" style={{ width: '100%' }}>
+                    <Select
+                      style={{ width: 200 }}
+                      value={makeupStatusFilter}
+                      onChange={setMakeupStatusFilter}
+                      options={[
+                        { value: 'pending', label: '待审批' },
+                        { value: 'approved', label: '已批准' },
+                        { value: 'rejected', label: '已拒绝' },
+                      ]}
+                    />
+
+                    {makeupQuery.error && (
+                      <Alert
+                        type="error"
+                        showIcon
+                        message={(makeupQuery.error as Error).message || '数据加载失败'}
+                      />
+                    )}
+
+                    <Table
+                      rowKey="id"
+                      columns={makeupColumns}
+                      dataSource={makeupApplications}
+                      loading={makeupQuery.isLoading}
+                      pagination={false}
+                      locale={{ emptyText: <Empty description="暂无补卡申请" /> }}
+                    />
+                  </Space>
+                ),
+              },
+            ]}
+          />
+        </Card>
+      )}
 
       {/* 详情Drawer */}
       <Drawer
@@ -1030,4 +1156,3 @@ const AttendancePage = () => {
 }
 
 export default AttendancePage
-

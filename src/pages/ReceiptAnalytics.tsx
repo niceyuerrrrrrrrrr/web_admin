@@ -22,6 +22,7 @@ import dayjs from 'dayjs'
 import { fetchReceipts } from '../api/services/receipts'
 import { fetchUsers } from '../api/services/users'
 import { fetchCompanyDetail } from '../api/services/companies'
+import { fetchCEOStatistics } from '../api/services/statistics'
 import type { Receipt, LoadingReceipt, UnloadingReceipt } from '../api/types'
 import useAuthStore from '../store/auth'
 import useCompanyStore from '../store/company'
@@ -95,12 +96,23 @@ const ReceiptAnalytics = () => {
   const [vehicleFilter, setVehicleFilter] = useState('')
   const [driverFilter, setDriverFilter] = useState('')
 
+  // 优先从 CEO 统计数据获取业务类型（更准确）
+  const ceoStatsQuery = useQuery({
+    queryKey: ['ceo-stats-for-business-type', effectiveCompanyId],
+    queryFn: () => fetchCEOStatistics({ timeRange: 'month', companyId: effectiveCompanyId }),
+    enabled: !!effectiveCompanyId,
+  })
+
   const companyQuery = useQuery({
     queryKey: ['company', effectiveCompanyId],
     queryFn: () => fetchCompanyDetail(effectiveCompanyId!),
     enabled: !!effectiveCompanyId,
   })
-  const businessType = companyQuery.data?.business_type || '罐车' // Default to Tanker if unknown
+  
+  // 优先使用 CEO 统计数据中的业务类型，否则使用公司详情中的业务类型
+  const businessType = ceoStatsQuery.data?.transportDetails?.businessType || 
+                      companyQuery.data?.business_type || 
+                      '挂车' // 默认为挂车
 
   const usersQuery = useQuery({
     queryKey: ['users', 'list', effectiveCompanyId],
