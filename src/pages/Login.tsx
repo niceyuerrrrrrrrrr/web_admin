@@ -23,6 +23,8 @@ const LoginPage = () => {
           role: data.user.role || data.user.positionType || '管理员',
           positionType: data.user.positionType || data.user.position_type,
           email: data.user.phone,
+          companyId: data.user.companyId,
+          companyBusinessType: data.user.companyBusinessType,
         },
       })
       message.success('登录成功')

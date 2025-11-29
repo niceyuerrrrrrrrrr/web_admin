@@ -6,6 +6,8 @@ interface UserInfo {
   role: string
   positionType?: string
   email?: string
+  companyId?: number
+  companyBusinessType?: string
 }
 
 interface AuthState {

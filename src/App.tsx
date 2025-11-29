@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import React, { useMemo, useState } from 'react'
 import {
   AimOutlined,
   AppstoreOutlined,
@@ -363,25 +363,42 @@ const AppLayout = () => {
     return [activeRoute?.key ?? 'dashboard']
   }, [location.pathname])
 
+  const isSuperAdmin = user?.role === 'super_admin' || user?.positionType === '超级管理员'
+
   const generateMenuItems = (routes: any[]): MenuProps['items'] => {
-    return routes.map((item: any) => {
+    const items: any[] = []
+    
+    for (const item of routes) {
+      // 过滤掉公司管理菜单项（非超级管理员）
+      if (item.key === 'companies' && !isSuperAdmin) {
+        continue
+      }
+      
       if (item.children) {
-        return {
+        // 递归处理子菜单，并过滤掉公司管理
+        const filteredChildren = generateMenuItems(item.children)
+        // 如果过滤后子菜单为空，则不显示父菜单
+        if (filteredChildren && filteredChildren.length > 0) {
+          items.push({
+            key: item.key,
+            label: item.label,
+            icon: item.icon,
+            children: filteredChildren,
+          })
+        }
+      } else {
+        items.push({
           key: item.key,
           label: item.label,
           icon: item.icon,
-          children: generateMenuItems(item.children),
-        }
+        })
       }
-      return {
-        key: item.key,
-        label: item.label,
-        icon: item.icon,
-      }
-    })
+    }
+    
+    return items
   }
 
-  const menuItems = useMemo(() => generateMenuItems(routeDefinitions), [])
+  const menuItems = useMemo(() => generateMenuItems(routeDefinitions), [isSuperAdmin])
 
   const handleMenuClick: MenuProps['onClick'] = ({ key }) => {
     const route = flattenRoutes(routeDefinitions).find((item: any) => item.key === key)
@@ -464,14 +481,43 @@ const AppLayout = () => {
   )
 }
 
+// 权限保护的路由组件
+const ProtectedRoute = ({ children, requireSuperAdmin }: { children: React.ReactNode; requireSuperAdmin?: boolean }) => {
+  const { user } = useAuthStore()
+  const isSuperAdmin = user?.role === 'super_admin' || user?.positionType === '超级管理员'
+  
+  if (requireSuperAdmin && !isSuperAdmin) {
+    return <Navigate to="/dashboard" replace />
+  }
+  
+  return <>{children}</>
+}
+
 function App() {
+  const { user } = useAuthStore()
+  const isSuperAdmin = user?.role === 'super_admin' || user?.positionType === '超级管理员'
+  
   return (
     <Routes>
       <Route element={<AppLayout />}>
         <Route path="/" element={<Navigate to="/dashboard" replace />} />
-        {flattenRoutes(routeDefinitions).map((route: any) => (
-          <Route key={route.key} path={route.path} element={route.element} />
-        ))}
+        {flattenRoutes(routeDefinitions).map((route: any) => {
+          // 公司管理路由需要超级管理员权限
+          if (route.key === 'companies') {
+            return (
+              <Route
+                key={route.key}
+                path={route.path}
+                element={
+                  <ProtectedRoute requireSuperAdmin>
+                    {route.element}
+                  </ProtectedRoute>
+                }
+              />
+            )
+          }
+          return <Route key={route.key} path={route.path} element={route.element} />
+        })}
         <Route path="/statistics" element={<StatisticsPage />} />
       </Route>
       <Route path="/login" element={<LoginPage />} />

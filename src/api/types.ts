@@ -892,6 +892,8 @@ export interface LoginUserInfo {
   position_type?: string
   status?: string
   companyName?: string
+  companyId?: number
+  companyBusinessType?: string
   role?: string
 }
 

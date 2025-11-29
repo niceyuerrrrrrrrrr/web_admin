@@ -29,6 +29,7 @@ import {
   TeamOutlined,
 } from '@ant-design/icons'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { Navigate } from 'react-router-dom'
 import dayjs from 'dayjs'
 import {
   createCompany,
@@ -40,12 +41,22 @@ import {
   updateCompanyStatus,
   type Company,
 } from '../api/services/companies'
+import useAuthStore from '../store/auth'
 
 const { Title, Paragraph, Text } = Typography
 
 const CompaniesPage = () => {
   const queryClient = useQueryClient()
   const { message } = AntdApp.useApp()
+  const { user } = useAuthStore()
+  
+  // 检查是否为超级管理员
+  const isSuperAdmin = user?.role === 'super_admin' || user?.positionType === '超级管理员'
+  
+  // 如果不是超级管理员，重定向到首页
+  if (!isSuperAdmin) {
+    return <Navigate to="/dashboard" replace />
+  }
 
   const [filters, setFilters] = useState<{ status?: string }>({})
   const [selectedCompany, setSelectedCompany] = useState<Company | null>(null)

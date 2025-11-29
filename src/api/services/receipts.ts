@@ -175,3 +175,90 @@ export const updateWaterTicket = (
 export const deleteWaterTicket = (ticketId: number) =>
   unwrap(client.delete(`/receipts/water_tickets/${ticketId}`))
 
+/**
+ * 更新装料单
+ */
+export const updateLoadingReceipt = (
+  receiptId: number,
+  data: {
+    company?: string
+    driver_name?: string
+    vehicle_no?: string
+    material_name?: string
+    material_spec?: string
+    gross_weight?: number
+    net_weight?: number
+    tare_weight?: number
+    loading_time?: string
+    unloading_time?: string
+    thumb_url?: string
+  },
+) => unwrap<LoadingReceipt>(client.put(`/receipts/loading/${receiptId}`, data))
+
+/**
+ * 删除装料单
+ */
+export const deleteLoadingReceipt = (receiptId: number) =>
+  unwrap(client.delete(`/receipts/loading/${receiptId}`))
+
+/**
+ * 更新卸货单
+ */
+export const updateUnloadingReceipt = (
+  receiptId: number,
+  data: {
+    company?: string
+    driver_name?: string
+    vehicle_no?: string
+    material_name?: string
+    material_spec?: string
+    gross_weight?: number
+    net_weight?: number
+    tare_weight?: number
+    loading_time?: string
+    unloading_time?: string
+    thumb_url?: string
+  },
+) => unwrap<UnloadingReceipt>(client.put(`/receipts/unloading/${receiptId}`, data))
+
+/**
+ * 删除卸货单
+ */
+export const deleteUnloadingReceipt = (receiptId: number) =>
+  unwrap(client.delete(`/receipts/unloading/${receiptId}`))
+
+/**
+ * 删除充电单
+ */
+export const deleteChargingReceipt = (receiptId: number) =>
+  unwrap(client.delete(`/receipts/charging/${receiptId}`))
+
+/**
+ * 获取已匹配的装卸数据列表
+ */
+export const fetchMatchedReceipts = (params: {
+  userId?: number
+  startDate?: string
+  endDate?: string
+  companyId?: number
+}) =>
+  unwrap<Array<{
+    id: number
+    task_id: string
+    status: string
+    loadBill: any
+    unloadBill: any
+    created_at?: string
+    finished_at?: string
+    updated_at?: string
+  }>>(
+    client.get('/receipts/matched-receipts', {
+      params: {
+        user_id: params.userId,
+        start_date: params.startDate,
+        end_date: params.endDate,
+        company_id: params.companyId,
+      },
+    }),
+  )
+
