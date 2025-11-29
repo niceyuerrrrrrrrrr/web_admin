@@ -796,11 +796,35 @@ const UsersPage = () => {
 
             {/* 业务信息 */}
             <Card title="业务信息" size="small">
-              <Form.Item name="plate" label="车牌号">
-                <Input placeholder="请输入车牌号" />
-              </Form.Item>
-              <Form.Item name="positionType" label="职位类型">
+              <Form.Item 
+                name="positionType" 
+                label="职位类型"
+                rules={[{ required: true, message: '请选择职位类型' }]}
+              >
                 <Select placeholder="请选择职位类型" options={POSITION_TYPES} />
+              </Form.Item>
+              <Form.Item
+                noStyle
+                shouldUpdate={(prevValues, currentValues) =>
+                  prevValues.positionType !== currentValues.positionType
+                }
+              >
+                {({ getFieldValue }) => {
+                  const positionType = getFieldValue('positionType')
+                  const isDriver = positionType === '司机'
+                  return isDriver ? (
+                    <Form.Item
+                      name="plate"
+                      label="车牌号"
+                      rules={[
+                        { required: true, message: '司机职位必须填写车牌号' },
+                        { pattern: /^[京津沪渝冀豫云辽黑湘皖鲁新苏浙赣鄂桂甘晋蒙陕吉闽贵粤青藏川宁琼使领][A-Z][A-HJ-NP-Z0-9]{4,5}[A-HJ-NP-Z0-9挂学警港澳]$/, message: '车牌号格式不正确' }
+                      ]}
+                    >
+                      <Input placeholder="请输入车牌号" />
+                    </Form.Item>
+                  ) : null
+                }}
               </Form.Item>
               <Form.Item name="role" label="系统角色">
                 <Select placeholder="请选择系统角色" options={[
