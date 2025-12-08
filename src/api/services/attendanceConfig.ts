@@ -74,6 +74,13 @@ export const createShiftTemplate = (payload: ShiftTemplatePayload) =>
 export const updateShiftTemplate = (id: number, payload: Partial<ShiftTemplatePayload>) =>
   unwrap(client.put(`/attendance/config/shifts/${id}`, payload))
 export const deleteShiftTemplate = (id: number) => unwrap(client.delete(`/attendance/config/shifts/${id}`))
+export const exportShiftTemplates = () =>
+  unwrap<{ filename: string; content: string }>(client.get('/attendance/config/shifts/export'))
+export const importShiftTemplates = (file: File) => {
+  const formData = new FormData()
+  formData.append('file', file)
+  return unwrap(client.post('/attendance/config/shifts/import', formData, { headers: { 'Content-Type': 'multipart/form-data' } }))
+}
 
 export const getAttendancePolicy = () => unwrap<AttendancePolicy>(client.get('/attendance/config/policy'))
 export const updateAttendancePolicy = (payload: AttendancePolicyPayload) =>
@@ -93,5 +100,36 @@ export const listRosters = (params: { start_date: string; end_date: string }) =>
   )
 
 export const setRosters = (items: RosterItemPayload[]) => unwrap(client.post('/attendance/config/rosters', items))
+
+// -------------------- 围栏 --------------------
+export interface GeoFence {
+  id: number
+  name: string
+  center_lng: number
+  center_lat: number
+  radius: number
+  description?: string
+  allowed_roles: string[]
+  location_type: string
+  is_active: boolean
+  company_id?: number
+}
+
+export interface GeoFencePayload {
+  name: string
+  center_lng: number
+  center_lat: number
+  radius: number
+  description?: string
+  allowed_roles?: string[]
+  location_type?: string
+  is_active?: boolean
+}
+
+export const listFences = () => unwrap<GeoFence[]>(client.get('/attendance/config/fences'))
+export const createFence = (payload: GeoFencePayload) => unwrap(client.post('/attendance/config/fences', payload))
+export const updateFence = (id: number, payload: Partial<GeoFencePayload>) =>
+  unwrap(client.put(`/attendance/config/fences/${id}`, payload))
+export const deleteFence = (id: number) => unwrap(client.delete(`/attendance/config/fences/${id}`))
 
 
