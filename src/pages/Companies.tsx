@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   Alert,
   App as AntdApp,
@@ -70,6 +70,14 @@ const CompaniesPage = () => {
     queryKey: ['companies', 'list', filters],
     queryFn: () => fetchCompanies({ status: filters.status }),
   })
+
+  useEffect(() => {
+    if (companiesQuery.data?.records) {
+      // 调试接口返回，确认是否带有 invitation_code
+      // eslint-disable-next-line no-console
+      console.debug('[companies] sample', companiesQuery.data.records.slice(0, 3))
+    }
+  }, [companiesQuery.data])
 
   // 获取公司详情
   const companyDetailQuery = useQuery({
