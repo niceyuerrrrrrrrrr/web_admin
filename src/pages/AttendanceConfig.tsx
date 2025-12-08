@@ -46,6 +46,7 @@ import {
   type GeoFence,
 } from '../api/services/attendanceConfig'
 import { fetchUsers, type User } from '../api/services/users'
+import useCompanyStore from '../store/company'
 
 const { RangePicker } = DatePicker
 
@@ -69,6 +70,7 @@ const AttendanceConfigPage = () => {
   const [fenceModalOpen, setFenceModalOpen] = useState(false)
   const [editingFence, setEditingFence] = useState<GeoFence | null>(null)
   const [fenceForm] = Form.useForm()
+  const currentCompanyId = useCompanyStore((s) => s.currentCompany?.id)
 
   const [shiftModalOpen, setShiftModalOpen] = useState(false)
   const [editingShift, setEditingShift] = useState<ShiftTemplate | null>(null)
@@ -82,7 +84,7 @@ const AttendanceConfigPage = () => {
   const fetchShifts = async () => {
     setLoadingShifts(true)
     try {
-      const data = await listShiftTemplates()
+      const data = await listShiftTemplates(currentCompanyId || undefined)
       setShifts(data)
     } catch (err: any) {
       antdMessage.error(err.message || '获取班次失败')
@@ -94,7 +96,7 @@ const AttendanceConfigPage = () => {
   const fetchPolicy = async () => {
     setLoadingPolicy(true)
     try {
-      const data = await getAttendancePolicy()
+      const data = await getAttendancePolicy(currentCompanyId || undefined)
       setPolicy(data)
       formPolicy.setFieldsValue(data)
     } catch (err: any) {
@@ -107,7 +109,7 @@ const AttendanceConfigPage = () => {
   const fetchLeaveTypes = async () => {
     setLoadingLeaveTypes(true)
     try {
-      const data = await listLeaveTypes()
+      const data = await listLeaveTypes(currentCompanyId || undefined)
       setLeaveTypes(data)
     } catch (err: any) {
       antdMessage.error(err.message || '获取请假类型失败')
@@ -126,7 +128,7 @@ const AttendanceConfigPage = () => {
       setLoadingRoster(true)
       const start = values.dateRange[0].format('YYYY-MM-DD')
       const end = values.dateRange[1].format('YYYY-MM-DD')
-      const data = await listRosters({ start_date: start, end_date: end })
+      const data = await listRosters({ start_date: start, end_date: end }, currentCompanyId || undefined)
       setRosterData(data || [])
     } catch (err: any) {
       antdMessage.error(err.message || '获取排班失败')
@@ -141,12 +143,12 @@ const AttendanceConfigPage = () => {
     fetchLeaveTypes()
     fetchFenceList()
     fetchUserOptions()
-  }, [])
+  }, [currentCompanyId])
 
   const fetchFenceList = async () => {
     setLoadingFences(true)
     try {
-      const data = await listFences()
+      const data = await listFences(currentCompanyId || undefined)
       setFenceList(data)
     } catch (err: any) {
       antdMessage.error(err.message || '获取围栏失败')
@@ -158,7 +160,7 @@ const AttendanceConfigPage = () => {
   const fetchUserOptions = async (keyword?: string) => {
     setLoadingUsers(true)
     try {
-      const res = await fetchUsers({ page: 1, size: 200, name: keyword || undefined })
+      const res = await fetchUsers({ page: 1, size: 200, name: keyword || undefined, company_id: currentCompanyId || undefined })
       setUserOptions(
         res.items.map((u: User) => ({
           label: `${u.name || u.nickname || '用户'}（ID:${u.id}）`,
@@ -218,7 +220,7 @@ const AttendanceConfigPage = () => {
                   title: '确认删除该班次？',
                   onOk: async () => {
                     try {
-                      await deleteShiftTemplate(record.id)
+                      await deleteShiftTemplate(record.id, currentCompanyId || undefined)
                       antdMessage.success('已删除')
                       fetchShifts()
                     } catch (err: any) {
@@ -282,7 +284,7 @@ const AttendanceConfigPage = () => {
                   title: '确认删除该类型？',
                   onOk: async () => {
                     try {
-                      await deleteLeaveType(record.id)
+                      await deleteLeaveType(record.id, currentCompanyId || undefined)
                       antdMessage.success('已删除')
                       fetchLeaveTypes()
                     } catch (err: any) {
@@ -317,7 +319,7 @@ const AttendanceConfigPage = () => {
                     <Button
                       onClick={async () => {
                         try {
-                          const data = await exportShiftTemplates()
+                          const data = await exportShiftTemplates(currentCompanyId || undefined)
                           const blob = new Blob([data.content], { type: 'text/csv;charset=utf-8;' })
                           const url = window.URL.createObjectURL(blob)
                           const a = document.createElement('a')
@@ -342,7 +344,7 @@ const AttendanceConfigPage = () => {
                           const file = e.target.files?.[0]
                           if (!file) return
                           try {
-                            await importShiftTemplates(file)
+                            await importShiftTemplates(file, currentCompanyId || undefined)
                             antdMessage.success('导入完成')
                             fetchShifts()
                           } catch (err: any) {
@@ -384,7 +386,7 @@ const AttendanceConfigPage = () => {
                     onClick={async () => {
                       try {
                         const values = await formPolicy.validateFields()
-                        await updateAttendancePolicy(values)
+                        await updateAttendancePolicy(values, currentCompanyId || undefined)
                         antdMessage.success('策略已保存')
                         fetchPolicy()
                       } catch {}
@@ -531,7 +533,7 @@ const AttendanceConfigPage = () => {
                                 })
                               })
                             })
-                            await setRosters(items)
+                            await setRosters(items, currentCompanyId || undefined)
                             antdMessage.success('排班已保存')
                             fetchRoster()
                           } catch {}
@@ -640,7 +642,7 @@ const AttendanceConfigPage = () => {
                                 title: '确认删除该围栏？',
                                 onOk: async () => {
                                   try {
-                                    await deleteFence(record.id)
+                      await deleteFence(record.id, currentCompanyId || undefined)
                                     antdMessage.success('已删除')
                                     fetchFenceList()
                                   } catch (err: any) {
@@ -691,10 +693,10 @@ const AttendanceConfigPage = () => {
               roles: (values.roles || []).map((r: string) => ({ role_name: r })),
             }
             if (editingShift) {
-              await updateShiftTemplate(editingShift.id, payload)
+              await updateShiftTemplate(editingShift.id, payload, currentCompanyId || undefined)
               antdMessage.success('班次已更新')
             } else {
-              await createShiftTemplate(payload)
+              await createShiftTemplate(payload, currentCompanyId || undefined)
               antdMessage.success('班次已创建')
             }
             setShiftModalOpen(false)
@@ -735,10 +737,10 @@ const AttendanceConfigPage = () => {
           try {
             const values = await leaveTypeForm.validateFields()
             if (editingLeaveType) {
-              await updateLeaveType(editingLeaveType.id, values)
+              await updateLeaveType(editingLeaveType.id, values, currentCompanyId || undefined)
               antdMessage.success('已更新')
             } else {
-              await createLeaveType(values)
+              await createLeaveType(values, currentCompanyId || undefined)
               antdMessage.success('已创建')
             }
             setLeaveTypeModalOpen(false)
@@ -770,10 +772,10 @@ const AttendanceConfigPage = () => {
           try {
             const values = await fenceForm.validateFields()
             if (editingFence) {
-              await updateFence(editingFence.id, values)
+                              await updateFence(editingFence.id, values, currentCompanyId || undefined)
               antdMessage.success('围栏已更新')
             } else {
-              await createFence(values)
+                              await createFence(values, currentCompanyId || undefined)
               antdMessage.success('围栏已创建')
             }
             setFenceModalOpen(false)
