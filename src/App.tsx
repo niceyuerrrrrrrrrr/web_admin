@@ -365,9 +365,11 @@ const AppLayout = () => {
   const config = configQuery.data?.base
 
   const selectedKeys = useMemo(() => {
-    const activeRoute = flattenRoutes(routeDefinitions).find((route: any) =>
-      route.path && location.pathname.startsWith(route.path),
-    )
+    const flat = flattenRoutes(routeDefinitions).filter((r: any) => r.path)
+    // 优先匹配最长路径，避免 /attendance-config 被 /attendance 抢占
+    const activeRoute = flat
+      .sort((a: any, b: any) => (b.path?.length || 0) - (a.path?.length || 0))
+      .find((route: any) => location.pathname.startsWith(route.path))
     return [activeRoute?.key ?? 'dashboard']
   }, [location.pathname])
 
