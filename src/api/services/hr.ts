@@ -98,3 +98,53 @@ export const exportOffboardingForms = (formIds: string[]) =>
     .post('/hr/offboarding/export', { form_ids: formIds }, { responseType: 'blob' })
     .then((response) => response.data)
 
+// ----------------- 考勤配置辅助（简要引导） -----------------
+// 注意：考勤配置相关API在 attendanceConfig.ts 中
+
+export interface EmployeeImportResult {
+  message: string
+  success_count: number
+  skip_count: number
+  error_count: number
+  success_list: Array<{ name: string; phone: string; position: string; employee_status: string }>
+  skip_list: Array<{ name: string; phone: string; reason: string }>
+  errors: string[]
+  total_errors: number
+}
+
+export const importEmployees = (file: File, defaultPassword: string = '123456', skipExisting: boolean = true) => {
+  const formData = new FormData()
+  formData.append('file', file)
+  formData.append('default_password', defaultPassword)
+  formData.append('skip_existing', skipExisting.toString())
+  return unwrap<EmployeeImportResult>(
+    client.post('/hr/employees/import', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    }),
+  )
+}
+
+export const downloadImportTemplate = () =>
+  client.get('/hr/employees/import-template', { responseType: 'blob' }).then((response) => {
+    const url = window.URL.createObjectURL(new Blob([response.data]))
+    const link = document.createElement('a')
+    link.href = url
+    link.setAttribute('download', `员工批量导入模板.xlsx`)
+    document.body.appendChild(link)
+    link.click()
+    link.remove()
+    window.URL.revokeObjectURL(url)
+  })
+
+export const setProbationPeriod = (formId: string, probationPeriod: number, comment?: string) =>
+  unwrap(client.put(`/hr/employees/${formId}/probation-period`, { probation_period: probationPeriod, comment }))
+
+export const fetchStatusLogs = (params: { form_id?: string; user_id?: number; change_type?: string; limit?: number }) =>
+  unwrap<{ logs: any[]; total: number }>(
+    client.get('/hr/status-logs', {
+      params,
+    }),
+  )
+

@@ -4,6 +4,7 @@ import {
   Alert,
   Button,
   Card,
+  Checkbox,
   Col,
   DatePicker,
   Descriptions,
@@ -26,6 +27,7 @@ import {
   Upload,
 } from 'antd'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import type { ColumnsType } from 'antd/es/table'
 import dayjs from 'dayjs'
 import {
   CheckCircleOutlined,
@@ -55,6 +57,10 @@ import {
   generateHRPdf,
   regularizeEmployee,
   updateHRDraft,
+  importEmployees,
+  downloadImportTemplate,
+  setProbationPeriod,
+  fetchStatusLogs,
 } from '../api/services/hr'
 import { fetchUsers, type User } from '../api/services/users'
 import useAuthStore from '../store/auth'
@@ -127,6 +133,13 @@ const HRPage = () => {
   })
   const [signatureModal, setSignatureModal] = useState<{ open: boolean; formId?: string; name?: string }>({ open: false })
   const [approverModal, setApproverModal] = useState<{ open: boolean; formId?: string }>({ open: false })
+  const [importModal, setImportModal] = useState<{ open: boolean }>({ open: false })
+  const [importForm] = Form.useForm()
+  const [probationPeriodModal, setProbationPeriodModal] = useState<{ open: boolean; formId?: string; name?: string }>({
+    open: false,
+  })
+  const [probationPeriodForm] = Form.useForm()
+  const [statusLogModal, setStatusLogModal] = useState<{ open: boolean; formId?: string }>({ open: false })
 
   useEffect(() => {
     if (activeTab !== 'offboarding') {
@@ -290,6 +303,63 @@ const HRPage = () => {
       message.success('导出成功')
     },
     onError: (error) => message.error((error as Error).message || '导出失败'),
+  })
+
+  const importEmployeesMutation = useMutation({
+    mutationFn: ({ file, defaultPassword, skipExisting }: { file: File; defaultPassword: string; skipExisting: boolean }) =>
+      importEmployees(file, defaultPassword, skipExisting),
+    onSuccess: (data) => {
+      const { success_count, skip_count, error_count, errors } = data
+      let messageText = `导入完成：成功 ${success_count} 个`
+      if (skip_count > 0) messageText += `，跳过 ${skip_count} 个`
+      if (error_count > 0) messageText += `，失败 ${error_count} 个`
+      message.success(messageText)
+      if (errors.length > 0) {
+        Modal.warning({
+          title: '导入错误详情',
+          width: 600,
+          content: (
+            <div style={{ maxHeight: '400px', overflow: 'auto' }}>
+              {errors.map((err, idx) => (
+                <div key={idx} style={{ marginBottom: 8 }}>
+                  {err}
+                </div>
+              ))}
+            </div>
+          ),
+        })
+      }
+      setImportModal({ open: false })
+      importForm.resetFields()
+      queryClient.invalidateQueries({ queryKey: ['hr', 'forms'] })
+      queryClient.invalidateQueries({ queryKey: ['hr', 'probation'] })
+    },
+    onError: (error) => message.error((error as Error).message || '导入失败'),
+  })
+
+  const downloadTemplateMutation = useMutation({
+    mutationFn: downloadImportTemplate,
+    onSuccess: () => message.success('模板下载成功'),
+    onError: (error) => message.error((error as Error).message || '下载失败'),
+  })
+
+  const setProbationPeriodMutation = useMutation({
+    mutationFn: ({ formId, probationPeriod, comment }: { formId: string; probationPeriod: number; comment?: string }) =>
+      setProbationPeriod(formId, probationPeriod, comment),
+    onSuccess: () => {
+      message.success('试用期时长设置成功')
+      setProbationPeriodModal({ open: false })
+      probationPeriodForm.resetFields()
+      queryClient.invalidateQueries({ queryKey: ['hr', 'probation'] })
+      queryClient.invalidateQueries({ queryKey: ['hr', 'forms'] })
+    },
+    onError: (error) => message.error((error as Error).message || '设置失败'),
+  })
+
+  const statusLogsQuery = useQuery({
+    queryKey: ['hr', 'status-logs', statusLogModal.formId],
+    queryFn: () => fetchStatusLogs({ form_id: statusLogModal.formId, limit: 50 }),
+    enabled: statusLogModal.open && !!statusLogModal.formId,
   })
 
   const submitDraftMutation = useMutation({
@@ -469,11 +539,23 @@ const HRPage = () => {
                 生成PDF
               </Button>
             )}
+            <Button type="link" size="small" onClick={() => handleViewStatusLogs(record.form_id)}>
+              日志
+            </Button>
           </Space>
         )
       },
     },
   ]
+
+  const handleSetProbationPeriod = (record: ProbationEmployee) => {
+    setProbationPeriodModal({ open: true, formId: record.form_id, name: record.name })
+    probationPeriodForm.setFieldsValue({ probation_period: record.probation_period || 0 })
+  }
+
+  const handleViewStatusLogs = (formId: string) => {
+    setStatusLogModal({ open: true, formId })
+  }
 
   const probationColumns = [
     { title: '姓名', dataIndex: 'name' },
@@ -485,8 +567,14 @@ const HRPage = () => {
     { title: '提醒', dataIndex: 'status_text', render: (text: string) => <Tag color="gold">{text}</Tag> },
     {
       title: '操作',
+      width: 280,
       render: (_: unknown, record: ProbationEmployee) => (
         <Space>
+          {!record.probation_period && (
+            <Button type="link" size="small" onClick={() => handleSetProbationPeriod(record)}>
+              设置试用期
+            </Button>
+          )}
           <Button
             type="primary"
             size="small"
@@ -496,6 +584,9 @@ const HRPage = () => {
           </Button>
           <Button size="small" onClick={() => activateAccountMutation.mutate(record.user_id)}>
             激活账号
+          </Button>
+          <Button type="link" size="small" onClick={() => handleViewStatusLogs(record.form_id)}>
+            查看日志
           </Button>
         </Space>
       ),
@@ -1020,6 +1111,146 @@ const HRPage = () => {
             />
           </Form.Item>
         </Form>
+      </Modal>
+
+      <Modal
+        title="批量导入员工"
+        open={importModal.open}
+        onCancel={() => setImportModal({ open: false })}
+        footer={null}
+        width={600}
+      >
+        <Alert
+          message="使用说明"
+          description={
+            <div>
+              <p>1. 点击"下载模板"按钮下载Excel模板</p>
+              <p>2. 按照模板格式填写员工数据（必填：姓名、手机号、职位、部门、入职日期）</p>
+              <p>3. 上传填写好的Excel文件</p>
+              <p>4. 系统会自动创建账号和入职申请记录</p>
+            </div>
+          }
+          type="info"
+          showIcon
+          style={{ marginBottom: 16 }}
+        />
+        <Form
+          form={importForm}
+          layout="vertical"
+          onFinish={(values) => {
+            if (!values.file) {
+              message.warning('请选择Excel文件')
+              return
+            }
+            importEmployeesMutation.mutate({
+              file: values.file,
+              defaultPassword: values.default_password || '123456',
+              skipExisting: values.skip_existing !== false,
+            })
+          }}
+        >
+          <Form.Item
+            label="Excel文件"
+            name="file"
+            rules={[{ required: true, message: '请选择Excel文件' }]}
+            valuePropName="file"
+            getValueFromEvent={(e) => e.file}
+          >
+            <Upload
+              maxCount={1}
+              accept=".xlsx,.xls"
+              beforeUpload={(file) => {
+                importForm.setFieldValue('file', file)
+                return false
+              }}
+            >
+              <Button icon={<CloudUploadOutlined />}>选择文件</Button>
+            </Upload>
+          </Form.Item>
+          <Form.Item label="默认密码" name="default_password" initialValue="123456">
+            <Input placeholder="新员工的默认登录密码" />
+          </Form.Item>
+          <Form.Item name="skip_existing" valuePropName="checked" initialValue={true}>
+            <Checkbox>跳过已存在的员工（根据手机号判断）</Checkbox>
+          </Form.Item>
+          <Form.Item>
+            <Space>
+              <Button onClick={() => setImportModal({ open: false })}>取消</Button>
+              <Button type="primary" htmlType="submit" loading={importEmployeesMutation.isPending}>
+                开始导入
+              </Button>
+            </Space>
+          </Form.Item>
+        </Form>
+      </Modal>
+
+      <Modal
+        title="设置试用期时长"
+        open={probationPeriodModal.open}
+        onCancel={() => setProbationPeriodModal({ open: false })}
+        footer={null}
+        width={500}
+      >
+        <Form
+          form={probationPeriodForm}
+          layout="vertical"
+          onFinish={(values) => {
+            if (!probationPeriodModal.formId) return
+            setProbationPeriodMutation.mutate({
+              formId: probationPeriodModal.formId,
+              probationPeriod: values.probation_period,
+              comment: values.comment,
+            })
+          }}
+        >
+          <Alert
+            message={`为员工 ${probationPeriodModal.name} 设置试用期时长`}
+            type="info"
+            showIcon
+            style={{ marginBottom: 16 }}
+          />
+          <Form.Item
+            label="试用期时长（月）"
+            name="probation_period"
+            rules={[{ required: true, message: '请输入试用期时长' }, { type: 'number', min: 1, max: 12 }]}
+          >
+            <InputNumber min={1} max={12} className="w-full" placeholder="1-12个月，0表示直接转正" />
+          </Form.Item>
+          <Form.Item label="备注" name="comment">
+            <Input.TextArea rows={3} placeholder="可选" />
+          </Form.Item>
+          <Form.Item>
+            <Space>
+              <Button onClick={() => setProbationPeriodModal({ open: false })}>取消</Button>
+              <Button type="primary" htmlType="submit" loading={setProbationPeriodMutation.isPending}>
+                确定
+              </Button>
+            </Space>
+          </Form.Item>
+        </Form>
+      </Modal>
+
+      <Modal
+        title="状态变更日志"
+        open={statusLogModal.open}
+        onCancel={() => setStatusLogModal({ open: false })}
+        footer={<Button onClick={() => setStatusLogModal({ open: false })}>关闭</Button>}
+        width={800}
+      >
+        <Table
+          rowKey="id"
+          loading={statusLogsQuery.isLoading}
+          columns={[
+            { title: '变更类型', dataIndex: 'change_type', width: 120 },
+            { title: '旧状态', dataIndex: 'old_status', width: 120 },
+            { title: '新状态', dataIndex: 'new_status', width: 120 },
+            { title: '操作人', dataIndex: 'changed_by', width: 100 },
+            { title: '备注', dataIndex: 'comment', ellipsis: true },
+            { title: '变更时间', dataIndex: 'created_at', width: 180 },
+          ]}
+          dataSource={statusLogsQuery.data?.logs || []}
+          pagination={false}
+        />
       </Modal>
     </Space>
   )

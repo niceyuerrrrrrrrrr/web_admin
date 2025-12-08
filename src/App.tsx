@@ -76,6 +76,7 @@ import useCompanyStore from './store/company'
 import CompanySelector from './components/CompanySelector'
 import LoginPage from './pages/Login'
 import NotFoundPage from './pages/NotFound'
+import AttendanceConfigPage from './pages/AttendanceConfig'
 import './App.css'
 import { fetchSystemConfig } from './api/services/systemConfig'
 
@@ -237,6 +238,13 @@ const routeDefinitions = [
         icon: <ClockCircleOutlined />,
         element: <AttendancePage />,
       },
+          {
+            key: 'attendance-config',
+            label: '考勤配置',
+            path: '/attendance-config',
+            icon: <SettingOutlined />,
+            element: <AttendanceConfigPage />,
+          },
       {
         key: 'notices',
         label: '公告管理',
