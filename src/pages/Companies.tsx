@@ -184,6 +184,29 @@ const CompaniesPage = () => {
         render: (value) => <Text strong>{value}</Text>,
       },
       {
+        title: '邀请码',
+        dataIndex: 'invitation_code',
+        width: 160,
+        render: (value) =>
+          value ? (
+            <Space>
+              <Text code>{value}</Text>
+              <Button
+                size="small"
+                type="link"
+                onClick={() => {
+                  navigator.clipboard.writeText(value)
+                  message.success('已复制')
+                }}
+              >
+                复制
+              </Button>
+            </Space>
+          ) : (
+            <Text type="secondary">-</Text>
+          ),
+      },
+      {
         title: '业务类型',
         dataIndex: 'business_type',
         width: 120,

@@ -17,6 +17,7 @@ export interface Company {
   status: string
   created_at?: string
   updated_at?: string
+  invitation_code?: string
 }
 
 // 公司统计
