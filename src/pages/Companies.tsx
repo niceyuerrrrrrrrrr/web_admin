@@ -74,8 +74,19 @@ const CompaniesPage = () => {
   useEffect(() => {
     if (companiesQuery.data?.records) {
       // 调试接口返回，确认是否带有 invitation_code
+      const sample = companiesQuery.data.records.slice(0, 3)
       // eslint-disable-next-line no-console
-      console.debug('[companies] sample', companiesQuery.data.records.slice(0, 3))
+      console.debug('[companies] sample', sample)
+      sample.forEach((c: any, i: number) => {
+        // eslint-disable-next-line no-console
+        console.debug(`[companies] item ${i}:`, {
+          id: c.id,
+          name: c.name,
+          invitation_code: c.invitation_code,
+          has_invitation_code: 'invitation_code' in c,
+          all_keys: Object.keys(c),
+        })
+      })
     }
   }, [companiesQuery.data])
 

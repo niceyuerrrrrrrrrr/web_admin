@@ -7,6 +7,9 @@ export const APPROVAL_TYPES = [
   { value: 'leave', label: '请假' },
   { value: 'material', label: '物品领用' },
   { value: 'report', label: '故障上报' },
+  { value: 'makeup', label: '补卡' },
+  { value: 'regularization', label: '转正' },
+  { value: 'offboarding', label: '离职' },
 ]
 
 export type ApprovalCoreFields = {

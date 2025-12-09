@@ -18,8 +18,16 @@ import {
   Tag,
   DatePicker,
   message,
+  Radio,
+  Upload,
+  Checkbox,
 } from 'antd'
 import dayjs from 'dayjs'
+import weekOfYear from 'dayjs/plugin/weekOfYear'
+import { DownloadOutlined, UploadOutlined, EditOutlined } from '@ant-design/icons'
+import type { UploadFile } from 'antd'
+
+dayjs.extend(weekOfYear)
 import {
   listShiftTemplates,
   createShiftTemplate,
@@ -39,14 +47,19 @@ import {
   createFence,
   updateFence,
   deleteFence,
+  listMakeupQuotas,
+  updateMakeupQuota,
   type ShiftTemplate,
   type AttendancePolicy,
   type LeaveTypeDict,
   type RosterItemPayload,
   type GeoFence,
+  type MakeupQuota,
 } from '../api/services/attendanceConfig'
 import { fetchUsers, type User } from '../api/services/users'
 import useCompanyStore from '../store/company'
+import useAuthStore from '../store/auth'
+import MapPicker from '../components/MapPicker'
 
 const { RangePicker } = DatePicker
 
@@ -59,18 +72,53 @@ const AttendanceConfigPage = () => {
   const [loadingPolicy, setLoadingPolicy] = useState(false)
   const [leaveTypes, setLeaveTypes] = useState<LeaveTypeDict[]>([])
   const [loadingLeaveTypes, setLoadingLeaveTypes] = useState(false)
-  const [rosterForm] = Form.useForm()
   const [rosterData, setRosterData] = useState<any[]>([])
   const [loadingRoster, setLoadingRoster] = useState(false)
   const [userOptions, setUserOptions] = useState<{ label: string; value: number }[]>([])
   const [loadingUsers, setLoadingUsers] = useState(false)
+  
+  // 矩阵视图相关状态
+  const [rosterViewMode, setRosterViewMode] = useState<'week' | 'month'>('week')
+  const [rosterStartDate, setRosterStartDate] = useState(dayjs().startOf('week'))
+  const [rosterUsers, setRosterUsers] = useState<User[]>([])
+  const [rosterUserFilter, setRosterUserFilter] = useState<{
+    search?: string
+    department?: string
+    role?: string
+  }>({})
+  const [selectedUsersForBatch, setSelectedUsersForBatch] = useState<number[]>([])
+  const [selectedDatesForBatch, setSelectedDatesForBatch] = useState<string[]>([])
+  const [rosterEditModal, setRosterEditModal] = useState<{
+    open: boolean
+    userId: number
+    userName: string
+    date: string
+    shiftId: number | null
+  } | null>(null)
 
   const [fenceList, setFenceList] = useState<GeoFence[]>([])
   const [loadingFences, setLoadingFences] = useState(false)
   const [fenceModalOpen, setFenceModalOpen] = useState(false)
   const [editingFence, setEditingFence] = useState<GeoFence | null>(null)
   const [fenceForm] = Form.useForm()
+  
+  // 补卡配额相关状态
+  const [makeupQuotas, setMakeupQuotas] = useState<MakeupQuota[]>([])
+  const [loadingMakeupQuotas, setLoadingMakeupQuotas] = useState(false)
+  const [makeupQuotaSearch, setMakeupQuotaSearch] = useState<string>('')
+  const [editingQuota, setEditingQuota] = useState<MakeupQuota | null>(null)
+  const [quotaModalOpen, setQuotaModalOpen] = useState(false)
+  const [quotaForm] = Form.useForm()
   const currentCompanyId = useCompanyStore((s) => s.currentCompany?.id)
+  const { user } = useAuthStore()
+  
+  // 检查是否有权限操作电子围栏（只有总经理和统计可以）
+  const canManageFences = useMemo(() => {
+    if (!user) return false
+    const isSuperAdmin = user.role === 'super_admin' || user.positionType === '超级管理员'
+    const allowedRoles = ['总经理', '统计', '统计员']
+    return isSuperAdmin || (user.positionType && allowedRoles.includes(user.positionType))
+  }, [user])
 
   const [shiftModalOpen, setShiftModalOpen] = useState(false)
   const [editingShift, setEditingShift] = useState<ShiftTemplate | null>(null)
@@ -118,23 +166,11 @@ const AttendanceConfigPage = () => {
     }
   }
 
+  // 注意：fetchRoster函数已不再使用，排班数据通过fetchRosterMatrix获取
+  // 保留此函数以防将来需要，但已移除rosterForm依赖
   const fetchRoster = async () => {
-    try {
-      const values = rosterForm.getFieldsValue()
-      if (!values.dateRange || values.dateRange.length !== 2) {
-        antdMessage.warning('请选择排班日期范围')
-        return
-      }
-      setLoadingRoster(true)
-      const start = values.dateRange[0].format('YYYY-MM-DD')
-      const end = values.dateRange[1].format('YYYY-MM-DD')
-      const data = await listRosters({ start_date: start, end_date: end }, currentCompanyId || undefined)
-      setRosterData(data || [])
-    } catch (err: any) {
-      antdMessage.error(err.message || '获取排班失败')
-    } finally {
-      setLoadingRoster(false)
-    }
+    // 此函数已废弃，使用fetchRosterMatrix代替
+    console.warn('fetchRoster已废弃，请使用fetchRosterMatrix')
   }
 
   useEffect(() => {
@@ -143,7 +179,16 @@ const AttendanceConfigPage = () => {
     fetchLeaveTypes()
     fetchFenceList()
     fetchUserOptions()
+    fetchMakeupQuotas()
   }, [currentCompanyId])
+
+  useEffect(() => {
+    fetchRosterUsers()
+  }, [currentCompanyId, rosterUserFilter])
+
+  useEffect(() => {
+    fetchRosterMatrix()
+  }, [currentCompanyId, rosterStartDate, rosterViewMode])
 
   const fetchFenceList = async () => {
     setLoadingFences(true)
@@ -154,6 +199,40 @@ const AttendanceConfigPage = () => {
       antdMessage.error(err.message || '获取围栏失败')
     } finally {
       setLoadingFences(false)
+    }
+  }
+
+  // 获取补卡配额列表
+  const fetchMakeupQuotas = async () => {
+    setLoadingMakeupQuotas(true)
+    try {
+      const data = await listMakeupQuotas(currentCompanyId || undefined, makeupQuotaSearch || undefined)
+      setMakeupQuotas(data)
+    } catch (err: any) {
+      antdMessage.error(err.message || '获取补卡配额列表失败')
+    } finally {
+      setLoadingMakeupQuotas(false)
+    }
+  }
+
+  // 更新补卡配额
+  const handleUpdateQuota = async (values: { monthly_makeup_quota: number }) => {
+    if (!editingQuota) return
+    try {
+      await updateMakeupQuota(
+        {
+          user_id: editingQuota.user_id,
+          monthly_makeup_quota: values.monthly_makeup_quota,
+        },
+        currentCompanyId || undefined
+      )
+      antdMessage.success('补卡配额更新成功')
+      setQuotaModalOpen(false)
+      setEditingQuota(null)
+      quotaForm.resetFields()
+      fetchMakeupQuotas()
+    } catch (err: any) {
+      antdMessage.error(err.message || '更新补卡配额失败')
     }
   }
 
@@ -171,6 +250,215 @@ const AttendanceConfigPage = () => {
       antdMessage.error(err.message || '获取用户列表失败')
     } finally {
       setLoadingUsers(false)
+    }
+  }
+
+  // 获取用户列表（用于矩阵视图）
+  const fetchRosterUsers = async () => {
+    try {
+      const res = await fetchUsers({
+        page: 1,
+        size: 1000,
+        name: rosterUserFilter.search,
+        company_id: currentCompanyId || undefined,
+      })
+      let users = res.items
+      
+      // 按部门筛选
+      if (rosterUserFilter.department) {
+        users = users.filter((u: User) => u.position_type === rosterUserFilter.department)
+      }
+      
+      // 按角色筛选
+      if (rosterUserFilter.role) {
+        users = users.filter((u: User) => u.role === rosterUserFilter.role)
+      }
+      
+      setRosterUsers(users)
+    } catch (err: any) {
+      antdMessage.error(err.message || '获取用户列表失败')
+    }
+  }
+
+  // 获取排班数据（用于矩阵视图）
+  const fetchRosterMatrix = async () => {
+    if (!rosterStartDate) return
+    
+    const endDate = rosterViewMode === 'week' 
+      ? rosterStartDate.clone().add(6, 'day')
+      : rosterStartDate.clone().add(1, 'month').subtract(1, 'day')
+    
+    setLoadingRoster(true)
+    try {
+      const start = rosterStartDate.format('YYYY-MM-DD')
+      const end = endDate.format('YYYY-MM-DD')
+      const data = await listRosters({ start_date: start, end_date: end }, currentCompanyId || undefined)
+      setRosterData(data || [])
+    } catch (err: any) {
+      antdMessage.error(err.message || '获取排班失败')
+    } finally {
+      setLoadingRoster(false)
+    }
+  }
+
+  // 获取日期列表
+  const getDateList = () => {
+    if (!rosterStartDate) return []
+    const dates: string[] = []
+    const endDate = rosterViewMode === 'week' 
+      ? rosterStartDate.clone().add(6, 'day')
+      : rosterStartDate.clone().add(1, 'month').subtract(1, 'day')
+    
+    let current = rosterStartDate.clone()
+    while (current.isBefore(endDate) || current.isSame(endDate, 'day')) {
+      dates.push(current.format('YYYY-MM-DD'))
+      current = current.add(1, 'day')
+    }
+    return dates
+  }
+
+  // 获取某用户某天的班次
+  const getShiftForUserDate = (userId: number, date: string) => {
+    const roster = rosterData.find((r: any) => r.user_id === userId && r.work_date === date)
+    if (!roster || !roster.shift_id) return null
+    return shifts.find((s) => s.id === roster.shift_id)
+  }
+
+  // 获取某用户某天的考勤状态
+  const getAttendanceStatusForUserDate = (userId: number, date: string) => {
+    const roster = rosterData.find((r: any) => r.user_id === userId && r.work_date === date)
+    return roster?.attendance_status || null
+  }
+
+  // 判断日期是否为往日（今天之前）
+  const isPastDate = (date: string) => {
+    return dayjs(date).isBefore(dayjs(), 'day')
+  }
+
+  // 更新单个单元格的排班
+  const updateCellRoster = async (userId: number, date: string, shiftId: number | null) => {
+    try {
+      await setRosters(
+        [
+          {
+            user_id: userId,
+            work_date: date,
+            shift_id: shiftId,
+            status: 'normal',
+          },
+        ],
+        currentCompanyId || undefined,
+      )
+      antdMessage.success('排班已更新')
+      await fetchRosterMatrix()
+    } catch (err: any) {
+      antdMessage.error(err.message || '更新排班失败')
+    }
+  }
+
+  // 批量排班
+  const handleBatchRoster = async (shiftId: number | null) => {
+    if (!selectedUsersForBatch.length || !selectedDatesForBatch.length) {
+      antdMessage.warning('请选择员工和日期')
+      return
+    }
+    
+    try {
+      const items: RosterItemPayload[] = []
+      selectedUsersForBatch.forEach((userId) => {
+        selectedDatesForBatch.forEach((date) => {
+          items.push({
+            user_id: userId,
+            work_date: date,
+            shift_id: shiftId,
+            status: 'normal',
+          })
+        })
+      })
+      await setRosters(items, currentCompanyId || undefined)
+      antdMessage.success('批量排班已保存')
+      await fetchRosterMatrix()
+      setSelectedUsersForBatch([])
+      setSelectedDatesForBatch([])
+    } catch (err: any) {
+      antdMessage.error(err.message || '批量排班失败')
+    }
+  }
+
+  // 导出排班数据
+  const exportRoster = () => {
+    const dates = getDateList()
+    const headers = ['员工姓名', '员工ID', ...dates]
+    const rows: string[][] = []
+    
+    rosterUsers.forEach((user) => {
+      const row = [
+        user.name || user.nickname || '未知',
+        String(user.id),
+        ...dates.map((date) => {
+          const shift = getShiftForUserDate(user.id, date)
+          return shift ? shift.name : ''
+        }),
+      ]
+      rows.push(row)
+    })
+    
+    const csvContent = [
+      headers.join(','),
+      ...rows.map((row) => row.map((cell) => `"${cell}"`).join(',')),
+    ].join('\n')
+    
+    const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' })
+    const link = document.createElement('a')
+    link.href = URL.createObjectURL(blob)
+    link.download = `排班表_${rosterStartDate.format('YYYY-MM-DD')}_${rosterViewMode === 'week' ? '周' : '月'}.csv`
+    link.click()
+  }
+
+  // 导入排班数据
+  const importRoster = async (file: File) => {
+    try {
+      const text = await file.text()
+      const lines = text.split('\n').filter((line) => line.trim())
+      if (lines.length < 2) {
+        antdMessage.error('文件格式错误')
+        return
+      }
+      
+      const headers = lines[0].split(',').map((h) => h.replace(/"/g, '').trim())
+      const dateCols = headers.slice(2) // 跳过员工姓名和ID
+      const items: RosterItemPayload[] = []
+      
+      for (let i = 1; i < lines.length; i++) {
+        const cells = lines[i].split(',').map((c) => c.replace(/"/g, '').trim())
+        const userId = parseInt(cells[1])
+        if (!userId) continue
+        
+        dateCols.forEach((date, idx) => {
+          const shiftName = cells[idx + 2]
+          if (!shiftName) return
+          
+          const shift = shifts.find((s) => s.name === shiftName)
+          if (shift) {
+            items.push({
+              user_id: userId,
+              work_date: date,
+              shift_id: shift.id,
+              status: 'normal',
+            })
+          }
+        })
+      }
+      
+      if (items.length > 0) {
+        await setRosters(items, currentCompanyId || undefined)
+        antdMessage.success(`成功导入 ${items.length} 条排班数据`)
+        await fetchRosterMatrix()
+      } else {
+        antdMessage.warning('没有有效的排班数据')
+      }
+    } catch (err: any) {
+      antdMessage.error(err.message || '导入失败')
     }
   }
 
@@ -456,107 +744,307 @@ const AttendanceConfigPage = () => {
             label: '排班管理',
             children: (
               <Card
-                title="排班管理（按日期范围查询/设置）"
+                title="排班管理（矩阵视图）"
                 extra={
-                  <Button onClick={fetchRoster} loading={loadingRoster}>
-                    刷新
-                  </Button>
+                  <Space>
+                    <Upload
+                      accept=".csv"
+                      showUploadList={false}
+                      beforeUpload={(file) => {
+                        importRoster(file)
+                        return false
+                      }}
+                    >
+                      <Button icon={<UploadOutlined />}>导入</Button>
+                    </Upload>
+                    <Button icon={<DownloadOutlined />} onClick={exportRoster}>
+                      导出
+                    </Button>
+                    <Button onClick={fetchRosterMatrix} loading={loadingRoster}>
+                      刷新
+                    </Button>
+                  </Space>
                 }
               >
-                <Form form={rosterForm} layout="inline" initialValues={{ dateRange: [dayjs(), dayjs().add(7, 'day')], status: 'normal' }}>
-                  <Form.Item label="日期范围" name="dateRange" rules={[{ required: true, message: '请选择日期范围' }]}>
-                    <RangePicker />
-                  </Form.Item>
-                  <Form.Item label="用户" name="userIds">
-                    <Select
-                      mode="multiple"
-                      allowClear
-                      showSearch
-                      filterOption={false}
-                      onSearch={(val) => fetchUserOptions(val)}
-                      placeholder="选择或搜索用户"
-                      notFoundContent={loadingUsers ? '加载中...' : '无数据'}
-                      options={userOptions}
-                      style={{ minWidth: 260 }}
-                    />
-                  </Form.Item>
-                  <Form.Item label="班次" name="shift_id">
-                    <Select
-                      allowClear
-                      style={{ width: 200 }}
-                      options={shifts.map((s) => ({ label: `${s.name} (${s.start_time}-${s.end_time})`, value: s.id }))}
-                    />
-                  </Form.Item>
-                  <Form.Item label="状态" name="status">
-                    <Select
-                      style={{ width: 140 }}
-                      options={[
-                        { label: '正常', value: 'normal' },
-                        { label: '请假/外勤', value: 'leave' },
-                        { label: '休息', value: 'off' },
-                      ]}
-                    />
-                  </Form.Item>
-                  <Form.Item>
-                    <Space>
-                      <Button type="primary" onClick={fetchRoster} loading={loadingRoster}>
-                        查询
-                      </Button>
-                      <Button
-                        onClick={async () => {
-                          try {
-                            const values = await rosterForm.validateFields()
-                            const userIds = (values.userIds as number[]) || []
-                            if (!userIds.length) {
-                              antdMessage.warning('请选择用户')
-                              return
-                            }
-                            if (!values.dateRange || values.dateRange.length !== 2) {
-                              antdMessage.warning('请选择日期范围')
-                              return
-                            }
-                            const [start, end] = values.dateRange
-                            const days: string[] = []
-                            let cur = start.clone()
-                            while (cur.isBefore(end) || cur.isSame(end, 'day')) {
-                              days.push(cur.format('YYYY-MM-DD'))
-                              cur = cur.add(1, 'day')
-                            }
-                            const items: RosterItemPayload[] = []
-                            userIds.forEach((uid: number) => {
-                              days.forEach((d) => {
-                                items.push({
-                                  user_id: uid,
-                                  work_date: d,
-                                  shift_id: values.shift_id,
-                                  status: values.status || 'normal',
-                                })
-                              })
-                            })
-                            await setRosters(items, currentCompanyId || undefined)
-                            antdMessage.success('排班已保存')
-                            fetchRoster()
-                          } catch {}
+                <Space direction="vertical" size="large" style={{ width: '100%' }}>
+                  {/* 视图控制和日期选择 */}
+                  <Row gutter={16} align="middle">
+                    <Col>
+                      <Radio.Group
+                        value={rosterViewMode}
+                        onChange={(e) => {
+                          setRosterViewMode(e.target.value)
+                          setRosterStartDate(e.target.value === 'week' ? dayjs().startOf('week') : dayjs().startOf('month'))
                         }}
-                        loading={loadingRoster}
                       >
-                        批量排班
-                      </Button>
-                    </Space>
-                  </Form.Item>
-                </Form>
-                <Divider />
-                <Table
-                  rowKey="id"
-                  loading={loadingRoster}
-                  columns={[
-                    { title: '用户ID', dataIndex: 'user_id' },
-                    { title: '日期', dataIndex: 'work_date' },
-                    { title: '班次ID', dataIndex: 'shift_id' },
-                    { title: '状态', dataIndex: 'status' },
-                  ]}
-                  dataSource={rosterData}
-                />
+                        <Radio.Button value="week">周视图</Radio.Button>
+                        <Radio.Button value="month">月视图</Radio.Button>
+                      </Radio.Group>
+                    </Col>
+                    <Col>
+                      <Space>
+                        <Button
+                          onClick={() => {
+                            const newDate = rosterViewMode === 'week' 
+                              ? rosterStartDate.clone().subtract(1, 'week')
+                              : rosterStartDate.clone().subtract(1, 'month')
+                            setRosterStartDate(newDate)
+                          }}
+                        >
+                          上一{rosterViewMode === 'week' ? '周' : '月'}
+                        </Button>
+                        <DatePicker
+                          value={rosterStartDate}
+                          onChange={(date) => {
+                            if (date) {
+                              setRosterStartDate(rosterViewMode === 'week' ? date.startOf('week') : date.startOf('month'))
+                            }
+                          }}
+                          picker={rosterViewMode}
+                        />
+                        <Button
+                          onClick={() => {
+                            const newDate = rosterViewMode === 'week' 
+                              ? rosterStartDate.clone().add(1, 'week')
+                              : rosterStartDate.clone().add(1, 'month')
+                            setRosterStartDate(newDate)
+                          }}
+                        >
+                          下一{rosterViewMode === 'week' ? '周' : '月'}
+                        </Button>
+                        <Button onClick={() => setRosterStartDate(rosterViewMode === 'week' ? dayjs().startOf('week') : dayjs().startOf('month'))}>
+                          今天
+                        </Button>
+                      </Space>
+                    </Col>
+                  </Row>
+
+                  {/* 员工筛选 */}
+                  <Row gutter={16}>
+                    <Col span={8}>
+                      <Input
+                        placeholder="搜索员工姓名"
+                        value={rosterUserFilter.search}
+                        onChange={(e) => setRosterUserFilter({ ...rosterUserFilter, search: e.target.value })}
+                        allowClear
+                      />
+                    </Col>
+                    <Col span={8}>
+                      <Select
+                        placeholder="筛选部门/职位"
+                        value={rosterUserFilter.department}
+                        onChange={(value) => setRosterUserFilter({ ...rosterUserFilter, department: value })}
+                        allowClear
+                        style={{ width: '100%' }}
+                      >
+                        <Select.Option value="司机">司机</Select.Option>
+                        <Select.Option value="车队长">车队长</Select.Option>
+                        <Select.Option value="总经理">总经理</Select.Option>
+                      </Select>
+                    </Col>
+                    <Col span={8}>
+                      <Select
+                        placeholder="筛选角色"
+                        value={rosterUserFilter.role}
+                        onChange={(value) => setRosterUserFilter({ ...rosterUserFilter, role: value })}
+                        allowClear
+                        style={{ width: '100%' }}
+                      >
+                        <Select.Option value="driver">司机</Select.Option>
+                        <Select.Option value="fleet_manager">车队长</Select.Option>
+                        <Select.Option value="general_manager">总经理</Select.Option>
+                      </Select>
+                    </Col>
+                  </Row>
+
+                  {/* 批量排班操作 */}
+                  {(selectedUsersForBatch.length > 0 || selectedDatesForBatch.length > 0) && (
+                    <Card size="small" style={{ background: '#f0f2f5' }}>
+                      <Space>
+                        <span>
+                          已选择 {selectedUsersForBatch.length} 名员工，{selectedDatesForBatch.length} 个日期
+                        </span>
+                        <Select
+                          placeholder="选择班次进行批量排班"
+                          style={{ width: 200 }}
+                          onChange={(shiftId) => {
+                            if (shiftId !== undefined) {
+                              handleBatchRoster(shiftId)
+                            }
+                          }}
+                          allowClear
+                        >
+                          <Select.Option value={null}>无排班</Select.Option>
+                          {shifts.map((s) => (
+                            <Select.Option key={s.id} value={s.id}>
+                              {s.name} ({s.start_time}-{s.end_time})
+                            </Select.Option>
+                          ))}
+                        </Select>
+                        <Button onClick={() => {
+                          setSelectedUsersForBatch([])
+                          setSelectedDatesForBatch([])
+                        }}>
+                          清除选择
+                        </Button>
+                      </Space>
+                    </Card>
+                  )}
+
+                  {/* 矩阵表格 */}
+                  <div style={{ overflowX: 'auto', maxWidth: '100%' }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 800 }}>
+                      <thead>
+                        <tr>
+                          <th style={{ padding: '8px', border: '1px solid #d9d9d9', background: '#fafafa', position: 'sticky', left: 0, zIndex: 10, minWidth: 120 }}>
+                            <Checkbox
+                              checked={rosterUsers.length > 0 && selectedUsersForBatch.length === rosterUsers.length}
+                              indeterminate={selectedUsersForBatch.length > 0 && selectedUsersForBatch.length < rosterUsers.length}
+                              onChange={(e) => {
+                                if (e.target.checked) {
+                                  setSelectedUsersForBatch(rosterUsers.map((u) => u.id))
+                                } else {
+                                  setSelectedUsersForBatch([])
+                                }
+                              }}
+                            />
+                            <span style={{ marginLeft: 8 }}>员工姓名</span>
+                          </th>
+                          {getDateList().map((date) => {
+                            const d = dayjs(date)
+                            const isSelected = selectedDatesForBatch.includes(date)
+                            return (
+                              <th
+                                key={date}
+                                style={{
+                                  padding: '8px',
+                                  border: '1px solid #d9d9d9',
+                                  background: isSelected ? '#e6f7ff' : '#fafafa',
+                                  minWidth: 100,
+                                  cursor: 'pointer',
+                                }}
+                                onClick={() => {
+                                  if (isSelected) {
+                                    setSelectedDatesForBatch(selectedDatesForBatch.filter((d) => d !== date))
+                                  } else {
+                                    setSelectedDatesForBatch([...selectedDatesForBatch, date])
+                                  }
+                                }}
+                              >
+                                <Checkbox
+                                  checked={isSelected}
+                                  onChange={(e) => {
+                                    if (e.target.checked) {
+                                      setSelectedDatesForBatch([...selectedDatesForBatch, date])
+                                    } else {
+                                      setSelectedDatesForBatch(selectedDatesForBatch.filter((d) => d !== date))
+                                    }
+                                  }}
+                                />
+                                <div>{d.format('MM-DD')}</div>
+                                <div style={{ fontSize: '12px', color: '#999' }}>
+                                  {['日', '一', '二', '三', '四', '五', '六'][d.day()]}
+                                </div>
+                              </th>
+                            )
+                          })}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {rosterUsers.map((user) => {
+                          const isUserSelected = selectedUsersForBatch.includes(user.id)
+                          return (
+                            <tr key={user.id}>
+                              <td
+                                style={{
+                                  padding: '8px',
+                                  border: '1px solid #d9d9d9',
+                                  background: isUserSelected ? '#e6f7ff' : '#fff',
+                                  position: 'sticky',
+                                  left: 0,
+                                  zIndex: 5,
+                                  cursor: 'pointer',
+                                }}
+                                onClick={() => {
+                                  if (isUserSelected) {
+                                    setSelectedUsersForBatch(selectedUsersForBatch.filter((id) => id !== user.id))
+                                  } else {
+                                    setSelectedUsersForBatch([...selectedUsersForBatch, user.id])
+                                  }
+                                }}
+                              >
+                                <Checkbox
+                                  checked={isUserSelected}
+                                  onChange={(e) => {
+                                    if (e.target.checked) {
+                                      setSelectedUsersForBatch([...selectedUsersForBatch, user.id])
+                                    } else {
+                                      setSelectedUsersForBatch(selectedUsersForBatch.filter((id) => id !== user.id))
+                                    }
+                                  }}
+                                />
+                                <span style={{ marginLeft: 8 }}>
+                                  {user.name || user.nickname || `用户${user.id}`}
+                                </span>
+                              </td>
+                              {getDateList().map((date) => {
+                                const shift = getShiftForUserDate(user.id, date)
+                                const attendanceStatus = getAttendanceStatusForUserDate(user.id, date)
+                                const isCellSelected = isUserSelected && selectedDatesForBatch.includes(date)
+                                const isPast = isPastDate(date)
+                                
+                                // 根据考勤状态设置背景色（仅对往日排班）
+                                let cellBackground = '#fff'
+                                if (isCellSelected) {
+                                  cellBackground = '#e6f7ff'
+                                } else if (isPast && attendanceStatus) {
+                                  if (attendanceStatus === 'normal') {
+                                    cellBackground = '#f6ffed' // 绿色（正常出勤）
+                                  } else if (attendanceStatus === 'absent' || attendanceStatus === 'late' || attendanceStatus === 'early') {
+                                    cellBackground = '#fff1f0' // 红色（缺勤/迟到/早退）
+                                  } else if (attendanceStatus === 'leave') {
+                                    cellBackground = '#fffbe6' // 黄色（请假）
+                                  }
+                                }
+                                
+                                return (
+                                  <td
+                                    key={date}
+                                    style={{
+                                      padding: '8px',
+                                      border: '1px solid #d9d9d9',
+                                      background: cellBackground,
+                                      cursor: 'pointer',
+                                      textAlign: 'center',
+                                      minWidth: 100,
+                                    }}
+                                  >
+                                    <Tag 
+                                      color={shift ? 'green' : 'default'} 
+                                      style={{ cursor: 'pointer', width: '100%', display: 'block', textAlign: 'center' }}
+                                      onClick={(e) => {
+                                        e.stopPropagation()
+                                        setRosterEditModal({
+                                          open: true,
+                                          userId: user.id,
+                                          userName: user.name || user.nickname || `用户${user.id}`,
+                                          date,
+                                          shiftId: shift?.id || null,
+                                        })
+                                      }}
+                                    >
+                                      {shift ? shift.name : '-'}
+                                    </Tag>
+                                  </td>
+                                )
+                              })}
+                            </tr>
+                          )
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </Space>
               </Card>
             ),
           },
@@ -567,17 +1055,19 @@ const AttendanceConfigPage = () => {
               <Card
                 title="电子围栏"
                 extra={
-                  <Button
-                    type="primary"
-                    onClick={() => {
-                      setEditingFence(null)
-                      fenceForm.resetFields()
-                      fenceForm.setFieldsValue({ is_active: true, location_type: 'other' })
-                      setFenceModalOpen(true)
-                    }}
-                  >
-                    新建围栏
-                  </Button>
+                  canManageFences && (
+                    <Button
+                      type="primary"
+                      onClick={() => {
+                        setEditingFence(null)
+                        fenceForm.resetFields()
+                        fenceForm.setFieldsValue({ is_active: true, location_type: 'other' })
+                        setFenceModalOpen(true)
+                      }}
+                    >
+                      新建围栏
+                    </Button>
+                  )
                 }
               >
                 <Table
@@ -614,47 +1104,51 @@ const AttendanceConfigPage = () => {
                     {
                       title: '操作',
                       render: (_: any, record: GeoFence) => (
-                        <Space>
-                          <Button
-                            type="link"
-                            onClick={() => {
-                              setEditingFence(record)
-                              fenceForm.setFieldsValue({
-                                name: record.name,
-                                center_lng: record.center_lng,
-                                center_lat: record.center_lat,
-                                radius: record.radius,
-                                description: record.description,
-                                allowed_roles: record.allowed_roles,
-                                location_type: record.location_type,
-                                is_active: record.is_active,
-                              })
-                              setFenceModalOpen(true)
-                            }}
-                          >
-                            编辑
-                          </Button>
-                          <Button
-                            type="link"
-                            danger
-                            onClick={() =>
-                              modal.confirm({
-                                title: '确认删除该围栏？',
-                                onOk: async () => {
-                                  try {
+                        canManageFences ? (
+                          <Space>
+                            <Button
+                              type="link"
+                              onClick={() => {
+                                setEditingFence(record)
+                                fenceForm.setFieldsValue({
+                                  name: record.name,
+                                  center_lng: Number(record.center_lng),
+                                  center_lat: Number(record.center_lat),
+                                  radius: record.radius,
+                                  description: record.description,
+                                  allowed_roles: record.allowed_roles,
+                                  location_type: record.location_type,
+                                  is_active: record.is_active,
+                                })
+                                setFenceModalOpen(true)
+                              }}
+                            >
+                              编辑
+                            </Button>
+                            <Button
+                              type="link"
+                              danger
+                              onClick={() =>
+                                modal.confirm({
+                                  title: '确认删除该围栏？',
+                                  onOk: async () => {
+                                    try {
                       await deleteFence(record.id, currentCompanyId || undefined)
-                                    antdMessage.success('已删除')
-                                    fetchFenceList()
-                                  } catch (err: any) {
-                                    antdMessage.error(err.message || '删除失败')
-                                  }
-                                },
-                              })
-                            }
-                          >
-                            删除
-                          </Button>
-                        </Space>
+                                      antdMessage.success('已删除')
+                                      fetchFenceList()
+                                    } catch (err: any) {
+                                      antdMessage.error(err.message || '删除失败')
+                                    }
+                                  },
+                                })
+                              }
+                            >
+                              删除
+                            </Button>
+                          </Space>
+                        ) : (
+                          <span style={{ color: '#999' }}>无权限</span>
+                        )
                       ),
                     },
                   ]}
@@ -674,6 +1168,79 @@ const AttendanceConfigPage = () => {
                       )
                     },
                   }}
+                />
+              </Card>
+            ),
+          },
+          {
+            key: 'makeup-quota',
+            label: '补卡配额',
+            children: (
+              <Card
+                title="补卡配额管理"
+                extra={
+                  <Space>
+                    <Input.Search
+                      placeholder="搜索员工姓名"
+                      value={makeupQuotaSearch}
+                      onChange={(e) => setMakeupQuotaSearch(e.target.value)}
+                      onSearch={fetchMakeupQuotas}
+                      style={{ width: 200 }}
+                      allowClear
+                    />
+                    <Button onClick={fetchMakeupQuotas} loading={loadingMakeupQuotas}>
+                      刷新
+                    </Button>
+                  </Space>
+                }
+              >
+                <Table
+                  rowKey="user_id"
+                  loading={loadingMakeupQuotas}
+                  columns={[
+                    { title: '员工ID', dataIndex: 'user_id', width: 100 },
+                    { title: '员工姓名', dataIndex: 'user_name' },
+                    { title: '职位', dataIndex: 'position_type' },
+                    {
+                      title: '每月配额',
+                      dataIndex: 'monthly_makeup_quota',
+                      render: (quota: number) => <Tag color="blue">{quota}次</Tag>,
+                    },
+                    {
+                      title: '已使用',
+                      dataIndex: 'used_makeup_count',
+                      render: (used: number) => <Tag color="orange">{used}次</Tag>,
+                    },
+                    {
+                      title: '剩余',
+                      dataIndex: 'remaining',
+                      render: (remaining: number, record: MakeupQuota) => (
+                        <Tag color={remaining > 0 ? 'green' : 'red'}>{remaining}次</Tag>
+                      ),
+                    },
+                    {
+                      title: '上次重置日期',
+                      dataIndex: 'last_reset_date',
+                      render: (date: string | null) => date || '-',
+                    },
+                    {
+                      title: '操作',
+                      render: (_: any, record: MakeupQuota) => (
+                        <Button
+                          type="link"
+                          onClick={() => {
+                            setEditingQuota(record)
+                            quotaForm.setFieldsValue({ monthly_makeup_quota: record.monthly_makeup_quota })
+                            setQuotaModalOpen(true)
+                          }}
+                        >
+                          编辑配额
+                        </Button>
+                      ),
+                    },
+                  ]}
+                  dataSource={makeupQuotas}
+                  pagination={{ pageSize: 20 }}
                 />
               </Card>
             ),
@@ -767,7 +1334,12 @@ const AttendanceConfigPage = () => {
       <Modal
         title={editingFence ? '编辑围栏' : '新建围栏'}
         open={fenceModalOpen}
-        onCancel={() => setFenceModalOpen(false)}
+        width={800}
+        onCancel={() => {
+          setFenceModalOpen(false)
+          setEditingFence(null)
+          fenceForm.resetFields()
+        }}
         onOk={async () => {
           try {
             const values = await fenceForm.validateFields()
@@ -787,11 +1359,24 @@ const AttendanceConfigPage = () => {
           <Form.Item label="名称" name="name" rules={[{ required: true }]}>
             <Input />
           </Form.Item>
+          <Form.Item label="选择位置">
+            <MapPicker
+              lng={fenceForm.getFieldValue('center_lng')}
+              lat={fenceForm.getFieldValue('center_lat')}
+              onChange={(lng, lat, address) => {
+                fenceForm.setFieldsValue({
+                  center_lng: lng,
+                  center_lat: lat,
+                })
+              }}
+              height={350}
+            />
+          </Form.Item>
           <Form.Item label="经度" name="center_lng" rules={[{ required: true, type: 'number' }]}>
-            <InputNumber className="w-full" controls={false} />
+            <InputNumber className="w-full" controls={false} precision={6} />
           </Form.Item>
           <Form.Item label="纬度" name="center_lat" rules={[{ required: true, type: 'number' }]}>
-            <InputNumber className="w-full" controls={false} />
+            <InputNumber className="w-full" controls={false} precision={6} />
           </Form.Item>
           <Form.Item label="半径(米)" name="radius" rules={[{ required: true, type: 'number' }]}>
             <InputNumber min={10} max={2000} className="w-full" />
@@ -817,6 +1402,98 @@ const AttendanceConfigPage = () => {
             <Switch defaultChecked />
           </Form.Item>
         </Form>
+      </Modal>
+
+      {/* 补卡配额编辑Modal */}
+      <Modal
+        title={`编辑补卡配额 - ${editingQuota?.user_name || ''}`}
+        open={quotaModalOpen}
+        onCancel={() => {
+          setQuotaModalOpen(false)
+          setEditingQuota(null)
+          quotaForm.resetFields()
+        }}
+        onOk={async () => {
+          try {
+            const values = await quotaForm.validateFields()
+            await handleUpdateQuota(values)
+          } catch {}
+        }}
+      >
+        <Form form={quotaForm} layout="vertical">
+          <Form.Item
+            label="每月补卡配额"
+            name="monthly_makeup_quota"
+            rules={[{ required: true, message: '请输入每月补卡配额' }]}
+            extra="设置该员工每月可以补卡的次数（0-100次）"
+          >
+            <InputNumber min={0} max={100} className="w-full" />
+          </Form.Item>
+          {editingQuota && (
+            <div style={{ marginTop: 16, padding: 12, background: '#f5f5f5', borderRadius: 4 }}>
+              <div>当前已使用：{editingQuota.used_makeup_count}次</div>
+              <div>当前剩余：{editingQuota.remaining}次</div>
+              <div style={{ marginTop: 8, fontSize: 12, color: '#999' }}>
+                注意：修改配额不会影响已使用的次数，每月1日会自动重置使用次数
+              </div>
+            </div>
+          )}
+        </Form>
+      </Modal>
+
+      {/* 排班编辑Modal */}
+      <Modal
+        title={rosterEditModal ? `设置排班 - ${rosterEditModal.userName} - ${dayjs(rosterEditModal.date).format('MM-DD')}` : ''}
+        open={rosterEditModal?.open || false}
+        onCancel={() => setRosterEditModal(null)}
+        footer={null}
+        width={400}
+      >
+        {rosterEditModal && (
+          <Space direction="vertical" style={{ width: '100%', marginTop: 16 }}>
+            <Select
+              placeholder="选择班次"
+              style={{ width: '100%' }}
+              value={rosterEditModal.shiftId}
+              onChange={(value) => {
+                if (rosterEditModal) {
+                  setRosterEditModal({ ...rosterEditModal, shiftId: value })
+                }
+              }}
+            >
+              <Select.Option value={null}>无排班</Select.Option>
+              {shifts.map((s) => (
+                <Select.Option key={s.id} value={s.id}>
+                  {s.name} ({s.start_time}-{s.end_time})
+                </Select.Option>
+              ))}
+            </Select>
+            <Space style={{ marginTop: 16, width: '100%', justifyContent: 'flex-end' }}>
+              <Button
+                type="primary"
+                onClick={async () => {
+                  if (rosterEditModal) {
+                    await updateCellRoster(rosterEditModal.userId, rosterEditModal.date, rosterEditModal.shiftId)
+                    setRosterEditModal(null)
+                  }
+                }}
+              >
+                保存
+              </Button>
+              <Button
+                onClick={async () => {
+                  if (rosterEditModal) {
+                    await updateCellRoster(rosterEditModal.userId, rosterEditModal.date, null)
+                    setRosterEditModal(null)
+                  }
+                }}
+              >
+                清除排班
+              </Button>
+              <Button onClick={() => setRosterEditModal(null)}>取消</Button>
+            </Space>
+          </Space>
+        )}
       </Modal>
     </Space>
   )

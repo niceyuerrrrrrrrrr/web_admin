@@ -153,4 +153,34 @@ export const updateFence = (id: number, payload: Partial<GeoFencePayload>, compa
 export const deleteFence = (id: number, companyId?: number) =>
   unwrap(client.delete(`/attendance/config/fences/${id}`, { params: companyId ? { company_id: companyId } : undefined }))
 
+// ============ 补卡配额管理 ============
+
+export interface MakeupQuota {
+  user_id: number
+  user_name: string
+  position_type: string
+  monthly_makeup_quota: number
+  used_makeup_count: number
+  remaining: number
+  last_reset_date: string | null
+}
+
+export interface MakeupQuotaUpdate {
+  user_id: number
+  monthly_makeup_quota: number
+}
+
+export const listMakeupQuotas = (companyId?: number, search?: string) =>
+  unwrap(client.get<MakeupQuota[]>('/attendance/config/makeup-quotas', { 
+    params: { 
+      ...(companyId ? { company_id: companyId } : {}),
+      ...(search ? { search } : {})
+    } 
+  }))
+
+export const updateMakeupQuota = (payload: MakeupQuotaUpdate, companyId?: number) =>
+  unwrap(client.put('/attendance/config/makeup-quota', payload, { 
+    params: companyId ? { company_id: companyId } : undefined 
+  }))
+
 
