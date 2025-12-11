@@ -240,6 +240,7 @@ export interface ReimbursementRecord {
   approver_name?: string
   amount: number
   category: string
+  subcategory?: string
   merchant?: string
   date: string
   remark?: string

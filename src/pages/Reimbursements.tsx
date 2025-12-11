@@ -60,13 +60,22 @@ const { Title, Paragraph, Text } = Typography
 const { RangePicker } = DatePicker
 
 const categoryOptions = [
-  '交通',
-  '餐饮',
-  '住宿',
-  '办公',
-  '采购',
+  '办公室支出',
+  '加油费',
+  '打车费',
+  '过路费',
+  '违章',
+  '餐费',
+  '充电费',
+  '维修',
+  '保养',
   '其他',
 ].map((item) => ({ label: item, value: item }))
+
+const subcategoryOptions: Record<string, string[]> = {
+  '维修': ['换胎', '换气管', '焊车', '补胎', '其他维修'],
+  '保养': ['加柴暖', '加水', '打黄油'],
+}
 
 const ReimbursementsPage = () => {
   const queryClient = useQueryClient()
@@ -83,6 +92,7 @@ const ReimbursementsPage = () => {
     keyword?: string
     applicantId?: number
     category?: string
+    subcategory?: string
     dateRange?: [dayjs.Dayjs, dayjs.Dayjs]
   }>({
     dateRange: [dayjs().subtract(29, 'day'), dayjs()],
@@ -114,6 +124,7 @@ const ReimbursementsPage = () => {
         userId: filters.applicantId,
         beginDate: filters.dateRange ? filters.dateRange[0]?.format('YYYY-MM-DD') : undefined,
         endDate: filters.dateRange ? filters.dateRange[1]?.format('YYYY-MM-DD') : undefined,
+        subcategory: filters.subcategory,
         companyId: effectiveCompanyId,
       }),
     enabled: !isSuperAdmin || !!effectiveCompanyId,
@@ -221,6 +232,7 @@ const ReimbursementsPage = () => {
     nextFilters.status = values.status
     nextFilters.keyword = values.keyword
     nextFilters.category = values.category
+    nextFilters.subcategory = values.subcategory
     nextFilters.applicantId = values.applicantId
     nextFilters.dateRange = values.dateRange
     setFilters(nextFilters)
@@ -258,7 +270,9 @@ const ReimbursementsPage = () => {
       {
         title: '类别',
         dataIndex: 'category',
-        width: 120,
+        width: 160,
+        render: (_: any, record) =>
+          record.subcategory ? `${record.category} / ${record.subcategory}` : record.category,
       },
       {
         title: '项目/备注',
@@ -376,6 +390,7 @@ const ReimbursementsPage = () => {
         user_id: values.user_id,
         amount: values.amount,
         category: values.category,
+        subcategory: values.subcategory,
         merchant: values.merchant,
         date: values.date.format('YYYY-MM-DD'),
         remark: values.remark,
@@ -459,6 +474,7 @@ const ReimbursementsPage = () => {
                       keyword: filters.keyword,
                       applicantId: filters.applicantId,
                       category: filters.category,
+                      subcategory: filters.subcategory,
                       dateRange: filters.dateRange,
                     }}
                     onFinish={handleFilters}
@@ -472,6 +488,25 @@ const ReimbursementsPage = () => {
                     </Form.Item>
                     <Form.Item name="category" label="类别">
                       <Select allowClear placeholder="请选择类别" style={{ width: 150 }} options={categoryOptions} />
+                    </Form.Item>
+                    <Form.Item noStyle shouldUpdate={(prev, next) => prev.category !== next.category}>
+                      {({ getFieldValue }) => {
+                        const category = getFieldValue('category') as string
+                        const options = category ? subcategoryOptions[category] || [] : []
+                        if (!['维修', '保养'].includes(category) || options.length === 0) {
+                          return null
+                        }
+                        return (
+                          <Form.Item name="subcategory" label="二级类别">
+                            <Select
+                              allowClear
+                              placeholder="请选择二级类别"
+                              style={{ width: 160 }}
+                              options={options.map((item) => ({ label: item, value: item }))}
+                            />
+                          </Form.Item>
+                        )
+                      }}
                     </Form.Item>
                     <Form.Item name="applicantId" label="报销人">
                       <Select
@@ -530,7 +565,7 @@ const ReimbursementsPage = () => {
                           label={{ 
                             content: (data: any) => {
                               const item = data.data || data
-                              return `${item.category}: ${item.amount}`
+                              return `${item.type}: ${item.value}`
                             } 
                           }}
                         />
@@ -609,7 +644,11 @@ const ReimbursementsPage = () => {
               <Descriptions column={2}>
                 <Descriptions.Item label="报销人">{detailQuery.data.applicant_name || detailQuery.data.user_name}</Descriptions.Item>
                 <Descriptions.Item label="金额">¥ {detailQuery.data.amount.toFixed(2)}</Descriptions.Item>
-                <Descriptions.Item label="类别">{detailQuery.data.category}</Descriptions.Item>
+                <Descriptions.Item label="类别">
+                  {detailQuery.data.subcategory
+                    ? `${detailQuery.data.category} / ${detailQuery.data.subcategory}`
+                    : detailQuery.data.category}
+                </Descriptions.Item>
                 <Descriptions.Item label="日期">{detailQuery.data.date}</Descriptions.Item>
                 <Descriptions.Item label="商户">{detailQuery.data.merchant || '-'}</Descriptions.Item>
                 <Descriptions.Item label="项目">{detailQuery.data.project || '-'}</Descriptions.Item>
@@ -732,6 +771,24 @@ const ReimbursementsPage = () => {
           </Form.Item>
           <Form.Item name="category" label="类别" rules={[{ required: true, message: '请选择类别' }]}>
             <Select options={categoryOptions} placeholder="选择类别" />
+          </Form.Item>
+          <Form.Item noStyle shouldUpdate={(prev, next) => prev.category !== next.category}>
+            {({ getFieldValue }) => {
+              const category = getFieldValue('category') as string
+              const options = category ? subcategoryOptions[category] || [] : []
+              if (!['维修', '保养'].includes(category) || options.length === 0) {
+                return null
+              }
+              return (
+                <Form.Item name="subcategory" label="二级类别">
+                  <Select
+                    allowClear
+                    placeholder="选择二级类别"
+                    options={options.map((item) => ({ label: item, value: item }))}
+                  />
+                </Form.Item>
+              )
+            }}
           </Form.Item>
           <Form.Item name="date" label="日期" rules={[{ required: true, message: '请选择日期' }]}>
             <DatePicker style={{ width: '100%' }} />
