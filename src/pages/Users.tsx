@@ -37,6 +37,7 @@ import {
   updateUser,
   type User,
 } from '../api/services/users'
+import { fetchDepartments, type Department } from '../api/services/departments'
 import useAuthStore from '../store/auth'
 import useCompanyStore from '../store/company'
 import CompanySelector from '../components/CompanySelector'
@@ -65,12 +66,15 @@ const UsersPage = () => {
     phone?: string
     name?: string
     status?: string
+    department_id?: number
   }>({})
   const [selectedUser, setSelectedUser] = useState<User | null>(null)
   const [detailDrawerOpen, setDetailDrawerOpen] = useState(false)
   const [editDrawerOpen, setEditDrawerOpen] = useState(false)
   const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([])
   const [editForm] = Form.useForm()
+  const [batchDepartmentModalOpen, setBatchDepartmentModalOpen] = useState(false)
+  const [selectedBatchDepartmentId, setSelectedBatchDepartmentId] = useState<number | undefined>()
 
   // 当公司选择变化时，更新查询
   useEffect(() => {
@@ -78,6 +82,13 @@ const UsersPage = () => {
       queryClient.invalidateQueries({ queryKey: ['users', 'list'] })
     }
   }, [selectedCompanyId, isSuperAdmin, queryClient])
+
+  // 获取部门列表（用于筛选和选择器）
+  const departmentsQuery = useQuery({
+    queryKey: ['departments', 'list', effectiveCompanyId],
+    queryFn: () => fetchDepartments({ company_id: effectiveCompanyId }),
+    enabled: !!effectiveCompanyId,
+  })
 
   // 获取用户列表
   const usersQuery = useQuery({
@@ -90,6 +101,7 @@ const UsersPage = () => {
         name: filters.name,
         status: filters.status,
         company_id: effectiveCompanyId,
+        department_id: filters.department_id,
       }),
   })
 
@@ -102,12 +114,21 @@ const UsersPage = () => {
 
   const users = usersQuery.data?.items || []
   const userDetail = userDetailQuery.data?.user
+  
+  // 从用户列表推断当前公司的业务类型
+  const currentCompanyBusinessType = useMemo(() => {
+    if (users.length > 0) {
+      return users[0].company_business_type
+    }
+    return undefined
+  }, [users])
 
-  const handleSearch = (values: { phone?: string; name?: string; status?: string }) => {
+  const handleSearch = (values: { phone?: string; name?: string; status?: string; department_id?: number }) => {
     setFilters({
       phone: values.phone,
       name: values.name,
       status: values.status,
+      department_id: values.department_id,
     })
   }
 
@@ -134,6 +155,7 @@ const UsersPage = () => {
       phone: user.phone,
       email: user.email,
       plate: user.plate || user.plateNumber,
+      tanker_vehicle_code: user.tanker_vehicle_code, // 自编车号（罐车）
       positionType: user.position_type,
       role: user.role,
       status: user.status === 'active',
@@ -145,6 +167,7 @@ const UsersPage = () => {
       card_holder: user.card_holder,
       onboard_date: user.onboard_date ? dayjs(user.onboard_date) : null,
       app_lang: user.app_lang,
+      department_id: user.department_id || user.departmentId,
     })
     setEditDrawerOpen(true)
   }, [editForm])
@@ -268,9 +291,48 @@ const UsersPage = () => {
     })
   }
 
+  const handleBatchAssignDepartment = () => {
+    if (selectedRowKeys.length === 0) {
+      message.warning('请选择要分配部门的用户')
+      return
+    }
+    if (!departmentsQuery.data?.records || departmentsQuery.data.records.length === 0) {
+      message.warning('当前公司没有部门，请先创建部门')
+      return
+    }
+    setSelectedBatchDepartmentId(undefined)
+    setBatchDepartmentModalOpen(true)
+  }
+
+  const handleBatchDepartmentSubmit = async () => {
+    if (!selectedBatchDepartmentId) {
+      message.warning('请选择部门')
+      return
+    }
+    try {
+      // 批量更新用户部门
+      await Promise.all(
+        (selectedRowKeys as number[]).map((userId) =>
+          updateUser(userId, { department_id: selectedBatchDepartmentId })
+        )
+      )
+      message.success(`成功为 ${selectedRowKeys.length} 个用户分配部门`)
+      setSelectedRowKeys([])
+      setBatchDepartmentModalOpen(false)
+      setSelectedBatchDepartmentId(undefined)
+      queryClient.invalidateQueries({ queryKey: ['users'] })
+      queryClient.invalidateQueries({ queryKey: ['departments'] })
+    } catch (error) {
+      message.error((error as Error).message || '批量分配部门失败')
+    }
+  }
+
   // 用户列表列定义
   const userColumns: ColumnsType<User> = useMemo(
-    () => [
+    () => {
+      const isTankerBusiness = currentCompanyBusinessType === '罐车'
+      
+      return [
       {
         title: 'ID',
         dataIndex: 'id',
@@ -301,11 +363,56 @@ const UsersPage = () => {
         width: 180,
         render: (value) => value || <Text type="secondary">-</Text>,
       },
+      // 只有罐车业务才显示自编车号列
+      ...(isTankerBusiness ? [{
+        title: '自编车号',
+        dataIndex: 'tanker_vehicle_code',
+        width: 100,
+        render: (value: string) => value || <Text type="secondary">-</Text>,
+      }] : []),
       {
         title: '车牌号',
         dataIndex: 'plate',
         width: 120,
         render: (value, record) => value || record.plateNumber || <Text type="secondary">-</Text>,
+      },
+      {
+        title: '历史车辆',
+        dataIndex: 'plate_history',
+        width: 150,
+        render: (_, record) => {
+          const isTanker = record.company_business_type === '罐车'
+          const plateHistory = record.plate_history || []
+          const codeHistory = record.tanker_vehicle_code_history || []
+          
+          if (isTanker) {
+            // 罐车：显示历史车号和历史车牌
+            const hasHistory = codeHistory.length > 0 || plateHistory.length > 0
+            if (!hasHistory) return <Text type="secondary">-</Text>
+            return (
+              <Space direction="vertical" size={0}>
+                {codeHistory.length > 0 && (
+                  <Text type="secondary" style={{ fontSize: 12 }}>
+                    车号: {codeHistory.join(', ')}
+                  </Text>
+                )}
+                {plateHistory.length > 0 && (
+                  <Text type="secondary" style={{ fontSize: 12 }}>
+                    车牌: {plateHistory.join(', ')}
+                  </Text>
+                )}
+              </Space>
+            )
+          } else {
+            // 挂车：只显示历史车牌
+            if (plateHistory.length === 0) return <Text type="secondary">-</Text>
+            return (
+              <Text type="secondary" style={{ fontSize: 12 }}>
+                {plateHistory.join(', ')}
+              </Text>
+            )
+          }
+        },
       },
       {
         title: '职位类型',
@@ -354,6 +461,15 @@ const UsersPage = () => {
         render: (value) => {
           if (!value) return <Text type="secondary">-</Text>
           return <Tag color={value === '罐车' ? 'blue' : 'green'}>{value}</Tag>
+        },
+      },
+      {
+        title: '部门',
+        dataIndex: 'department_name',
+        width: 120,
+        render: (value, record) => {
+          const deptName = value || record.departmentName
+          return deptName ? <Tag color="cyan">{deptName}</Tag> : <Text type="secondary">-</Text>
         },
       },
       {
@@ -465,8 +581,9 @@ const UsersPage = () => {
           </Space>
         ),
       },
-    ],
-    [openDetail, openEdit, resetPasswordMutation, deleteUserMutation],
+    ]
+    },
+    [currentCompanyBusinessType, openDetail, openEdit, resetPasswordMutation, deleteUserMutation],
   )
 
   const handleEditSubmit = () => {
@@ -481,9 +598,10 @@ const UsersPage = () => {
         app_lang: values.app_lang,
         status: values.status ? 'active' : 'inactive',
         
-        // 业务信息
+        // 业务信息 - 车辆
         plate: values.plate,
         plateNumber: values.plate, // 兼容字段
+        tanker_vehicle_code: values.tanker_vehicle_code, // 自编车号（罐车）
         position_type: values.positionType,
         positionType: values.positionType, // 兼容字段
         role: values.role,
@@ -493,6 +611,9 @@ const UsersPage = () => {
         company: values.company,
         company_name: values.company_name,
         company_business_type: values.company_business_type,
+        
+        // 部门信息
+        department_id: values.department_id,
         
         // 银行信息
         bank_card: values.bank_card,
@@ -553,6 +674,9 @@ const UsersPage = () => {
               <Button onClick={handleBatchAssignRole} loading={batchOperateMutation.isPending}>
                 批量分配角色 ({selectedRowKeys.length})
               </Button>
+              <Button onClick={handleBatchAssignDepartment} loading={departmentsQuery.isLoading}>
+                批量分配部门 ({selectedRowKeys.length})
+              </Button>
             </>
           )}
         </Space>
@@ -585,6 +709,18 @@ const UsersPage = () => {
                   { value: 'active', label: '启用' },
                   { value: 'inactive', label: '禁用' },
                 ]}
+              />
+            </Form.Item>
+            <Form.Item name="department_id" label="部门">
+              <Select
+                placeholder="请选择部门"
+                allowClear
+                style={{ width: 150 }}
+                loading={departmentsQuery.isLoading}
+                options={departmentsQuery.data?.records.map((dept) => ({
+                  value: dept.id,
+                  label: dept.title,
+                }))}
               />
             </Form.Item>
             <Form.Item>
@@ -620,7 +756,7 @@ const UsersPage = () => {
               showSizeChanger: true,
               showTotal: (total) => `共 ${total} 个用户`,
             }}
-            scroll={{ x: 2400 }}
+            scroll={{ x: 2700 }}
           />
         </Space>
       </Card>
@@ -656,7 +792,6 @@ const UsersPage = () => {
             {/* 业务信息 */}
             <Card title="业务信息" size="small">
               <Descriptions column={2} bordered size="small">
-                <Descriptions.Item label="车牌号">{userDetail.plate || userDetail.plateNumber || '-'}</Descriptions.Item>
                 <Descriptions.Item label="职位类型">
                   <Tag color="blue">{userDetail.position_type || '未设置'}</Tag>
                 </Descriptions.Item>
@@ -673,9 +808,43 @@ const UsersPage = () => {
                     </Text>
                   ) : '-'}
                 </Descriptions.Item>
-                <Descriptions.Item label="头像">
+                <Descriptions.Item label="头像" span={2}>
                   {userDetail.avatar ? (
                     <img src={userDetail.avatar} alt="头像" style={{ width: 40, height: 40, borderRadius: 4 }} />
+                  ) : '-'}
+                </Descriptions.Item>
+              </Descriptions>
+            </Card>
+
+            {/* 车辆信息 */}
+            <Card title="车辆信息" size="small">
+              <Descriptions column={2} bordered size="small">
+                {userDetail.company_business_type === '罐车' && (
+                  <>
+                    <Descriptions.Item label="当前自编车号">
+                      {userDetail.tanker_vehicle_code || '-'}
+                    </Descriptions.Item>
+                    <Descriptions.Item label="历史自编车号">
+                      {userDetail.tanker_vehicle_code_history?.length ? (
+                        <Space wrap>
+                          {userDetail.tanker_vehicle_code_history.map((code, idx) => (
+                            <Tag key={idx} color="default">{code}</Tag>
+                          ))}
+                        </Space>
+                      ) : '-'}
+                    </Descriptions.Item>
+                  </>
+                )}
+                <Descriptions.Item label="当前车牌号">
+                  {userDetail.plate || userDetail.plateNumber || '-'}
+                </Descriptions.Item>
+                <Descriptions.Item label="历史车牌号">
+                  {userDetail.plate_history?.length ? (
+                    <Space wrap>
+                      {userDetail.plate_history.map((plate, idx) => (
+                        <Tag key={idx} color="default">{plate}</Tag>
+                      ))}
+                    </Space>
                   ) : '-'}
                 </Descriptions.Item>
               </Descriptions>
@@ -691,6 +860,18 @@ const UsersPage = () => {
                     <Tag color={userDetail.company_business_type === '罐车' ? 'blue' : 'green'}>
                       {userDetail.company_business_type}
                     </Tag>
+                  ) : '-'}
+                </Descriptions.Item>
+              </Descriptions>
+            </Card>
+
+            {/* 部门信息 */}
+            <Card title="部门信息" size="small">
+              <Descriptions column={2} bordered size="small">
+                <Descriptions.Item label="部门ID">{userDetail.department_id || userDetail.departmentId || '-'}</Descriptions.Item>
+                <Descriptions.Item label="部门名称">
+                  {userDetail.department_name || userDetail.departmentName ? (
+                    <Tag color="cyan">{userDetail.department_name || userDetail.departmentName}</Tag>
                   ) : '-'}
                 </Descriptions.Item>
               </Descriptions>
@@ -803,29 +984,6 @@ const UsersPage = () => {
               >
                 <Select placeholder="请选择职位类型" options={POSITION_TYPES} />
               </Form.Item>
-              <Form.Item
-                noStyle
-                shouldUpdate={(prevValues, currentValues) =>
-                  prevValues.positionType !== currentValues.positionType
-                }
-              >
-                {({ getFieldValue }) => {
-                  const positionType = getFieldValue('positionType')
-                  const isDriver = positionType === '司机'
-                  return isDriver ? (
-                    <Form.Item
-                      name="plate"
-                      label="车牌号"
-                      rules={[
-                        { required: true, message: '司机职位必须填写车牌号' },
-                        { pattern: /^[京津沪渝冀豫云辽黑湘皖鲁新苏浙赣鄂桂甘晋蒙陕吉闽贵粤青藏川宁琼使领][A-Z][A-HJ-NP-Z0-9]{4,5}[A-HJ-NP-Z0-9挂学警港澳]$/, message: '车牌号格式不正确' }
-                      ]}
-                    >
-                      <Input placeholder="请输入车牌号" />
-                    </Form.Item>
-                  ) : null
-                }}
-              </Form.Item>
               <Form.Item name="role" label="系统角色">
                 <Select placeholder="请选择系统角色" options={[
                   { value: 'super_admin', label: '超级管理员' },
@@ -837,6 +995,56 @@ const UsersPage = () => {
               </Form.Item>
               <Form.Item name="onboard_date" label="入职日期">
                 <DatePicker placeholder="请选择入职日期" style={{ width: '100%' }} />
+              </Form.Item>
+            </Card>
+
+            {/* 车辆信息 */}
+            <Card title="车辆信息" size="small">
+              <Form.Item
+                noStyle
+                shouldUpdate={(prevValues, currentValues) =>
+                  prevValues.company_business_type !== currentValues.company_business_type
+                }
+              >
+                {({ getFieldValue }) => {
+                  const businessType = getFieldValue('company_business_type')
+                  const isTanker = businessType === '罐车'
+                  return isTanker ? (
+                    <Form.Item name="tanker_vehicle_code" label="自编车号">
+                      <Input placeholder="请输入自编车号（罐车业务）" />
+                    </Form.Item>
+                  ) : null
+                }}
+              </Form.Item>
+              <Form.Item name="plate" label="车牌号">
+                <Input placeholder="请输入车牌号" />
+              </Form.Item>
+              <Form.Item
+                noStyle
+                shouldUpdate={(prevValues, currentValues) =>
+                  prevValues.company_business_type !== currentValues.company_business_type
+                }
+              >
+                {({ getFieldValue }) => {
+                  const businessType = getFieldValue('company_business_type')
+                  const isTanker = businessType === '罐车'
+                  return isTanker ? (
+                    <Form.Item label="历史自编车号">
+                      <Text type="secondary">
+                        {selectedUser?.tanker_vehicle_code_history?.length 
+                          ? selectedUser.tanker_vehicle_code_history.join(', ')
+                          : '暂无历史记录'}
+                      </Text>
+                    </Form.Item>
+                  ) : null
+                }}
+              </Form.Item>
+              <Form.Item label="历史车牌号">
+                <Text type="secondary">
+                  {selectedUser?.plate_history?.length 
+                    ? selectedUser.plate_history.join(', ')
+                    : '暂无历史记录'}
+                </Text>
               </Form.Item>
             </Card>
 
@@ -856,6 +1064,21 @@ const UsersPage = () => {
               </Form.Item>
             </Card>
 
+            {/* 部门信息 */}
+            <Card title="部门信息" size="small">
+              <Form.Item name="department_id" label="部门">
+                <Select
+                  placeholder="请选择部门"
+                  allowClear
+                  loading={departmentsQuery.isLoading}
+                  options={departmentsQuery.data?.records.map((dept) => ({
+                    value: dept.id,
+                    label: dept.title,
+                  }))}
+                />
+              </Form.Item>
+            </Card>
+
             {/* 银行信息 */}
             <Card title="银行信息" size="small">
               <Form.Item name="bank_card" label="银行卡号">
@@ -871,6 +1094,34 @@ const UsersPage = () => {
           </Space>
         </Form>
       </Drawer>
+
+      {/* 批量分配部门Modal */}
+      <Modal
+        title="批量分配部门"
+        open={batchDepartmentModalOpen}
+        onOk={handleBatchDepartmentSubmit}
+        onCancel={() => {
+          setBatchDepartmentModalOpen(false)
+          setSelectedBatchDepartmentId(undefined)
+        }}
+        okText="确定"
+        cancelText="取消"
+      >
+        <div style={{ marginTop: 16 }}>
+          <div style={{ marginBottom: 8 }}>已选择 {selectedRowKeys.length} 个用户</div>
+          <Select
+            placeholder="选择部门"
+            style={{ width: '100%' }}
+            value={selectedBatchDepartmentId}
+            onChange={setSelectedBatchDepartmentId}
+            loading={departmentsQuery.isLoading}
+            options={departmentsQuery.data?.records.map((dept) => ({
+              value: dept.id,
+              label: `${dept.title} (${dept.user_count || 0}人)`,
+            }))}
+          />
+        </div>
+      </Modal>
     </Space>
   )
 }

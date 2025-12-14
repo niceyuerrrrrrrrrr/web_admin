@@ -27,9 +27,12 @@ export interface User {
   created_by_id?: number
   updated_by_id?: number
   
-  // 业务相关字段
+  // 业务相关字段 - 车辆信息
   plate?: string
   plateNumber?: string // 兼容字段
+  plate_history?: string[] // 历史车牌号列表
+  tanker_vehicle_code?: string // 当前自编车号（罐车业务）
+  tanker_vehicle_code_history?: string[] // 历史自编车号列表（罐车业务）
   position_type?: string
   positionType?: string // 兼容字段
   status?: string
@@ -46,6 +49,12 @@ export interface User {
   company_id?: number
   company_name?: string
   company_business_type?: string
+  
+  // 部门相关字段
+  department_id?: number
+  department_name?: string
+  departmentId?: number // 兼容字段
+  departmentName?: string // 兼容字段
   
   // 银行信息字段
   bank_card?: string
@@ -72,6 +81,7 @@ export const fetchUsers = (params?: {
   name?: string
   status?: string
   company_id?: number
+  department_id?: number
 }) =>
   unwrap<UserListResponse>(
     client.get('/users', {
@@ -82,6 +92,7 @@ export const fetchUsers = (params?: {
         name: params?.name,
         status: params?.status,
         company_id: params?.company_id,
+        department_id: params?.department_id,
       },
     }),
   )

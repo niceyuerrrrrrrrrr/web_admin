@@ -62,6 +62,7 @@ import VehiclesPage from './pages/Vehicles'
 import UsersPage from './pages/Users'
 import RolesPage from './pages/Roles'
 import CompaniesPage from './pages/Companies'
+import DepartmentsPage from './pages/Departments'
 import HRPage from './pages/HR'
 import LeavePage from './pages/Leave'
 import ReportsPage from './pages/Reports'
@@ -309,6 +310,13 @@ const routeDefinitions = [
         element: <CompaniesPage />,
       },
       {
+        key: 'departments',
+        label: '部门管理',
+        path: '/departments',
+        icon: <TeamOutlined />,
+        element: <DepartmentsPage />,
+      },
+      {
         key: 'settings',
         label: '系统配置',
         path: '/settings',
@@ -347,8 +355,23 @@ const flattenRoutes = (routes: any[]): any[] => {
   return flat
 }
 
+// 查找某个 key 的所有父级菜单 key（用于自动展开菜单）
+const findMenuOpenKeys = (routes: any[], targetKey: string, currentPath: string[] = []): string[] | null => {
+  for (const route of routes) {
+    if (route.key === targetKey) {
+      return currentPath
+    }
+    if (route.children) {
+      const path = findMenuOpenKeys(route.children, targetKey, [...currentPath, route.key])
+      if (path) return path
+    }
+  }
+  return null
+}
+
 const AppLayout = () => {
   const [collapsed, setCollapsed] = useState(false)
+  const [openKeys, setOpenKeys] = useState<string[]>([])
   const location = useLocation()
   const navigate = useNavigate()
   const { user, logout } = useAuthStore()
@@ -372,6 +395,23 @@ const AppLayout = () => {
       .find((route: any) => location.pathname.startsWith(route.path))
     return [activeRoute?.key ?? 'dashboard']
   }, [location.pathname])
+
+  // 当路由变化时，自动展开对应的菜单
+  React.useEffect(() => {
+    const activeKey = selectedKeys[0]
+    const keys = findMenuOpenKeys(routeDefinitions, activeKey)
+    if (keys) {
+      setOpenKeys((prev) => {
+        const newKeys = [...prev, ...keys]
+        return Array.from(new Set(newKeys))
+      })
+    }
+  }, [selectedKeys])
+
+  // 处理菜单展开/折叠
+  const onOpenChange: MenuProps['onOpenChange'] = (keys) => {
+    setOpenKeys(keys as string[])
+  }
 
   const isSuperAdmin = user?.role === 'super_admin' || user?.positionType === '超级管理员'
 
@@ -448,6 +488,8 @@ const AppLayout = () => {
           theme="dark"
           mode="inline"
           selectedKeys={selectedKeys}
+          openKeys={openKeys}
+          onOpenChange={onOpenChange}
           items={menuItems}
           onClick={handleMenuClick}
         />
