@@ -270,8 +270,8 @@ const DashboardPage = () => {
     const waterTicketList = waterTickets.byCompany || []
 
     // 图表数据转换
-    const companyChartData = loadingByCompany.map((i: any) => ({ type: i.company, value: i.totalVolume })).sort((a:any,b:any) => b.value - a.value)
-    const materialChartData = loadingByMaterial.map((i: any) => ({ type: i.material, value: i.totalVolume })).sort((a:any,b:any) => b.value - a.value)
+    const companyChartData = loadingByCompany.map((i: any) => ({ type: i.company || '未知公司', value: i.totalVolume })).sort((a:any,b:any) => b.value - a.value)
+    const materialChartData = loadingByMaterial.map((i: any) => ({ type: i.material || '未知材料', value: i.totalVolume })).sort((a:any,b:any) => b.value - a.value)
 
     return (
       <Row gutter={[24, 24]}>
@@ -348,8 +348,8 @@ const DashboardPage = () => {
     const matchedMaterials = matched.byMaterial || []
     
     // 准备材料分布数据
-    const loadingMaterials = (loading.byMaterial || []).map((i: any) => ({ type: i.material, value: i.totalWeight })).sort((a:any,b:any) => b.value - a.value)
-    const unloadingMaterials = (unloading.byMaterial || []).map((i: any) => ({ type: i.material, value: i.totalWeight })).sort((a:any,b:any) => b.value - a.value)
+    const loadingMaterials = (loading.byMaterial || []).map((i: any) => ({ type: i.material || '未知材料', value: i.totalWeight })).sort((a:any,b:any) => b.value - a.value)
+    const unloadingMaterials = (unloading.byMaterial || []).map((i: any) => ({ type: i.material || '未知材料', value: i.totalWeight })).sort((a:any,b:any) => b.value - a.value)
 
     // 运输匹配 - 卡片化展示
     const renderMatchedCards = () => (
