@@ -305,7 +305,7 @@ const DashboardPage = () => {
                 label={{ 
                   offset: 20,
                   labelLine: {},
-                  content: ({ type, percent }: any) => `${type}\n${(percent * 100).toFixed(0)}%` 
+                  content: (item: any) => `${item.type || ''}\n${(item.percent * 100).toFixed(0)}%` 
                 }}
                 theme="dark"
                 legend={{ position: 'bottom' }}
@@ -466,7 +466,7 @@ const DashboardPage = () => {
                           label={{ 
                             offset: 20,
                             labelLine: {},
-                            content: ({ type, percent }: any) => `${type}\n${(percent * 100).toFixed(0)}%` 
+                            content: (item: any) => `${item.type || ''}\n${(item.percent * 100).toFixed(0)}%` 
                           }}
                           theme="dark"
                           legend={{ position: 'bottom' }}
@@ -512,7 +512,7 @@ const DashboardPage = () => {
                           label={{ 
                             offset: 20,
                             labelLine: {},
-                            content: ({ type, percent }: any) => `${type}\n${(percent * 100).toFixed(0)}%` 
+                            content: (item: any) => `${item.type || ''}\n${(item.percent * 100).toFixed(0)}%` 
                           }}
                           theme="dark"
                           legend={{ position: 'bottom' }}
