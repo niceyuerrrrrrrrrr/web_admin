@@ -303,8 +303,7 @@ const DashboardPage = () => {
                 radius={0.8} 
                 innerRadius={0.6}
                 label={{
-                  type: 'spider',
-                  labelHeight: 28,
+                  position: 'outside',
                   formatter: (datum: any) => {
                     if (!datum || !datum.data) return '';
                     const name = datum.data.type || '';
@@ -469,8 +468,7 @@ const DashboardPage = () => {
                           radius={0.8} 
                           innerRadius={0.6}
                           label={{
-                            type: 'spider',
-                            labelHeight: 28,
+                            position: 'outside',
                             formatter: (datum: any) => {
                               if (!datum || !datum.data) return '';
                               const name = datum.data.type || '';
@@ -520,8 +518,7 @@ const DashboardPage = () => {
                           radius={0.8} 
                           innerRadius={0.6}
                           label={{
-                            type: 'spider',
-                            labelHeight: 28,
+                            position: 'outside',
                             formatter: (datum: any) => {
                               if (!datum || !datum.data) return '';
                               const name = datum.data.type || '';
