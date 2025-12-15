@@ -261,6 +261,15 @@ const DashboardPage = () => {
       .filter(item => item.value > 0)
   }, [statsData])
 
+  // 辅助函数：预处理饼图数据，添加显示标签
+  const processPieData = (data: any[]) => {
+    const total = data.reduce((sum, item) => sum + (item.value || 0), 0);
+    return data.map(item => ({
+      ...item,
+      displayLabel: `${item.type}: ${total > 0 ? ((item.value / total) * 100).toFixed(0) : 0}%`
+    }));
+  };
+
   // --- 渲染辅助: 罐车视图 (图形化) ---
   const renderTankerContent = () => {
     const tanker = transportDetails?.tanker
@@ -271,7 +280,8 @@ const DashboardPage = () => {
 
     // 图表数据转换
     const companyChartData = loadingByCompany.map((i: any) => ({ type: i.company || '未知公司', value: i.totalVolume })).sort((a:any,b:any) => b.value - a.value)
-    const materialChartData = loadingByMaterial.map((i: any) => ({ type: i.material || '未知材料', value: i.totalVolume })).sort((a:any,b:any) => b.value - a.value)
+    const rawMaterialChartData = loadingByMaterial.map((i: any) => ({ type: i.material || '未知材料', value: i.totalVolume })).sort((a:any,b:any) => b.value - a.value)
+    const materialChartData = processPieData(rawMaterialChartData)
 
     return (
       <Row gutter={[24, 24]}>
@@ -303,9 +313,7 @@ const DashboardPage = () => {
                 radius={0.8} 
                 innerRadius={0.6}
                 label={{
-                  content: (item: any) => {
-                    return `${item.type}: ${item.percent.toFixed(0)}%`;
-                  }
+                  content: (item: any) => item.displayLabel
                 }}
                 theme="dark"
                 legend={{ position: 'bottom' }}
@@ -348,8 +356,11 @@ const DashboardPage = () => {
     const matchedMaterials = matched.byMaterial || []
     
     // 准备材料分布数据
-    const loadingMaterials = (loading.byMaterial || []).map((i: any) => ({ type: i.material || '未知材料', value: i.totalWeight })).sort((a:any,b:any) => b.value - a.value)
-    const unloadingMaterials = (unloading.byMaterial || []).map((i: any) => ({ type: i.material || '未知材料', value: i.totalWeight })).sort((a:any,b:any) => b.value - a.value)
+    const rawLoadingMaterials = (loading.byMaterial || []).map((i: any) => ({ type: i.material || '未知材料', value: i.totalWeight })).sort((a:any,b:any) => b.value - a.value)
+    const loadingMaterials = processPieData(rawLoadingMaterials)
+    
+    const rawUnloadingMaterials = (unloading.byMaterial || []).map((i: any) => ({ type: i.material || '未知材料', value: i.totalWeight })).sort((a:any,b:any) => b.value - a.value)
+    const unloadingMaterials = processPieData(rawUnloadingMaterials)
 
     // 运输匹配 - 卡片化展示
     const renderMatchedCards = () => (
@@ -464,9 +475,7 @@ const DashboardPage = () => {
                           radius={0.8} 
                           innerRadius={0.6}
                           label={{
-                            content: (item: any) => {
-                              return `${item.type}: ${item.percent.toFixed(0)}%`;
-                            }
+                            content: (item: any) => item.displayLabel
                           }}
                           theme="dark"
                           legend={{ position: 'bottom' }}
@@ -510,9 +519,7 @@ const DashboardPage = () => {
                           radius={0.8} 
                           innerRadius={0.6}
                           label={{
-                            content: (item: any) => {
-                              return `${item.type}: ${item.percent.toFixed(0)}%`;
-                            }
+                            content: (item: any) => item.displayLabel
                           }}
                           theme="dark"
                           legend={{ position: 'bottom' }}
