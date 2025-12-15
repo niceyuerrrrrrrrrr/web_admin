@@ -46,6 +46,12 @@ import {
 
 const { Title, Paragraph, Text } = Typography
 
+// 权限代码到中文名称的映射
+const getPermissionName = (code: string, permissions: Permission[]): string => {
+  const permission = permissions.find(p => p.code === code)
+  return permission ? permission.name : code
+}
+
 const PermissionsPage = () => {
   const queryClient = useQueryClient()
   const [activeTab, setActiveTab] = useState('roles')
@@ -519,11 +525,17 @@ const PermissionsPage = () => {
 
             <Card title="权限列表" size="small">
               <Space direction="vertical" style={{ width: '100%' }}>
-                {selectedRole.permissions.map((perm) => (
-                  <Tag key={perm} color="blue">
-                    {perm}
-                  </Tag>
-                ))}
+                {selectedRole.permissions.map((perm) => {
+                  const permName = getPermissionName(perm, permissions)
+                  return (
+                    <Tag key={perm} color="blue">
+                      {permName}
+                      <Text type="secondary" style={{ marginLeft: 8, fontSize: 12 }}>
+                        ({perm})
+                      </Text>
+                    </Tag>
+                  )
+                })}
               </Space>
             </Card>
           </Space>
