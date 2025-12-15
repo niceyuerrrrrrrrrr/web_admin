@@ -303,12 +303,8 @@ const DashboardPage = () => {
                 radius={0.8} 
                 innerRadius={0.6}
                 label={{
-                  position: 'outside',
-                  formatter: (datum: any) => {
-                    if (!datum || !datum.data) return '';
-                    const name = datum.data.type || '';
-                    const percent = ((datum.data.value / materialChartData.reduce((sum: number, d: any) => sum + d.value, 0)) * 100).toFixed(0);
-                    return `${name} ${percent}%`;
+                  content: (item: any) => {
+                    return `${item.type}: ${item.percent.toFixed(0)}%`;
                   }
                 }}
                 theme="dark"
@@ -468,12 +464,8 @@ const DashboardPage = () => {
                           radius={0.8} 
                           innerRadius={0.6}
                           label={{
-                            position: 'outside',
-                            formatter: (datum: any) => {
-                              if (!datum || !datum.data) return '';
-                              const name = datum.data.type || '';
-                              const percent = ((datum.data.value / loadingMaterials.reduce((sum: number, d: any) => sum + d.value, 0)) * 100).toFixed(0);
-                              return `${name} ${percent}%`;
+                            content: (item: any) => {
+                              return `${item.type}: ${item.percent.toFixed(0)}%`;
                             }
                           }}
                           theme="dark"
@@ -518,12 +510,8 @@ const DashboardPage = () => {
                           radius={0.8} 
                           innerRadius={0.6}
                           label={{
-                            position: 'outside',
-                            formatter: (datum: any) => {
-                              if (!datum || !datum.data) return '';
-                              const name = datum.data.type || '';
-                              const percent = ((datum.data.value / unloadingMaterials.reduce((sum: number, d: any) => sum + d.value, 0)) * 100).toFixed(0);
-                              return `${name} ${percent}%`;
+                            content: (item: any) => {
+                              return `${item.type}: ${item.percent.toFixed(0)}%`;
                             }
                           }}
                           theme="dark"
