@@ -302,9 +302,7 @@ const DashboardPage = () => {
                 colorField="type" 
                 radius={0.8} 
                 innerRadius={0.6}
-                label={{ 
-                  type: 'outer',
-                  offset: 20,
+                label={{
                   formatter: (datum: any) => {
                     if (!datum || !datum.data) return '';
                     const name = datum.data.type || '';
@@ -468,9 +466,7 @@ const DashboardPage = () => {
                           colorField="type" 
                           radius={0.8} 
                           innerRadius={0.6}
-                          label={{ 
-                            type: 'outer',
-                            offset: 20,
+                          label={{
                             formatter: (datum: any) => {
                               if (!datum || !datum.data) return '';
                               const name = datum.data.type || '';
@@ -519,9 +515,7 @@ const DashboardPage = () => {
                           colorField="type" 
                           radius={0.8} 
                           innerRadius={0.6}
-                          label={{ 
-                            type: 'outer',
-                            offset: 20,
+                          label={{
                             formatter: (datum: any) => {
                               if (!datum || !datum.data) return '';
                               const name = datum.data.type || '';
