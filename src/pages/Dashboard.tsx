@@ -305,7 +305,7 @@ const DashboardPage = () => {
                 label={{ 
                   type: 'outer',
                   offset: 20,
-                  content: '{name}\n{percentage}'
+                  formatter: (datum: any) => `${datum.type}\n${(datum.percent * 100).toFixed(0)}%`
                 }}
                 theme="dark"
                 legend={{ position: 'bottom' }}
@@ -466,7 +466,7 @@ const DashboardPage = () => {
                           label={{ 
                             type: 'outer',
                             offset: 20,
-                            content: '{name}\n{percentage}'
+                            formatter: (datum: any) => `${datum.type}\n${(datum.percent * 100).toFixed(0)}%`
                           }}
                           theme="dark"
                           legend={{ position: 'bottom' }}
@@ -512,7 +512,7 @@ const DashboardPage = () => {
                           label={{ 
                             type: 'outer',
                             offset: 20,
-                            content: '{name}\n{percentage}'
+                            formatter: (datum: any) => `${datum.type}\n${(datum.percent * 100).toFixed(0)}%`
                           }}
                           theme="dark"
                           legend={{ position: 'bottom' }}
