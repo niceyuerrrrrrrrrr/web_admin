@@ -303,9 +303,9 @@ const DashboardPage = () => {
                 radius={0.8} 
                 innerRadius={0.6}
                 label={{ 
+                  type: 'outer',
                   offset: 20,
-                  labelLine: {},
-                  content: (item: any) => `${item.type || ''}\n${(item.percent * 100).toFixed(0)}%` 
+                  content: '{name}\n{percentage}'
                 }}
                 theme="dark"
                 legend={{ position: 'bottom' }}
@@ -464,9 +464,9 @@ const DashboardPage = () => {
                           radius={0.8} 
                           innerRadius={0.6}
                           label={{ 
+                            type: 'outer',
                             offset: 20,
-                            labelLine: {},
-                            content: (item: any) => `${item.type || ''}\n${(item.percent * 100).toFixed(0)}%` 
+                            content: '{name}\n{percentage}'
                           }}
                           theme="dark"
                           legend={{ position: 'bottom' }}
@@ -510,9 +510,9 @@ const DashboardPage = () => {
                           radius={0.8} 
                           innerRadius={0.6}
                           label={{ 
+                            type: 'outer',
                             offset: 20,
-                            labelLine: {},
-                            content: (item: any) => `${item.type || ''}\n${(item.percent * 100).toFixed(0)}%` 
+                            content: '{name}\n{percentage}'
                           }}
                           theme="dark"
                           legend={{ position: 'bottom' }}
