@@ -39,6 +39,8 @@ import {
   type Vehicle,
 } from '../api/services/vehicles'
 import { fetchUsers } from '../api/services/users'
+import useAuthStore from '../store/auth'
+import useCompanyStore from '../store/company'
 
 const { Title, Paragraph, Text } = Typography
 
@@ -54,6 +56,11 @@ const getStatusColor = (status: string) => {
 
 const VehiclesPage = () => {
   const queryClient = useQueryClient()
+  const { user } = useAuthStore()
+  const { selectedCompanyId } = useCompanyStore()
+
+  const isSuperAdmin = user?.role === 'super_admin' || user?.positionType === '超级管理员'
+  const effectiveCompanyId = isSuperAdmin ? selectedCompanyId : undefined
 
   const [activeTab, setActiveTab] = useState('list')
   const [filters, setFilters] = useState<{
@@ -67,11 +74,12 @@ const VehiclesPage = () => {
 
   // 获取车辆列表
   const vehiclesQuery = useQuery({
-    queryKey: ['vehicles', 'list', filters],
+    queryKey: ['vehicles', 'list', filters, effectiveCompanyId],
     queryFn: () =>
       fetchVehicles({
         plateNumber: filters.plateNumber,
         status: filters.status,
+        companyId: effectiveCompanyId,
         page: 1,
         pageSize: 100,
       }),
@@ -105,10 +113,11 @@ const VehiclesPage = () => {
 
   // 获取绑定历史
   const historyQuery = useQuery({
-    queryKey: ['vehicles', 'plate_history', historyUserId],
+    queryKey: ['vehicles', 'plate_history', historyUserId, effectiveCompanyId],
     queryFn: () =>
       fetchPlateHistory({
         userId: historyUserId,
+        companyId: effectiveCompanyId,
         page: 1,
         pageSize: 100,
       }),
@@ -153,6 +162,12 @@ const VehiclesPage = () => {
         dataIndex: 'plate_number',
         width: 150,
         render: (value: string) => <Text strong>{value}</Text>,
+      },
+      {
+        title: '自编车号',
+        dataIndex: 'tanker_vehicle_code',
+        width: 120,
+        render: (value: string) => value || <Text type="secondary">-</Text>,
       },
       {
         title: '司机',
@@ -226,18 +241,24 @@ const VehiclesPage = () => {
       {
         title: '用户ID',
         dataIndex: 'user_id',
-        width: 100,
+        width: 80,
+      },
+      {
+        title: '用户名称',
+        dataIndex: 'user_name',
+        width: 120,
+        render: (value: string) => value || <Text type="secondary">-</Text>,
       },
       {
         title: '原车牌',
         dataIndex: 'previous_plate',
-        width: 150,
+        width: 120,
         render: (value: string) => value || <Text type="secondary">-</Text>,
       },
       {
         title: '新车牌',
         dataIndex: 'new_plate',
-        width: 150,
+        width: 120,
         render: (value: string) => <Text strong>{value}</Text>,
       },
       {
@@ -412,6 +433,9 @@ const VehiclesPage = () => {
                         loading={usersQuery.isLoading}
                         notFoundContent={usersQuery.isLoading ? '加载中...' : '暂无用户'}
                       />
+                    </Form.Item>
+                    <Form.Item>
+                      <Text type="secondary">不选择用户则显示当前公司所有绑定历史</Text>
                     </Form.Item>
                   </Form>
 

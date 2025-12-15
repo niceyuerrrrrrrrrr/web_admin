@@ -12,6 +12,7 @@ const unwrap = async <T>(promise: Promise<{ data: ApiResponse<T> }>) => {
 // 车辆信息
 export interface Vehicle {
   plate_number: string
+  tanker_vehicle_code?: string  // 自编车号（罐车）
   driver_id?: number
   driver_name?: string
   driver_phone?: string
@@ -43,6 +44,7 @@ export interface VehicleStatistics {
 export interface PlateBindHistory {
   id: number
   user_id: number
+  user_name?: string
   previous_plate?: string
   new_plate: string
   changed_by: number
@@ -75,6 +77,7 @@ export interface VehicleDriver {
 export const fetchVehicles = (params?: {
   plateNumber?: string
   status?: string
+  companyId?: number
   page?: number
   pageSize?: number
 }) =>
@@ -88,6 +91,7 @@ export const fetchVehicles = (params?: {
       params: {
         plate_number: params?.plateNumber,
         status: params?.status,
+        company_id: params?.companyId,
         page: params?.page || 1,
         page_size: params?.pageSize || 20,
       },
@@ -122,6 +126,7 @@ export const bindPlate = (data: { plate_number: string }) =>
  */
 export const fetchPlateHistory = (params?: {
   userId?: number
+  companyId?: number
   page?: number
   pageSize?: number
 }) =>
@@ -134,6 +139,7 @@ export const fetchPlateHistory = (params?: {
     client.get('/vehicles/plate_history', {
       params: {
         user_id: params?.userId,
+        company_id: params?.companyId,
         page: params?.page || 1,
         page_size: params?.pageSize || 20,
       },

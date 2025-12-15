@@ -6,7 +6,7 @@ export interface ApiResponse<T> {
 }
 
 // 票据相关类型
-export type ReceiptType = 'loading' | 'unloading' | 'charging' | 'water'
+export type ReceiptType = 'loading' | 'unloading' | 'charging' | 'water' | 'departure'
 
 export interface LoadingReceipt {
   id: number
@@ -15,6 +15,7 @@ export interface LoadingReceipt {
   company?: string
   driver_name?: string
   vehicle_no?: string
+  tanker_vehicle_code?: string
   material_name?: string
   material_spec?: string
   gross_weight?: number
@@ -34,6 +35,7 @@ export interface UnloadingReceipt {
   company?: string
   driver_name?: string
   vehicle_no?: string
+  tanker_vehicle_code?: string
   material_name?: string
   material_spec?: string
   gross_weight?: number
@@ -48,34 +50,75 @@ export interface UnloadingReceipt {
 
 export interface ChargingReceipt {
   id: number
+  user_id?: number
   type: 'charging'
-  receipt_number?: string
-  vehicle_no?: string
-  charging_station?: string
-  charging_pile?: string
-  energy_kwh?: number
-  amount?: number
-  start_time?: string
-  end_time?: string
-  duration_min?: number
-  thumb_url?: string
+  driver_name?: string // 司机姓名
+  bill_no?: string // 单据编号
+  vehicle_no?: string // 车牌号
+  tanker_vehicle_code?: string // 自编车号
+  station_name?: string // 充电站名称
+  station_id?: string // 充电桩编号
+  energy_consumed?: number // 充电电量(kWh)
+  total_amount?: number // 充电费用(元)
+  charging_start_time?: string // 充电开始时间
+  charging_end_time?: string // 充电结束时间
+  charging_duration?: number // 充电时长(分钟)
+  thumb_url?: string // 图片URL
   raw_data?: Record<string, unknown>
   created_at?: string
+  updated_at?: string
 }
 
 export interface WaterTicket {
   id: number
+  user_id?: number
   type: 'water'
-  company?: string
-  company_name?: string
-  vehicle_no?: string
-  ticket_date?: string
-  thumb_url?: string
-  image_path?: string
+  driver_name?: string // 司机姓名
+  f_water_ticket_id?: string // 业务单号
+  company_name?: string // 公司名称
+  vehicle_no?: string // 车牌号
+  tanker_vehicle_code?: string // 自编车号
+  ticket_date?: string // 日期
+  image_path?: string // 图片
   created_at?: string
+  updated_at?: string
 }
 
-export type Receipt = LoadingReceipt | UnloadingReceipt | ChargingReceipt | WaterTicket
+export interface DepartureReceipt {
+  id: number
+  user_id: number
+  type: 'departure'
+  f_departure_receipt_id?: string // 单据编号
+  vehicle_no?: string // 车牌号
+  tanker_vehicle_code?: string // 自编车号
+  loading_company?: string // 装料公司
+  driver_name?: string // 司机姓名
+  material_name?: string // 材料名称
+  material_spec?: string // 规格型号
+  slump?: string // 坍落度
+  concrete_strength?: string // 混凝土强度
+  bill_no?: string // 提单号
+  gross_weight?: number // 毛重
+  net_weight?: number // 净重
+  tare_weight?: number // 皮重
+  loading_time?: string // 进厂时间
+  exit_time?: string // 出厂时间
+  production_date?: string // 生产日期
+  image_path?: string // 图片
+  project_name?: string // 工程名称
+  construction_location?: string // 施工地点
+  customer_name?: string // 客户名称
+  construction_unit?: string // 施工单位
+  concrete_volume?: string // 方量
+  total_volume?: string // 累计方量
+  total_vehicles?: string // 累计车次
+  status?: string
+  finished_at?: string
+  created_at?: string
+  updated_at?: string
+}
+
+export type Receipt = LoadingReceipt | UnloadingReceipt | ChargingReceipt | WaterTicket | DepartureReceipt
 
 export interface ReceiptListParams {
   userId?: number

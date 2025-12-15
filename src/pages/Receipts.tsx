@@ -44,8 +44,11 @@ import {
   updateUnloadingReceipt,
   deleteUnloadingReceipt,
   deleteChargingReceipt,
+  updateDepartureReceipt,
+  deleteDepartureReceipt,
 } from '../api/services/receipts'
 import { fetchCompanyDetail } from '../api/services/companies'
+import { fetchDepartments } from '../api/services/departments'
 import { fetchUsers } from '../api/services/users'
 import type { Receipt, ReceiptType } from '../api/types'
 import useAuthStore from '../store/auth'
@@ -119,6 +122,7 @@ const ReceiptsPage = () => {
   const [editDrawerOpen, setEditDrawerOpen] = useState(false)
   const [editingReceipt, setEditingReceipt] = useState<Receipt | null>(null)
   const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([])
+  const [selectedDepartmentId, setSelectedDepartmentId] = useState<number | undefined>(undefined)
   const [selectedUserId, setSelectedUserId] = useState<number | undefined>(undefined)
   const [editForm] = Form.useForm()
   const showCompanyWarning = isSuperAdmin && !effectiveCompanyId
@@ -130,15 +134,17 @@ const ReceiptsPage = () => {
     queryFn: () => fetchCompanyDetail(effectiveCompanyId!),
     enabled: !!effectiveCompanyId && (!user?.companyBusinessType || isSuperAdmin), // 如果没有业务类型或超级管理员，从API获取
   })
-  // 优先使用用户信息中的业务类型，如果没有则使用API返回的
-  const businessType = currentUser?.companyBusinessType || user?.companyBusinessType || companyQuery.data?.business_type
+  // 对于超级管理员，使用选中公司的业务类型；对于普通用户，使用用户自己的公司业务类型
+  const businessType = isSuperAdmin 
+    ? companyQuery.data?.business_type 
+    : (currentUser?.companyBusinessType || user?.companyBusinessType || companyQuery.data?.business_type)
 
   // 根据业务类型过滤可用的票据类型标签页
   const availableTabs = useMemo(() => {
     const tabs = []
     if (businessType === '罐车') {
-      // 罐车：装料单、充电单、水票
-      tabs.push(...RECEIPT_TYPES.filter(t => ['loading', 'charging', 'water'].includes(t.value)))
+      // 罐车：出厂单、充电单、水票
+      tabs.push(...RECEIPT_TYPES.filter(t => ['departure', 'charging', 'water'].includes(t.value)))
     } else if (businessType === '挂车') {
       // 挂车：装料单、卸货单、充电单、装卸匹配
       tabs.push(...RECEIPT_TYPES.filter(t => ['loading', 'unloading', 'charging'].includes(t.value)))
@@ -156,19 +162,37 @@ const ReceiptsPage = () => {
     }
   }, [availableTabs, activeTab])
 
-  // 获取用户列表
+  // 获取部门列表
+  const departmentsQuery = useQuery({
+    queryKey: ['departments', 'list', effectiveCompanyId],
+    queryFn: () => fetchDepartments({ company_id: effectiveCompanyId }),
+    enabled: !isSuperAdmin || !!effectiveCompanyId,
+  })
+
+  const departments = departmentsQuery.data?.records || []
+
+  // 获取用户列表（根据选择的部门过滤）
   const usersQuery = useQuery({
-    queryKey: ['users', 'list', effectiveCompanyId],
-    queryFn: () => fetchUsers({ size: 1000 }),
+    queryKey: ['users', 'list', effectiveCompanyId, selectedDepartmentId],
+    queryFn: () => fetchUsers({ 
+      size: 1000, 
+      company_id: effectiveCompanyId,
+      department_id: selectedDepartmentId,
+    }),
     enabled: !isSuperAdmin || !!effectiveCompanyId,
   })
 
   const users = usersQuery.data?.items || []
 
+  // 当部门变化时，清空用户选择
+  useEffect(() => {
+    setSelectedUserId(undefined)
+  }, [selectedDepartmentId])
+
   // 获取当前标签页的票据数据
   // 注意：对于非超级管理员，后端会根据当前登录用户自动过滤公司，所以即使不传companyId也可以
   const receiptsQuery = useQuery<Receipt[]>({
-    queryKey: ['receipts', activeTab, filters, selectedUserId, effectiveCompanyId],
+    queryKey: ['receipts', activeTab, filters, selectedUserId, selectedDepartmentId, effectiveCompanyId],
     queryFn: () =>
       fetchReceipts({
         userId: selectedUserId,
@@ -176,6 +200,7 @@ const ReceiptsPage = () => {
         startDate: filters.startDate,
         endDate: filters.endDate,
         companyId: effectiveCompanyId, // 超级管理员需要传，非超级管理员可以不传（后端会自动过滤）
+        departmentId: selectedDepartmentId, // 部门筛选
       }),
     enabled: (isSuperAdmin ? !!effectiveCompanyId : true) && activeTab !== 'matched', // 匹配数据使用单独的查询
   })
@@ -305,6 +330,33 @@ const ReceiptsPage = () => {
     },
   })
 
+  // 更新出厂单
+  const updateDepartureMutation = useMutation({
+    mutationFn: ({ id, data }: { id: number; data: any }) => updateDepartureReceipt(id, data),
+    onSuccess: () => {
+      message.success('更新成功')
+      setEditDrawerOpen(false)
+      setEditingReceipt(null)
+      editForm.resetFields()
+      queryClient.invalidateQueries({ queryKey: ['receipts'] })
+    },
+    onError: (error) => {
+      message.error((error as Error).message || '更新失败')
+    },
+  })
+
+  // 删除出厂单
+  const deleteDepartureMutation = useMutation({
+    mutationFn: (id: number) => deleteDepartureReceipt(id),
+    onSuccess: () => {
+      message.success('删除成功')
+      queryClient.invalidateQueries({ queryKey: ['receipts'] })
+    },
+    onError: (error) => {
+      message.error((error as Error).message || '删除失败')
+    },
+  })
+
   // 统计数据移除
 
   const handleSearch = (values: {
@@ -355,13 +407,15 @@ const ReceiptsPage = () => {
             await deleteChargingMutation.mutateAsync(receipt.id)
           } else if (receipt.type === 'water') {
             await deleteWaterMutation.mutateAsync(receipt.id)
+          } else if (receipt.type === 'departure') {
+            await deleteDepartureMutation.mutateAsync(receipt.id)
           }
         } catch (error) {
           // Error is handled by mutation
         }
       },
     })
-  }, [deleteLoadingMutation, deleteUnloadingMutation, deleteChargingMutation, deleteWaterMutation, canEditDelete, message])
+  }, [deleteLoadingMutation, deleteUnloadingMutation, deleteChargingMutation, deleteWaterMutation, deleteDepartureMutation, canEditDelete, message])
 
   // 打开编辑
   const openEdit = useCallback((receipt: Receipt) => {
@@ -456,8 +510,54 @@ const ReceiptsPage = () => {
         vehicle_no: r.vehicle_no,
         ticket_date: r.ticket_date ? dayjs(r.ticket_date) : undefined,
       })
+    } else if (receipt.type === 'departure') {
+      const r = receipt as any
+      editForm.setFieldsValue({
+        driver_name: r.driver_name,
+        vehicle_no: r.vehicle_no,
+        tanker_vehicle_code: r.tanker_vehicle_code,
+        loading_company: r.loading_company,
+        project_name: r.project_name,
+        construction_location: r.construction_location,
+        customer_name: r.customer_name,
+        construction_unit: r.construction_unit,
+        concrete_strength: r.concrete_strength,
+        slump: r.slump,
+        concrete_volume: r.concrete_volume,
+        total_volume: r.total_volume,
+        total_vehicles: r.total_vehicles,
+        bill_no: r.bill_no,
+        loading_time: r.loading_time ? dayjs(r.loading_time) : undefined,
+        exit_time: r.exit_time ? dayjs(r.exit_time) : undefined,
+        production_date: r.production_date ? dayjs(r.production_date) : undefined,
+      })
     }
   }, [editForm, canEditDelete, message])
+
+  // 通用操作列渲染
+  const renderActions = useCallback((record: Receipt) => (
+    <Space direction="vertical" size={0}>
+      <Button type="link" size="small" icon={<EyeOutlined />} onClick={() => openDetail(record)}>
+        查看
+      </Button>
+      {canEditDelete && (
+        <>
+          <Button type="link" size="small" icon={<EditOutlined />} onClick={() => openEdit(record)}>
+            编辑
+          </Button>
+          <Button
+            type="link"
+            size="small"
+            danger
+            icon={<DeleteOutlined />}
+            onClick={() => handleDelete(record)}
+          >
+            删除
+          </Button>
+        </>
+      )}
+    </Space>
+  ), [openDetail, openEdit, handleDelete, canEditDelete])
 
   // 装料单列定义
   const loadingColumns: ColumnsType<Receipt> = useMemo(
@@ -482,6 +582,16 @@ const ReceiptsPage = () => {
         dataIndex: 'vehicle_no',
         width: 120,
       },
+      ...(businessType === '罐车'
+        ? [
+            {
+              title: '自编车号',
+              dataIndex: 'tanker_vehicle_code',
+              width: 120,
+              render: (value: string) => value || '-',
+            },
+          ]
+        : []),
       {
         title: '材料名称',
         dataIndex: 'material_name',
@@ -535,39 +645,12 @@ const ReceiptsPage = () => {
       },
       {
         title: '操作',
-        width: 200,
+        width: 80,
         fixed: 'right',
-        render: (_, record) => (
-          <Space size="small">
-            <Button type="link" icon={<EyeOutlined />} onClick={() => openDetail(record)}>
-              查看
-            </Button>
-            {canEditDelete && (
-              <>
-                <Button type="link" icon={<EditOutlined />} onClick={() => openEdit(record)}>
-                  编辑
-                </Button>
-                <Button
-                  type="link"
-                  danger
-                  icon={<DeleteOutlined />}
-                  onClick={() => handleDelete(record)}
-                  loading={
-                    (record.type === 'loading' && deleteLoadingMutation.isPending) ||
-                    (record.type === 'unloading' && deleteUnloadingMutation.isPending) ||
-                    (record.type === 'charging' && deleteChargingMutation.isPending) ||
-                    (record.type === 'water' && deleteWaterMutation.isPending)
-                  }
-                >
-                  删除
-                </Button>
-              </>
-            )}
-          </Space>
-        ),
+        render: (_, record) => renderActions(record),
       },
     ],
-    [openDetail, openEdit, handleDelete, deleteLoadingMutation, deleteUnloadingMutation, deleteChargingMutation, deleteWaterMutation],
+    [businessType, renderActions],
   )
 
   // 卸货单列定义
@@ -593,6 +676,16 @@ const ReceiptsPage = () => {
         dataIndex: 'vehicle_no',
         width: 120,
       },
+      ...(businessType === '罐车'
+        ? [
+            {
+              title: '自编车号',
+              dataIndex: 'tanker_vehicle_code',
+              width: 120,
+              render: (value: string) => value || '-',
+            },
+          ]
+        : []),
       {
         title: '材料名称',
         dataIndex: 'material_name',
@@ -646,39 +739,12 @@ const ReceiptsPage = () => {
       },
       {
         title: '操作',
-        width: 200,
+        width: 80,
         fixed: 'right',
-        render: (_, record) => (
-          <Space size="small">
-            <Button type="link" icon={<EyeOutlined />} onClick={() => openDetail(record)}>
-              查看
-            </Button>
-            {canEditDelete && (
-              <>
-                <Button type="link" icon={<EditOutlined />} onClick={() => openEdit(record)}>
-                  编辑
-                </Button>
-                <Button
-                  type="link"
-                  danger
-                  icon={<DeleteOutlined />}
-                  onClick={() => handleDelete(record)}
-                  loading={
-                    (record.type === 'loading' && deleteLoadingMutation.isPending) ||
-                    (record.type === 'unloading' && deleteUnloadingMutation.isPending) ||
-                    (record.type === 'charging' && deleteChargingMutation.isPending) ||
-                    (record.type === 'water' && deleteWaterMutation.isPending)
-                  }
-                >
-                  删除
-                </Button>
-              </>
-            )}
-          </Space>
-        ),
+        render: (_, record) => renderActions(record),
       },
     ],
-    [openDetail, openEdit, handleDelete, deleteLoadingMutation, deleteUnloadingMutation, deleteChargingMutation, deleteWaterMutation],
+    [businessType, renderActions],
   )
 
   // 充电单列定义
@@ -693,93 +759,85 @@ const ReceiptsPage = () => {
         title: '单据编号',
         dataIndex: 'receipt_number',
         width: 150,
+        render: (value: string) => value || '-',
+      },
+      {
+        title: '司机',
+        dataIndex: 'driver_name',
+        width: 100,
+        render: (value: string) => value || '-',
       },
       {
         title: '车牌号',
         dataIndex: 'vehicle_no',
-        width: 120,
+        width: 100,
       },
+      ...(businessType === '罐车'
+        ? [
+            {
+              title: '自编车号',
+              dataIndex: 'tanker_vehicle_code',
+              width: 100,
+              render: (value: string) => value || '-',
+            },
+          ]
+        : []),
       {
         title: '充电站',
         dataIndex: 'charging_station',
         width: 150,
+        render: (value: string) => value || '-',
       },
       {
         title: '充电桩',
         dataIndex: 'charging_pile',
-        width: 120,
+        width: 100,
+        render: (value: string) => value || '-',
       },
       {
         title: '电量(kWh)',
         dataIndex: 'energy_kwh',
-        width: 120,
+        width: 100,
         render: (value: number) => (value ? value.toFixed(2) : '-'),
       },
       {
         title: '金额(元)',
         dataIndex: 'amount',
-        width: 120,
+        width: 100,
         render: (value: number) => (value ? value.toFixed(2) : '-'),
       },
       {
         title: '开始时间',
         dataIndex: 'start_time',
-        width: 180,
+        width: 150,
         render: (value: string) => (value ? dayjs(value).format('YYYY-MM-DD HH:mm') : '-'),
       },
       {
         title: '结束时间',
         dataIndex: 'end_time',
-        width: 180,
+        width: 150,
         render: (value: string) => (value ? dayjs(value).format('YYYY-MM-DD HH:mm') : '-'),
       },
       {
         title: '时长(分钟)',
         dataIndex: 'duration_min',
-        width: 120,
+        width: 100,
         render: (value: number) => (value ? `${value}分钟` : '-'),
       },
       {
         title: '创建时间',
         dataIndex: 'created_at',
-        width: 180,
+        width: 150,
         render: (value: string) => (value ? dayjs(value).format('YYYY-MM-DD HH:mm') : '-'),
       },
       {
         title: '操作',
-        width: 200,
+        width: 80,
         fixed: 'right',
-        render: (_, record) => (
-          <Space size="small">
-            <Button type="link" icon={<EyeOutlined />} onClick={() => openDetail(record)}>
-              查看
-            </Button>
-            {canEditDelete && (
-              <>
-                <Button type="link" icon={<EditOutlined />} onClick={() => openEdit(record)}>
-                  编辑
-                </Button>
-                <Button
-                  type="link"
-                  danger
-                  icon={<DeleteOutlined />}
-                  onClick={() => handleDelete(record)}
-                  loading={
-                    (record.type === 'loading' && deleteLoadingMutation.isPending) ||
-                    (record.type === 'unloading' && deleteUnloadingMutation.isPending) ||
-                    (record.type === 'charging' && deleteChargingMutation.isPending) ||
-                    (record.type === 'water' && deleteWaterMutation.isPending)
-                  }
-                >
-                  删除
-                </Button>
-              </>
-            )}
-          </Space>
-        ),
+        render: (_, record) => renderActions(record),
       },
     ],
-    [openDetail, openEdit, handleDelete, deleteLoadingMutation, deleteUnloadingMutation, deleteChargingMutation, deleteWaterMutation],
+    [businessType, renderActions],
   )
 
   // 水票列定义
@@ -791,66 +849,58 @@ const ReceiptsPage = () => {
         width: 80,
       },
       {
-        title: '公司',
-        dataIndex: ['company', 'company_name'],
+        title: '业务单号',
+        dataIndex: 'f_water_ticket_id',
         width: 150,
-        render: (_, record) => {
-          const r = record as Receipt & { company?: string; company_name?: string }
-          return r.company || r.company_name || '-'
-        },
+        render: (value: string) => value || '-',
+      },
+      {
+        title: '司机',
+        dataIndex: 'driver_name',
+        width: 100,
+        render: (value: string) => value || '-',
+      },
+      {
+        title: '公司',
+        dataIndex: 'company_name',
+        width: 150,
+        render: (value: string) => value || '-',
       },
       {
         title: '车牌号',
         dataIndex: 'vehicle_no',
-        width: 120,
+        width: 100,
       },
+      ...(businessType === '罐车'
+        ? [
+            {
+              title: '自编车号',
+              dataIndex: 'tanker_vehicle_code',
+              width: 100,
+              render: (value: string) => value || '-',
+            },
+          ]
+        : []),
       {
         title: '日期',
         dataIndex: 'ticket_date',
-        width: 150,
+        width: 120,
         render: (value: string) => (value ? dayjs(value).format('YYYY-MM-DD') : '-'),
       },
       {
         title: '创建时间',
         dataIndex: 'created_at',
-        width: 180,
+        width: 150,
         render: (value: string) => (value ? dayjs(value).format('YYYY-MM-DD HH:mm') : '-'),
       },
       {
         title: '操作',
-        width: 200,
+        width: 80,
         fixed: 'right',
-        render: (_, record) => (
-          <Space size="small">
-            <Button type="link" icon={<EyeOutlined />} onClick={() => openDetail(record)}>
-              查看
-            </Button>
-            {canEditDelete && (
-              <>
-                <Button type="link" icon={<EditOutlined />} onClick={() => openEdit(record)}>
-                  编辑
-                </Button>
-                <Button
-                  type="link"
-                  danger
-                  icon={<DeleteOutlined />}
-                  onClick={() => handleDelete(record)}
-                  loading={
-                    (record.type === 'loading' && deleteLoadingMutation.isPending) ||
-                    (record.type === 'unloading' && deleteUnloadingMutation.isPending) ||
-                    (record.type === 'charging' && deleteChargingMutation.isPending) ||
-                    (record.type === 'water' && deleteWaterMutation.isPending)
-                  }
-                >
-                  删除
-                </Button>
-              </>
-            )}
-          </Space>
-        ),
+        render: (_, record) => renderActions(record),
       },
     ],
-    [openDetail, openEdit, handleDelete, deleteLoadingMutation, deleteUnloadingMutation, deleteChargingMutation, deleteWaterMutation],
+    [businessType, renderActions],
   )
 
   // 装卸匹配列定义
@@ -1009,6 +1059,137 @@ const ReceiptsPage = () => {
     [],
   )
 
+  // 出厂单列定义（罐车业务）
+  const departureColumns: ColumnsType<Receipt> = useMemo(
+    () => [
+      {
+        title: 'ID',
+        dataIndex: 'id',
+        width: 80,
+      },
+      {
+        title: '单据编号',
+        dataIndex: 'f_departure_receipt_id',
+        width: 150,
+        render: (value: string) => value || '-',
+      },
+      {
+        title: '司机',
+        dataIndex: 'driver_name',
+        width: 100,
+        render: (value: string) => value || '-',
+      },
+      {
+        title: '车牌号',
+        dataIndex: 'vehicle_no',
+        width: 100,
+      },
+      {
+        title: '自编车号',
+        dataIndex: 'tanker_vehicle_code',
+        width: 100,
+        render: (value: string) => value || '-',
+      },
+      {
+        title: '装料公司',
+        dataIndex: 'loading_company',
+        width: 150,
+        render: (value: string) => value || '-',
+      },
+      {
+        title: '工程名称',
+        dataIndex: 'project_name',
+        width: 150,
+        render: (value: string) => value || '-',
+      },
+      {
+        title: '施工地点',
+        dataIndex: 'construction_location',
+        width: 150,
+        render: (value: string) => value || '-',
+      },
+      {
+        title: '客户名称',
+        dataIndex: 'customer_name',
+        width: 150,
+        render: (value: string) => value || '-',
+      },
+      {
+        title: '施工单位',
+        dataIndex: 'construction_unit',
+        width: 150,
+        render: (value: string) => value || '-',
+      },
+      {
+        title: '强度等级',
+        dataIndex: 'concrete_strength',
+        width: 100,
+        render: (value: string) => value || '-',
+      },
+      {
+        title: '坍落度',
+        dataIndex: 'slump',
+        width: 80,
+        render: (value: string) => value || '-',
+      },
+      {
+        title: '方量',
+        dataIndex: 'concrete_volume',
+        width: 80,
+        render: (value: string) => value || '-',
+      },
+      {
+        title: '累计方量',
+        dataIndex: 'total_volume',
+        width: 100,
+        render: (value: string) => value || '-',
+      },
+      {
+        title: '累计车次',
+        dataIndex: 'total_vehicles',
+        width: 100,
+        render: (value: string) => value || '-',
+      },
+      {
+        title: '提单号',
+        dataIndex: 'bill_no',
+        width: 120,
+        render: (value: string) => value || '-',
+      },
+      {
+        title: '进厂时间',
+        dataIndex: 'loading_time',
+        width: 150,
+        render: (value: string) => (value ? dayjs(value).format('YYYY-MM-DD HH:mm') : '-'),
+      },
+      {
+        title: '出厂时间',
+        dataIndex: 'exit_time',
+        width: 150,
+        render: (value: string) => (value ? dayjs(value).format('YYYY-MM-DD HH:mm') : '-'),
+      },
+      {
+        title: '生产日期',
+        dataIndex: 'production_date',
+        width: 120,
+        render: (value: string) => (value ? dayjs(value).format('YYYY-MM-DD') : '-'),
+      },
+      {
+        title: '创建时间',
+        dataIndex: 'created_at',
+        width: 150,
+        render: (value: string) => (value ? dayjs(value).format('YYYY-MM-DD HH:mm') : '-'),
+      },
+      {
+        title: '操作',
+        width: 80,
+        fixed: 'right',
+        render: (_, record) => renderActions(record),
+      },
+    ],
+    [renderActions],
+  )
+
   const getColumns = (type: ReceiptType | 'matched'): ColumnsType<Receipt | any> => {
     switch (type) {
       case 'loading':
@@ -1019,6 +1200,8 @@ const ReceiptsPage = () => {
         return chargingColumns
       case 'water':
         return waterColumns
+      case 'departure':
+        return departureColumns
       case 'matched':
         return matchedColumns as ColumnsType<Receipt>
       default:
@@ -1030,7 +1213,7 @@ const ReceiptsPage = () => {
     if (!selectedReceipt) return null
 
     const receipt = selectedReceipt
-    let imageUrl = receipt.thumb_url || (receipt as Receipt & { image_path?: string }).image_path
+    let imageUrl = (receipt as any).thumb_url || (receipt as any).image_path
     
     // 过滤掉无效的图片URL（如微信小程序的临时文件路径）
     if (imageUrl && (imageUrl.startsWith('wxfile://') || imageUrl.startsWith('file://') || imageUrl.includes('wxfile://'))) {
@@ -1282,15 +1465,89 @@ const ReceiptsPage = () => {
             {receipt.type === 'water' && (
               <>
                 <Descriptions.Item label="类型">水票</Descriptions.Item>
+                <Descriptions.Item label="业务单号">
+                  {(receipt as any).f_water_ticket_id || '-'}
+                </Descriptions.Item>
+                <Descriptions.Item label="司机">
+                  {(receipt as any).driver_name || '-'}
+                </Descriptions.Item>
                 <Descriptions.Item label="公司">
-                  {(receipt as Receipt & { company?: string; company_name?: string }).company ||
-                    (receipt as Receipt & { company_name?: string }).company_name ||
-                    '-'}
+                  {(receipt as any).company_name || '-'}
                 </Descriptions.Item>
                 <Descriptions.Item label="车牌号">{receipt.vehicle_no || '-'}</Descriptions.Item>
+                <Descriptions.Item label="自编车号">
+                  {(receipt as any).tanker_vehicle_code || '-'}
+                </Descriptions.Item>
                 <Descriptions.Item label="日期">
-                  {(receipt as Receipt & { ticket_date?: string }).ticket_date
-                    ? dayjs((receipt as Receipt & { ticket_date?: string }).ticket_date).format('YYYY-MM-DD')
+                  {(receipt as any).ticket_date
+                    ? dayjs((receipt as any).ticket_date).format('YYYY-MM-DD')
+                    : '-'}
+                </Descriptions.Item>
+                <Descriptions.Item label="创建时间">
+                  {receipt.created_at ? dayjs(receipt.created_at).format('YYYY-MM-DD HH:mm') : '-'}
+                </Descriptions.Item>
+              </>
+            )}
+
+            {receipt.type === 'departure' && (
+              <>
+                <Descriptions.Item label="类型">出厂单</Descriptions.Item>
+                <Descriptions.Item label="单据编号">
+                  {(receipt as any).f_departure_receipt_id || '-'}
+                </Descriptions.Item>
+                <Descriptions.Item label="司机">
+                  {(receipt as any).driver_name || '-'}
+                </Descriptions.Item>
+                <Descriptions.Item label="车牌号">{receipt.vehicle_no || '-'}</Descriptions.Item>
+                <Descriptions.Item label="自编车号">
+                  {(receipt as any).tanker_vehicle_code || '-'}
+                </Descriptions.Item>
+                <Descriptions.Item label="装料公司">
+                  {(receipt as any).loading_company || '-'}
+                </Descriptions.Item>
+                <Descriptions.Item label="工程名称">
+                  {(receipt as any).project_name || '-'}
+                </Descriptions.Item>
+                <Descriptions.Item label="施工地点">
+                  {(receipt as any).construction_location || '-'}
+                </Descriptions.Item>
+                <Descriptions.Item label="客户名称">
+                  {(receipt as any).customer_name || '-'}
+                </Descriptions.Item>
+                <Descriptions.Item label="施工单位">
+                  {(receipt as any).construction_unit || '-'}
+                </Descriptions.Item>
+                <Descriptions.Item label="强度等级">
+                  {(receipt as any).concrete_strength || '-'}
+                </Descriptions.Item>
+                <Descriptions.Item label="坍落度">
+                  {(receipt as any).slump || '-'}
+                </Descriptions.Item>
+                <Descriptions.Item label="方量">
+                  {(receipt as any).concrete_volume || '-'}
+                </Descriptions.Item>
+                <Descriptions.Item label="累计方量">
+                  {(receipt as any).total_volume || '-'}
+                </Descriptions.Item>
+                <Descriptions.Item label="累计车次">
+                  {(receipt as any).total_vehicles || '-'}
+                </Descriptions.Item>
+                <Descriptions.Item label="提单号">
+                  {(receipt as any).bill_no || '-'}
+                </Descriptions.Item>
+                <Descriptions.Item label="进厂时间">
+                  {(receipt as any).loading_time
+                    ? dayjs((receipt as any).loading_time).format('YYYY-MM-DD HH:mm')
+                    : '-'}
+                </Descriptions.Item>
+                <Descriptions.Item label="出厂时间">
+                  {(receipt as any).exit_time
+                    ? dayjs((receipt as any).exit_time).format('YYYY-MM-DD HH:mm')
+                    : '-'}
+                </Descriptions.Item>
+                <Descriptions.Item label="生产日期">
+                  {(receipt as any).production_date
+                    ? dayjs((receipt as any).production_date).format('YYYY-MM-DD')
                     : '-'}
                 </Descriptions.Item>
                 <Descriptions.Item label="创建时间">
@@ -1507,29 +1764,37 @@ const ReceiptsPage = () => {
     }
   }, [selectedRowKeys, receipts])
 
-  // 批量删除（仅支持水票）
+  // 批量删除（支持所有票据类型）
   const handleBatchDelete = useCallback(() => {
     if (selectedRowKeys.length === 0) {
       message.warning('请先选择要删除的数据')
       return
     }
 
-    if (activeTab !== 'water') {
-      message.warning('批量删除仅支持水票')
-      return
-    }
+    const typeLabel = RECEIPT_TYPES.find(t => t.value === activeTab)?.label || '票据'
 
     Modal.confirm({
       title: '确认删除',
-      content: `确定要删除选中的 ${selectedRowKeys.length} 条水票记录吗？此操作不可恢复。`,
+      content: `确定要删除选中的 ${selectedRowKeys.length} 条${typeLabel}记录吗？此操作不可恢复。`,
       onOk: async () => {
         try {
           const deletePromises = selectedRowKeys.map((key) => {
             const [type, id] = String(key).split('-')
-            if (type === 'water') {
-              return deleteWaterMutation.mutateAsync(Number(id))
+            const receiptId = Number(id)
+            switch (type) {
+              case 'loading':
+                return deleteLoadingMutation.mutateAsync(receiptId)
+              case 'unloading':
+                return deleteUnloadingMutation.mutateAsync(receiptId)
+              case 'charging':
+                return deleteChargingMutation.mutateAsync(receiptId)
+              case 'water':
+                return deleteWaterMutation.mutateAsync(receiptId)
+              case 'departure':
+                return deleteDepartureMutation.mutateAsync(receiptId)
+              default:
+                return Promise.resolve()
             }
-            return Promise.resolve()
           })
           await Promise.all(deletePromises)
           message.success('删除成功')
@@ -1539,7 +1804,7 @@ const ReceiptsPage = () => {
         }
       },
     })
-  }, [selectedRowKeys, activeTab, deleteWaterMutation])
+  }, [selectedRowKeys, activeTab, deleteLoadingMutation, deleteUnloadingMutation, deleteChargingMutation, deleteWaterMutation, deleteDepartureMutation, message])
 
   // 提交编辑
   const handleEditSubmit = useCallback(() => {
@@ -1581,9 +1846,19 @@ const ReceiptsPage = () => {
             ticket_date: values.ticket_date ? values.ticket_date.format('YYYY-MM-DD') : undefined,
           },
         })
+      } else if (editingReceipt.type === 'departure') {
+        updateDepartureMutation.mutate({
+          id: editingReceipt.id,
+          data: {
+            ...values,
+            loading_time: values.loading_time ? values.loading_time.format('YYYY-MM-DD HH:mm:ss') : undefined,
+            exit_time: values.exit_time ? values.exit_time.format('YYYY-MM-DD HH:mm:ss') : undefined,
+            production_date: values.production_date ? values.production_date.format('YYYY-MM-DD') : undefined,
+          },
+        })
       }
     })
-  }, [editForm, editingReceipt, updateLoadingMutation, updateUnloadingMutation, updateChargingMutation, updateWaterMutation, canEditDelete, message])
+  }, [editForm, editingReceipt, updateLoadingMutation, updateUnloadingMutation, updateChargingMutation, updateWaterMutation, updateDepartureMutation, canEditDelete, message])
 
   return (
     <Space direction="vertical" size="large" style={{ width: '100%' }}>
@@ -1596,9 +1871,27 @@ const ReceiptsPage = () => {
             管理装料单、卸货单、充电单、水票等各类票据记录。
           </Paragraph>
         </div>
-        <Space>
+        <Space wrap>
           <Select
-            style={{ width: 200 }}
+            style={{ width: 150 }}
+            placeholder="选择部门"
+            value={selectedDepartmentId}
+            onChange={(value) => {
+              setSelectedDepartmentId(value)
+            }}
+            allowClear
+            options={[
+              { value: undefined, label: '全部部门' },
+              ...departments.map((dept) => ({
+                value: dept.id,
+                label: dept.title,
+              })),
+            ]}
+            loading={departmentsQuery.isLoading}
+            notFoundContent={departmentsQuery.isLoading ? '加载中...' : '暂无部门'}
+          />
+          <Select
+            style={{ width: 180 }}
             placeholder="选择用户"
             value={selectedUserId}
             onChange={setSelectedUserId}
@@ -1607,10 +1900,13 @@ const ReceiptsPage = () => {
             filterOption={(input, option) =>
               (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
             }
-            options={users.map((user) => ({
-              value: user.id,
-              label: `${user.name || user.nickname || '用户'} (${user.phone || user.id})`,
-            }))}
+            options={[
+              { value: undefined, label: '全部用户' },
+              ...users.map((user) => ({
+                value: user.id,
+                label: `${user.name || user.nickname || '用户'} (${user.phone || user.id})`,
+              })),
+            ]}
             loading={usersQuery.isLoading}
             notFoundContent={usersQuery.isLoading ? '加载中...' : '暂无用户'}
           />
@@ -1619,21 +1915,25 @@ const ReceiptsPage = () => {
           </Button>
           {canEditDelete && (
             <>
-              {selectedRowKeys.length > 0 && (
+              {selectedRowKeys.length > 0 && activeTab !== 'matched' && (
                 <>
                   <Button icon={<DownloadOutlined />} onClick={handleBatchExport}>
                     批量导出 ({selectedRowKeys.length})
                   </Button>
-                  {activeTab === 'water' && (
-                    <Button
-                      danger
-                      icon={<DeleteOutlined />}
-                      onClick={handleBatchDelete}
-                      loading={deleteWaterMutation.isPending}
-                    >
-                      批量删除 ({selectedRowKeys.length})
-                    </Button>
-                  )}
+                  <Button
+                    danger
+                    icon={<DeleteOutlined />}
+                    onClick={handleBatchDelete}
+                    loading={
+                      deleteLoadingMutation.isPending ||
+                      deleteUnloadingMutation.isPending ||
+                      deleteChargingMutation.isPending ||
+                      deleteWaterMutation.isPending ||
+                      deleteDepartureMutation.isPending
+                    }
+                  >
+                    批量删除 ({selectedRowKeys.length})
+                  </Button>
                 </>
               )}
               <Button type="primary" icon={<DownloadOutlined />} onClick={handleExport}>
@@ -1763,7 +2063,8 @@ const ReceiptsPage = () => {
                 updateLoadingMutation.isPending ||
                 updateUnloadingMutation.isPending ||
                 updateChargingMutation.isPending ||
-                updateWaterMutation.isPending
+                updateWaterMutation.isPending ||
+                updateDepartureMutation.isPending
               }
             >
               保存
@@ -1847,6 +2148,61 @@ const ReceiptsPage = () => {
                   <Input placeholder="请输入车牌号" />
                 </Form.Item>
                 <Form.Item name="ticket_date" label="日期">
+                  <DatePicker style={{ width: '100%' }} format="YYYY-MM-DD" />
+                </Form.Item>
+              </>
+            )}
+            {editingReceipt.type === 'departure' && (
+              <>
+                <Form.Item name="driver_name" label="司机姓名">
+                  <Input placeholder="请输入司机姓名" />
+                </Form.Item>
+                <Form.Item name="vehicle_no" label="车牌号">
+                  <Input placeholder="请输入车牌号" />
+                </Form.Item>
+                <Form.Item name="tanker_vehicle_code" label="自编车号">
+                  <Input placeholder="请输入自编车号" />
+                </Form.Item>
+                <Form.Item name="loading_company" label="装料公司">
+                  <Input placeholder="请输入装料公司" />
+                </Form.Item>
+                <Form.Item name="project_name" label="工程名称">
+                  <Input placeholder="请输入工程名称" />
+                </Form.Item>
+                <Form.Item name="construction_location" label="施工地点">
+                  <Input placeholder="请输入施工地点" />
+                </Form.Item>
+                <Form.Item name="customer_name" label="客户名称">
+                  <Input placeholder="请输入客户名称" />
+                </Form.Item>
+                <Form.Item name="construction_unit" label="施工单位">
+                  <Input placeholder="请输入施工单位" />
+                </Form.Item>
+                <Form.Item name="concrete_strength" label="强度等级">
+                  <Input placeholder="请输入强度等级" />
+                </Form.Item>
+                <Form.Item name="slump" label="坍落度">
+                  <Input placeholder="请输入坍落度" />
+                </Form.Item>
+                <Form.Item name="concrete_volume" label="方量">
+                  <Input placeholder="请输入方量" />
+                </Form.Item>
+                <Form.Item name="total_volume" label="累计方量">
+                  <Input placeholder="请输入累计方量" />
+                </Form.Item>
+                <Form.Item name="total_vehicles" label="累计车次">
+                  <Input placeholder="请输入累计车次" />
+                </Form.Item>
+                <Form.Item name="bill_no" label="提单号">
+                  <Input placeholder="请输入提单号" />
+                </Form.Item>
+                <Form.Item name="loading_time" label="进厂时间">
+                  <DatePicker showTime style={{ width: '100%' }} format="YYYY-MM-DD HH:mm:ss" />
+                </Form.Item>
+                <Form.Item name="exit_time" label="出厂时间">
+                  <DatePicker showTime style={{ width: '100%' }} format="YYYY-MM-DD HH:mm:ss" />
+                </Form.Item>
+                <Form.Item name="production_date" label="生产日期">
                   <DatePicker style={{ width: '100%' }} format="YYYY-MM-DD" />
                 </Form.Item>
               </>

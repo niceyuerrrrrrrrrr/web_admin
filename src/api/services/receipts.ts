@@ -22,13 +22,16 @@ export const RECEIPT_TYPES: Array<{ value: ReceiptType; label: string }> = [
   { value: 'unloading', label: '卸货单' },
   { value: 'charging', label: '充电单' },
   { value: 'water', label: '水票' },
+  { value: 'departure', label: '出厂单' },
 ]
 
 /**
  * 获取票据列表
  * user_id 可选，不传则查询所有票据（需要管理员权限）
+ * scope: 'mine' 只获取当前用户数据，'all' 获取全部数据
+ * department_id 可选，按部门筛选
  */
-export const fetchReceipts = (params: ReceiptListParams & { userId?: number }) =>
+export const fetchReceipts = (params: ReceiptListParams & { userId?: number; scope?: 'mine' | 'all'; departmentId?: number }) =>
   unwrap<Receipt[]>(
     client.get('/receipts', {
       params: {
@@ -37,6 +40,8 @@ export const fetchReceipts = (params: ReceiptListParams & { userId?: number }) =
         start_date: params.startDate,
         end_date: params.endDate,
         company_id: params.companyId,
+        department_id: params.departmentId,
+        scope: params.scope || 'all', // 默认获取全部数据
       },
     }),
   )
@@ -234,6 +239,38 @@ export const deleteChargingReceipt = (receiptId: number) =>
   unwrap(client.delete(`/receipts/charging/${receiptId}`))
 
 /**
+ * 更新出厂单
+ */
+export const updateDepartureReceipt = (
+  receiptId: number,
+  data: {
+    driver_name?: string
+    vehicle_no?: string
+    tanker_vehicle_code?: string
+    loading_company?: string
+    project_name?: string
+    construction_location?: string
+    customer_name?: string
+    construction_unit?: string
+    concrete_strength?: string
+    slump?: string
+    concrete_volume?: string
+    total_volume?: string
+    total_vehicles?: string
+    bill_no?: string
+    loading_time?: string
+    exit_time?: string
+    production_date?: string
+  },
+) => unwrap(client.put(`/receipts/departure/${receiptId}`, data))
+
+/**
+ * 删除出厂单
+ */
+export const deleteDepartureReceipt = (receiptId: number) =>
+  unwrap(client.delete(`/receipts/departure/${receiptId}`))
+
+/**
  * 获取已匹配的装卸数据列表
  */
 export const fetchMatchedReceipts = (params: {
@@ -241,6 +278,7 @@ export const fetchMatchedReceipts = (params: {
   startDate?: string
   endDate?: string
   companyId?: number
+  scope?: 'mine' | 'all'
 }) =>
   unwrap<Array<{
     id: number
@@ -258,6 +296,7 @@ export const fetchMatchedReceipts = (params: {
         start_date: params.startDate,
         end_date: params.endDate,
         company_id: params.companyId,
+        scope: params.scope || 'all', // 默认获取全部数据
       },
     }),
   )

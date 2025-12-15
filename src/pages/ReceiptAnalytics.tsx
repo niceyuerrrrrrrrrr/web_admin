@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import {
   Card,
   Col,
@@ -22,7 +22,9 @@ import dayjs from 'dayjs'
 import { fetchReceipts } from '../api/services/receipts'
 import { fetchUsers } from '../api/services/users'
 import { fetchCompanyDetail } from '../api/services/companies'
+import { fetchDepartments } from '../api/services/departments'
 import { fetchCEOStatistics } from '../api/services/statistics'
+import { fetchVehicles } from '../api/services/vehicles'
 import type { Receipt, LoadingReceipt, UnloadingReceipt } from '../api/types'
 import useAuthStore from '../store/auth'
 import useCompanyStore from '../store/company'
@@ -61,10 +63,29 @@ interface RouteStats {
 interface TankerCompanyStats {
   company: string
   count: number
-  totalWeight: number
-  maxWeight: number
-  minWeight: number
-  avgWeight: number
+  totalVolume: number
+  maxVolume: number
+  minVolume: number
+  avgVolume: number
+}
+
+interface TankerDriverStats {
+  driver: string
+  count: number
+  totalVolume: number
+  maxVolume: number
+  minVolume: number
+  avgVolume: number
+}
+
+interface TankerVehicleStats {
+  vehicleCode: string
+  plateNumber: string
+  count: number
+  totalVolume: number
+  maxVolume: number
+  minVolume: number
+  avgVolume: number
 }
 
 interface DriverVehicleStats {
@@ -91,10 +112,10 @@ const ReceiptAnalytics = () => {
     startDate?: string
     endDate?: string
     userId?: number
+    departmentId?: number
   }>({})
   
-  const [vehicleFilter, setVehicleFilter] = useState('')
-  const [driverFilter, setDriverFilter] = useState('')
+  const [selectedVehicleNo, setSelectedVehicleNo] = useState<string | undefined>(undefined)
 
   // 优先从 CEO 统计数据获取业务类型（更准确）
   const ceoStatsQuery = useQuery({
@@ -114,12 +135,38 @@ const ReceiptAnalytics = () => {
                       companyQuery.data?.business_type || 
                       '挂车' // 默认为挂车
 
+  // 获取部门列表
+  const departmentsQuery = useQuery({
+    queryKey: ['departments', 'list', effectiveCompanyId],
+    queryFn: () => fetchDepartments({ company_id: effectiveCompanyId }),
+    enabled: !isSuperAdmin || !!effectiveCompanyId,
+  })
+  const departments = departmentsQuery.data?.records || []
+
+  // 获取用户列表（根据选择的部门过滤）
   const usersQuery = useQuery({
-    queryKey: ['users', 'list', effectiveCompanyId],
-    queryFn: () => fetchUsers({ size: 1000 }),
+    queryKey: ['users', 'list', effectiveCompanyId, filters.departmentId],
+    queryFn: () => fetchUsers({ 
+      size: 1000, 
+      company_id: effectiveCompanyId,
+      department_id: filters.departmentId,
+    }),
     enabled: !isSuperAdmin || !!effectiveCompanyId,
   })
   const users = usersQuery.data?.items || []
+
+  // 获取车辆列表
+  const vehiclesQuery = useQuery({
+    queryKey: ['vehicles', 'list', effectiveCompanyId],
+    queryFn: () => fetchVehicles({ companyId: effectiveCompanyId }),
+    enabled: !isSuperAdmin || !!effectiveCompanyId,
+  })
+  const vehicles = vehiclesQuery.data?.vehicles || []
+
+  // 当部门变化时，清空用户选择
+  useEffect(() => {
+    setFilters(prev => ({ ...prev, userId: undefined }))
+  }, [filters.departmentId])
 
   const allReceiptsQuery = useQuery<Receipt[]>({
     queryKey: ['receipts', 'analytics', filters, effectiveCompanyId],
@@ -130,20 +177,20 @@ const ReceiptAnalytics = () => {
         startDate: filters.startDate,
         endDate: filters.endDate,
         companyId: effectiveCompanyId,
+        departmentId: filters.departmentId,
       }),
     enabled: !isSuperAdmin || !!effectiveCompanyId,
   })
 
   const receipts = allReceiptsQuery.data || []
 
-  // Filter receipts in memory by vehicle and driver name
+  // Filter receipts in memory by vehicle
   const filteredReceipts = useMemo(() => {
     return receipts.filter(r => {
-      if (vehicleFilter && !r.vehicle_no?.toLowerCase().includes(vehicleFilter.toLowerCase())) return false
-      if (driverFilter && !(r as any).driver_name?.toLowerCase().includes(driverFilter.toLowerCase())) return false
+      if (selectedVehicleNo && r.vehicle_no !== selectedVehicleNo) return false
       return true
     })
-  }, [receipts, vehicleFilter, driverFilter])
+  }, [receipts, selectedVehicleNo])
 
   // ----------------------------------------------------------------
   // Trailer (挂车) Statistics Logic
@@ -272,35 +319,103 @@ const ReceiptAnalytics = () => {
   }, [filteredReceipts, businessType])
 
   // ----------------------------------------------------------------
-  // Tanker (罐车) Statistics Logic
+  // Tanker (罐车) Statistics Logic - 按方量统计
   // ----------------------------------------------------------------
-  const tankerStats = useMemo(() => {
+  
+  // 罐车出厂单数据
+  const tankerDepartureReceipts = useMemo(() => {
+    if (businessType !== '罐车') return []
+    return filteredReceipts.filter(r => r.type === 'departure')
+  }, [filteredReceipts, businessType])
+
+  // 按装料公司统计
+  const tankerCompanyStats = useMemo(() => {
     if (businessType !== '罐车') return []
 
-    const loadingReceipts = filteredReceipts.filter(r => r.type === 'loading') as LoadingReceipt[]
-    const companyMap = new Map<string, { weights: number[] }>()
+    const companyMap = new Map<string, { volumes: number[] }>()
 
-    loadingReceipts.forEach(r => {
-      const company = r.company || '未知公司'
+    tankerDepartureReceipts.forEach((r: any) => {
+      const company = r.loading_company || '未知公司'
+      const volume = parseFloat(r.concrete_volume) || 0
       if (!companyMap.has(company)) {
-        companyMap.set(company, { weights: [] })
+        companyMap.set(company, { volumes: [] })
       }
-      companyMap.get(company)!.weights.push(Number(r.net_weight || 0))
+      companyMap.get(company)!.volumes.push(volume)
     })
 
-    return Array.from(companyMap.entries()).map(([company, { weights }]) => {
-      const count = weights.length
-      const totalWeight = weights.reduce((a, b) => a + b, 0)
+    return Array.from(companyMap.entries()).map(([company, { volumes }]) => {
+      const count = volumes.length
+      const totalVolume = volumes.reduce((a, b) => a + b, 0)
       return {
         company,
         count,
-        totalWeight,
-        maxWeight: Math.max(...weights),
-        minWeight: Math.min(...weights),
-        avgWeight: count > 0 ? totalWeight / count : 0
+        totalVolume,
+        maxVolume: volumes.length > 0 ? Math.max(...volumes) : 0,
+        minVolume: volumes.length > 0 ? Math.min(...volumes) : 0,
+        avgVolume: count > 0 ? totalVolume / count : 0
       } as TankerCompanyStats
     })
-  }, [filteredReceipts, businessType])
+  }, [tankerDepartureReceipts, businessType])
+
+  // 按司机统计
+  const tankerDriverStats = useMemo(() => {
+    if (businessType !== '罐车') return []
+
+    const driverMap = new Map<string, { volumes: number[] }>()
+
+    tankerDepartureReceipts.forEach((r: any) => {
+      const driver = r.driver_name || '未知司机'
+      const volume = parseFloat(r.concrete_volume) || 0
+      if (!driverMap.has(driver)) {
+        driverMap.set(driver, { volumes: [] })
+      }
+      driverMap.get(driver)!.volumes.push(volume)
+    })
+
+    return Array.from(driverMap.entries()).map(([driver, { volumes }]) => {
+      const count = volumes.length
+      const totalVolume = volumes.reduce((a, b) => a + b, 0)
+      return {
+        driver,
+        count,
+        totalVolume,
+        maxVolume: volumes.length > 0 ? Math.max(...volumes) : 0,
+        minVolume: volumes.length > 0 ? Math.min(...volumes) : 0,
+        avgVolume: count > 0 ? totalVolume / count : 0
+      } as TankerDriverStats
+    })
+  }, [tankerDepartureReceipts, businessType])
+
+  // 按车号统计
+  const tankerVehicleStats = useMemo(() => {
+    if (businessType !== '罐车') return []
+
+    const vehicleMap = new Map<string, { plateNumber: string; volumes: number[] }>()
+
+    tankerDepartureReceipts.forEach((r: any) => {
+      const vehicleCode = r.tanker_vehicle_code || r.vehicle_no || '未知车号'
+      const plateNumber = r.vehicle_no || ''
+      const volume = parseFloat(r.concrete_volume) || 0
+      if (!vehicleMap.has(vehicleCode)) {
+        vehicleMap.set(vehicleCode, { plateNumber, volumes: [] })
+      }
+      vehicleMap.get(vehicleCode)!.volumes.push(volume)
+    })
+
+    return Array.from(vehicleMap.entries()).map(([vehicleCode, { plateNumber, volumes }]) => {
+      const count = volumes.length
+      const totalVolume = volumes.reduce((a, b) => a + b, 0)
+      return {
+        vehicleCode,
+        plateNumber,
+        count,
+        totalVolume,
+        maxVolume: volumes.length > 0 ? Math.max(...volumes) : 0,
+        minVolume: volumes.length > 0 ? Math.min(...volumes) : 0,
+        avgVolume: count > 0 ? totalVolume / count : 0
+      } as TankerVehicleStats
+    })
+  }, [tankerDepartureReceipts, businessType])
 
 
   // ----------------------------------------------------------------
@@ -397,13 +512,35 @@ const ReceiptAnalytics = () => {
     { title: '最小磅差(t)', dataIndex: 'minDiff', render: v => v?.toFixed(2) },
   ]
 
-  const tankerColumns: ColumnsType<TankerCompanyStats> = [
+  // 罐车按装料公司统计列
+  const tankerCompanyColumns: ColumnsType<TankerCompanyStats> = [
     { title: '装料公司', dataIndex: 'company' },
     { title: '总车次', dataIndex: 'count', sorter: (a, b) => a.count - b.count },
-    { title: '总重量(t)', dataIndex: 'totalWeight', render: v => v?.toFixed(2), sorter: (a, b) => a.totalWeight - b.totalWeight },
-    { title: '最大重量(t)', dataIndex: 'maxWeight', render: v => v?.toFixed(2) },
-    { title: '最小重量(t)', dataIndex: 'minWeight', render: v => v?.toFixed(2) },
-    { title: '平均重量(t)', dataIndex: 'avgWeight', render: v => v?.toFixed(2) },
+    { title: '总方量(m³)', dataIndex: 'totalVolume', render: v => v?.toFixed(2), sorter: (a, b) => a.totalVolume - b.totalVolume },
+    { title: '最大方量(m³)', dataIndex: 'maxVolume', render: v => v?.toFixed(2) },
+    { title: '最小方量(m³)', dataIndex: 'minVolume', render: v => v?.toFixed(2) },
+    { title: '平均方量(m³)', dataIndex: 'avgVolume', render: v => v?.toFixed(2) },
+  ]
+
+  // 罐车按司机统计列
+  const tankerDriverColumns: ColumnsType<TankerDriverStats> = [
+    { title: '司机姓名', dataIndex: 'driver' },
+    { title: '总车次', dataIndex: 'count', sorter: (a, b) => a.count - b.count },
+    { title: '总方量(m³)', dataIndex: 'totalVolume', render: v => v?.toFixed(2), sorter: (a, b) => a.totalVolume - b.totalVolume },
+    { title: '最大方量(m³)', dataIndex: 'maxVolume', render: v => v?.toFixed(2) },
+    { title: '最小方量(m³)', dataIndex: 'minVolume', render: v => v?.toFixed(2) },
+    { title: '平均方量(m³)', dataIndex: 'avgVolume', render: v => v?.toFixed(2) },
+  ]
+
+  // 罐车按车号统计列
+  const tankerVehicleColumns: ColumnsType<TankerVehicleStats> = [
+    { title: '车号', dataIndex: 'vehicleCode' },
+    { title: '车牌号', dataIndex: 'plateNumber' },
+    { title: '总车次', dataIndex: 'count', sorter: (a, b) => a.count - b.count },
+    { title: '总方量(m³)', dataIndex: 'totalVolume', render: v => v?.toFixed(2), sorter: (a, b) => a.totalVolume - b.totalVolume },
+    { title: '最大方量(m³)', dataIndex: 'maxVolume', render: v => v?.toFixed(2) },
+    { title: '最小方量(m³)', dataIndex: 'minVolume', render: v => v?.toFixed(2) },
+    { title: '平均方量(m³)', dataIndex: 'avgVolume', render: v => v?.toFixed(2) },
   ]
 
   const driverStatsColumns: ColumnsType<DriverVehicleStats> = [
@@ -453,8 +590,24 @@ const ReceiptAnalytics = () => {
           <RangePicker onChange={handleSearch} allowClear placeholder={['开始日期', '结束日期']} />
           
           <Select
+            style={{ width: 120 }}
+            placeholder="选择部门"
+            value={filters.departmentId}
+            onChange={(val) => setFilters(prev => ({ ...prev, departmentId: val }))}
+            allowClear
+            options={[
+              { value: undefined, label: '全部部门' },
+              ...departments.map((dept) => ({
+                value: dept.id,
+                label: dept.title,
+              })),
+            ]}
+            loading={departmentsQuery.isLoading}
+          />
+
+          <Select
             style={{ width: 150 }}
-            placeholder="选择用户(司机)"
+            placeholder="选择用户"
             value={filters.userId}
             onChange={(val) => setFilters(prev => ({ ...prev, userId: val }))}
             showSearch
@@ -462,26 +615,36 @@ const ReceiptAnalytics = () => {
             filterOption={(input, option) =>
               (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
             }
-            options={users.map((user) => ({
-              value: user.id,
-              label: user.name || user.nickname || `用户${user.id}`,
-            }))}
+            options={[
+              { value: undefined, label: '全部用户' },
+              ...users.map((user) => ({
+                value: user.id,
+                label: user.name || user.nickname || `用户${user.id}`,
+              })),
+            ]}
+            loading={usersQuery.isLoading}
           />
 
-          <Input 
-            placeholder="车牌号" 
-            style={{ width: 120 }} 
-            value={vehicleFilter}
-            onChange={e => setVehicleFilter(e.target.value)}
+          <Select
+            style={{ width: 130 }}
+            placeholder={businessType === '罐车' ? '选择车号' : '选择车牌号'}
+            value={selectedVehicleNo}
+            onChange={setSelectedVehicleNo}
+            showSearch
             allowClear
-          />
-
-          <Input 
-            placeholder="司机姓名(模糊)" 
-            style={{ width: 120 }} 
-            value={driverFilter}
-            onChange={e => setDriverFilter(e.target.value)}
-            allowClear
+            filterOption={(input, option) =>
+              (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
+            }
+            options={[
+              { value: undefined, label: '全部车辆' },
+              ...vehicles.map((v) => ({
+                value: v.plate_number,
+                label: businessType === '罐车' 
+                  ? (v.tanker_vehicle_code || v.plate_number)
+                  : v.plate_number,
+              })),
+            ]}
+            loading={vehiclesQuery.isLoading}
           />
 
           <Button 
@@ -535,17 +698,45 @@ const ReceiptAnalytics = () => {
       )}
 
       {businessType === '罐车' && (
-        <Card title="装料统计 (按公司)" size="small">
-          <Table
-            columns={tankerColumns}
-            dataSource={tankerStats}
-            rowKey="company"
-            scroll={{ x: 800 }}
-          />
-        </Card>
+        <>
+          <Card title="方量统计 (按装料公司)" size="small">
+            <Table
+              columns={tankerCompanyColumns}
+              dataSource={tankerCompanyStats}
+              rowKey="company"
+              scroll={{ x: 800 }}
+            />
+          </Card>
+
+          <Row gutter={[16, 16]}>
+            <Col xs={24} lg={12}>
+              <Card title="方量统计 (按司机)" size="small">
+                <Table
+                  size="small"
+                  columns={tankerDriverColumns}
+                  dataSource={tankerDriverStats}
+                  rowKey="driver"
+                  scroll={{ x: 600 }}
+                />
+              </Card>
+            </Col>
+            <Col xs={24} lg={12}>
+              <Card title="方量统计 (按车号)" size="small">
+                <Table
+                  size="small"
+                  columns={tankerVehicleColumns}
+                  dataSource={tankerVehicleStats}
+                  rowKey="vehicleCode"
+                  scroll={{ x: 700 }}
+                />
+              </Card>
+            </Col>
+          </Row>
+        </>
       )}
 
-      {/* 司机和车辆统计 (所有模式通用，但列会根据模式动态调整) */}
+      {/* 司机和车辆统计 (仅挂车模式) */}
+      {businessType === '挂车' && (
       <Row gutter={[16, 16]}>
         <Col xs={24} lg={12}>
           <Card title="司机统计" size="small">
@@ -570,6 +761,7 @@ const ReceiptAnalytics = () => {
           </Card>
         </Col>
       </Row>
+      )}
     </Space>
   )
 }
