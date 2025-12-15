@@ -61,6 +61,7 @@ import MaterialPricingPage from './pages/MaterialPricing'
 import VehiclesPage from './pages/Vehicles'
 import UsersPage from './pages/Users'
 import RolesPage from './pages/Roles'
+import PermissionsPage from './pages/Permissions'
 import CompaniesPage from './pages/Companies'
 import DepartmentsPage from './pages/Departments'
 import HRPage from './pages/HR'
@@ -301,6 +302,13 @@ const routeDefinitions = [
         path: '/roles',
         icon: <TeamOutlined />,
         element: <RolesPage />,
+      },
+      {
+        key: 'permissions',
+        label: '权限管理',
+        path: '/permissions',
+        icon: <FileProtectOutlined />,
+        element: <PermissionsPage />,
       },
       {
         key: 'companies',
