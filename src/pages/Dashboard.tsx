@@ -305,7 +305,12 @@ const DashboardPage = () => {
                 label={{ 
                   type: 'outer',
                   offset: 20,
-                  formatter: (datum: any) => `${datum.type}\n${(datum.percent * 100).toFixed(0)}%`
+                  formatter: (datum: any) => {
+                    if (!datum || !datum.data) return '';
+                    const name = datum.data.type || '';
+                    const percent = ((datum.data.value / materialChartData.reduce((sum: number, d: any) => sum + d.value, 0)) * 100).toFixed(0);
+                    return `${name}\n${percent}%`;
+                  }
                 }}
                 theme="dark"
                 legend={{ position: 'bottom' }}
@@ -466,7 +471,12 @@ const DashboardPage = () => {
                           label={{ 
                             type: 'outer',
                             offset: 20,
-                            formatter: (datum: any) => `${datum.type}\n${(datum.percent * 100).toFixed(0)}%`
+                            formatter: (datum: any) => {
+                              if (!datum || !datum.data) return '';
+                              const name = datum.data.type || '';
+                              const percent = ((datum.data.value / loadingMaterials.reduce((sum: number, d: any) => sum + d.value, 0)) * 100).toFixed(0);
+                              return `${name}\n${percent}%`;
+                            }
                           }}
                           theme="dark"
                           legend={{ position: 'bottom' }}
@@ -512,7 +522,12 @@ const DashboardPage = () => {
                           label={{ 
                             type: 'outer',
                             offset: 20,
-                            formatter: (datum: any) => `${datum.type}\n${(datum.percent * 100).toFixed(0)}%`
+                            formatter: (datum: any) => {
+                              if (!datum || !datum.data) return '';
+                              const name = datum.data.type || '';
+                              const percent = ((datum.data.value / unloadingMaterials.reduce((sum: number, d: any) => sum + d.value, 0)) * 100).toFixed(0);
+                              return `${name}\n${percent}%`;
+                            }
                           }}
                           theme="dark"
                           legend={{ position: 'bottom' }}
