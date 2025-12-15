@@ -313,7 +313,13 @@ const DashboardPage = () => {
                 radius={0.8} 
                 innerRadius={0.6}
                 label={{
-                  content: (item: any) => item.displayLabel
+                  content: (item: any) => {
+                    const dataItem = item.data || item;
+                    if (!dataItem || !dataItem.type) return '';
+                    const total = materialChartData.reduce((sum: number, d: any) => sum + d.value, 0);
+                    const percent = total > 0 ? ((dataItem.value / total) * 100).toFixed(0) : '0';
+                    return `${dataItem.type}: ${percent}%`;
+                  }
                 }}
                 theme="dark"
                 legend={{ position: 'bottom' }}
@@ -475,7 +481,13 @@ const DashboardPage = () => {
                           radius={0.8} 
                           innerRadius={0.6}
                           label={{
-                            content: (item: any) => item.displayLabel
+                            content: (item: any) => {
+                              const dataItem = item.data || item;
+                              if (!dataItem || !dataItem.type) return '';
+                              const total = loadingMaterials.reduce((sum: number, d: any) => sum + d.value, 0);
+                              const percent = total > 0 ? ((dataItem.value / total) * 100).toFixed(0) : '0';
+                              return `${dataItem.type}: ${percent}%`;
+                            }
                           }}
                           theme="dark"
                           legend={{ position: 'bottom' }}
@@ -519,7 +531,13 @@ const DashboardPage = () => {
                           radius={0.8} 
                           innerRadius={0.6}
                           label={{
-                            content: (item: any) => item.displayLabel
+                            content: (item: any) => {
+                              const dataItem = item.data || item;
+                              if (!dataItem || !dataItem.type) return '';
+                              const total = unloadingMaterials.reduce((sum: number, d: any) => sum + d.value, 0);
+                              const percent = total > 0 ? ((dataItem.value / total) * 100).toFixed(0) : '0';
+                              return `${dataItem.type}: ${percent}%`;
+                            }
                           }}
                           theme="dark"
                           legend={{ position: 'bottom' }}
