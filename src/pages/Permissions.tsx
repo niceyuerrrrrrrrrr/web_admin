@@ -45,7 +45,6 @@ import {
 } from '../api/services/permissions'
 
 const { Title, Paragraph, Text } = Typography
-const { TabPane } = Tabs
 
 const PermissionsPage = () => {
   const queryClient = useQueryClient()
@@ -371,8 +370,14 @@ const PermissionsPage = () => {
       )}
 
       <Card>
-        <Tabs activeKey={activeTab} onChange={setActiveTab}>
-          <TabPane tab="角色管理" key="roles">
+        <Tabs
+          activeKey={activeTab}
+          onChange={setActiveTab}
+          items={[
+            {
+              key: 'roles',
+              label: '角色管理',
+              children: (
             <Table
               rowKey="id"
               columns={roleColumns}
@@ -381,9 +386,12 @@ const PermissionsPage = () => {
               pagination={{ pageSize: 10, showSizeChanger: true, showTotal: (total) => `共 ${total} 条` }}
               locale={{ emptyText: <Empty description="暂无角色数据" /> }}
             />
-          </TabPane>
-
-          <TabPane tab="权限列表" key="permissions">
+              ),
+            },
+            {
+              key: 'permissions',
+              label: '权限列表',
+              children: (
             <Table
               rowKey="id"
               columns={permissionColumns}
@@ -392,9 +400,12 @@ const PermissionsPage = () => {
               pagination={{ pageSize: 20, showSizeChanger: true, showTotal: (total) => `共 ${total} 条` }}
               locale={{ emptyText: <Empty description="暂无权限数据" /> }}
             />
-          </TabPane>
-
-          <TabPane tab="权限树" key="tree">
+              ),
+            },
+            {
+              key: 'tree',
+              label: '权限树',
+              children: (
             <Card>
               <Tree
                 showLine
@@ -403,8 +414,10 @@ const PermissionsPage = () => {
                 style={{ marginTop: 16 }}
               />
             </Card>
-          </TabPane>
-        </Tabs>
+              ),
+            },
+          ]}
+        />
       </Card>
 
       {/* 角色编辑弹窗 */}
@@ -419,6 +432,7 @@ const PermissionsPage = () => {
         }}
         width={700}
         confirmLoading={createRoleMutation.isPending || updateRoleMutation.isPending}
+        destroyOnHidden
       >
         <Form form={form} layout="vertical" style={{ marginTop: 24 }}>
           {!editingRole && (
@@ -455,7 +469,7 @@ const PermissionsPage = () => {
               <Row gutter={[16, 16]}>
                 {Object.entries(permissionModules).map(([module, perms]) => (
                   <Col span={24} key={module}>
-                    <Card size="small" title={module} style={{ marginBottom: 8 }}>
+                    <Card size="small" title={module} variant="outlined" style={{ marginBottom: 8 }}>
                       <Space direction="vertical" style={{ width: '100%' }}>
                         {perms.map((perm) => (
                           <Checkbox key={perm.code} value={perm.code}>
