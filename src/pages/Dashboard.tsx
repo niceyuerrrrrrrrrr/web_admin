@@ -286,15 +286,15 @@ const DashboardPage = () => {
       }))
       .sort((a:any,b:any) => b.value - a.value)
 
-    // 兼容不同字段命名：material / name / material_name, totalVolume / weight / totalWeight
-    const rawMaterialChartData = (loadingByMaterial || [])
+    // 饼图数据：各装料公司方量占比（复用 loadingByCompany 数据）
+    const rawCompanyPieData = (loadingByCompany || [])
       .map((i: any) => ({
-        type: i.material || i.name || i.material_name || '未知材料',
-        value: Number(i.totalVolume || i.weight || i.totalWeight || 0),
+        type: i.company || i.name || '未知公司',
+        value: Number(i.totalVolume || i.weight || 0),
       }))
       .filter(item => item.value > 0)
       .sort((a:any,b:any) => b.value - a.value)
-    const materialChartData = processPieData(rawMaterialChartData)
+    const companyPieData = processPieData(rawCompanyPieData)
 
     return (
       <Row gutter={[24, 24]}>
@@ -308,7 +308,11 @@ const DashboardPage = () => {
                 color="#1890ff"
                 xAxis={{ label: { autoRotate: true, autoHide: false, style: { fill: '#fff' } } }}
                 yAxis={{ label: { style: { fill: '#fff' } } }}
-                label={{ position: 'top' }}
+                label={{ 
+                  position: 'top',
+                  offset: 4,
+                  style: { fill: '#fff', fontWeight: 'bold' }
+                }}
                 theme="dark"
                 height={240}
                 autoFit
@@ -317,10 +321,10 @@ const DashboardPage = () => {
           </DashboardCard>
         </Col>
         <Col xs={24} lg={10}>
-          <DashboardCard title="装料材料占比">
-             {materialChartData.length > 0 ? (
+          <DashboardCard title="各公司装料方量占比">
+             {companyPieData.length > 0 ? (
                <Pie 
-                data={materialChartData} 
+                data={companyPieData} 
                 angleField="value" 
                 colorField="type" 
                 radius={0.8} 
@@ -334,7 +338,7 @@ const DashboardPage = () => {
                     const dataItem = item.data || item;
                     if (dataItem?.displayLabel) return dataItem.displayLabel;
                     if (!dataItem || !dataItem.type) return '';
-                    const total = materialChartData.reduce((sum: number, d: any) => sum + (d.value || 0), 0);
+                    const total = companyPieData.reduce((sum: number, d: any) => sum + (d.value || 0), 0);
                     const percent = total > 0 ? ((dataItem.value / total) * 100).toFixed(0) : '0';
                     return `${dataItem.type}: ${percent}%`;
                   },
