@@ -326,6 +326,9 @@ const DashboardPage = () => {
                 radius={0.8} 
                 innerRadius={0.6}
                 label={{
+                  position: 'outside',
+                  style: { fill: '#fff', fontWeight: 'bold' },
+                  connector: true,
                   text: (item: any) => {
                     // G2 把原始数据挂在 item.data 上，优先使用我们预处理好的 displayLabel
                     const dataItem = item.data || item;
@@ -508,6 +511,9 @@ const DashboardPage = () => {
                           radius={0.8} 
                           innerRadius={0.6}
                           label={{
+                            position: 'outside',
+                            style: { fill: '#fff', fontWeight: 'bold' },
+                            connector: true,
                             text: (item: any) => {
                               const dataItem = item.data || item;
                               if (!dataItem || !dataItem.type) return '';
@@ -558,6 +564,9 @@ const DashboardPage = () => {
                           radius={0.8} 
                           innerRadius={0.6}
                           label={{
+                            position: 'outside',
+                            style: { fill: '#fff', fontWeight: 'bold' },
+                            connector: true,
                             text: (item: any) => {
                               const dataItem = item.data || item;
                               if (!dataItem || !dataItem.type) return '';
