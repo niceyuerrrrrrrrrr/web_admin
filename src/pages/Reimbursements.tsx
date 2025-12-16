@@ -561,13 +561,21 @@ const ReimbursementsPage = () => {
                           data={categoryChartData}
                           angleField="value"
                           colorField="type"
-                          radius={0.9}
+                          radius={0.8}
+                          innerRadius={0.5}
                           label={{ 
-                            content: (data: any) => {
+                            position: 'outside',
+                            text: (data: any) => {
                               const item = data.data || data
-                              return `${item.type}: ${item.value}`
-                            } 
+                              if (!item || !item.type) return ''
+                              const total = categoryChartData.reduce((sum: number, d: any) => sum + (d.value || 0), 0)
+                              const percent = total > 0 ? ((item.value / total) * 100).toFixed(0) : '0'
+                              return `${item.type}: ${percent}%`
+                            },
+                            style: { fontWeight: 'bold' },
+                            connector: true
                           }}
+                          legend={{ position: 'bottom' }}
                         />
                       ) : (
                         <Alert type="info" message="暂无分类数据" showIcon />
@@ -577,7 +585,17 @@ const ReimbursementsPage = () => {
                   <Col span={12}>
                     <Card title="金额趋势">
                       {trendChartData.length > 0 ? (
-                        <Line data={trendChartData} xField="month" yField="amount" smooth point={{ size: 4 }} />
+                        <Line 
+                          data={trendChartData} 
+                          xField="month" 
+                          yField="amount" 
+                          smooth 
+                          point={{ size: 4 }}
+                          label={{
+                            text: (d: any) => `¥${d.amount}`,
+                            style: { fontWeight: 'bold' }
+                          }}
+                        />
                       ) : (
                         <Alert type="info" message="暂无趋势数据" showIcon />
                       )}
