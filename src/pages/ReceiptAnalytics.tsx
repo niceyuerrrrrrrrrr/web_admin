@@ -63,29 +63,32 @@ interface RouteStats {
 interface TankerCompanyStats {
   company: string
   count: number
-  totalVolume: number
-  maxVolume: number
-  minVolume: number
-  avgVolume: number
+  totalSettlementVolume: number
+  totalConcreteVolume: number
+  maxSettlementVolume: number
+  minSettlementVolume: number
+  avgSettlementVolume: number
 }
 
 interface TankerDriverStats {
   driver: string
   count: number
-  totalVolume: number
-  maxVolume: number
-  minVolume: number
-  avgVolume: number
+  totalSettlementVolume: number
+  totalConcreteVolume: number
+  maxSettlementVolume: number
+  minSettlementVolume: number
+  avgSettlementVolume: number
 }
 
 interface TankerVehicleStats {
   vehicleCode: string
   plateNumber: string
   count: number
-  totalVolume: number
-  maxVolume: number
-  minVolume: number
-  avgVolume: number
+  totalSettlementVolume: number
+  totalConcreteVolume: number
+  maxSettlementVolume: number
+  minSettlementVolume: number
+  avgSettlementVolume: number
 }
 
 interface DriverVehicleStats {
@@ -328,31 +331,54 @@ const ReceiptAnalytics = () => {
     return filteredReceipts.filter(r => r.type === 'departure')
   }, [filteredReceipts, businessType])
 
+  const tankerSettlementSummary = useMemo(() => {
+    if (businessType !== '罐车') {
+      return { totalSettlementVolume: 0, totalConcreteVolume: 0, receiptCount: 0 }
+    }
+    const totals = tankerDepartureReceipts.reduce(
+      (acc, receipt: any) => {
+        const settlement = parseFloat(receipt.settlement_volume) || 0
+        const concrete = parseFloat(receipt.concrete_volume) || 0
+        acc.totalSettlementVolume += settlement
+        acc.totalConcreteVolume += concrete
+        acc.receiptCount += 1
+        return acc
+      },
+      { totalSettlementVolume: 0, totalConcreteVolume: 0, receiptCount: 0 }
+    )
+    return totals
+  }, [tankerDepartureReceipts, businessType])
+
   // 按装料公司统计
   const tankerCompanyStats = useMemo(() => {
     if (businessType !== '罐车') return []
 
-    const companyMap = new Map<string, { volumes: number[] }>()
+    const companyMap = new Map<string, { settlementVolumes: number[]; concreteVolumes: number[] }>()
 
     tankerDepartureReceipts.forEach((r: any) => {
       const company = r.loading_company || '未知公司'
-      const volume = parseFloat(r.concrete_volume) || 0
+      const settlementVolume = parseFloat(r.settlement_volume) || 0
+      const concreteVolume = parseFloat(r.concrete_volume) || 0
       if (!companyMap.has(company)) {
-        companyMap.set(company, { volumes: [] })
+        companyMap.set(company, { settlementVolumes: [], concreteVolumes: [] })
       }
-      companyMap.get(company)!.volumes.push(volume)
+      const entry = companyMap.get(company)!
+      entry.settlementVolumes.push(settlementVolume)
+      entry.concreteVolumes.push(concreteVolume)
     })
 
-    return Array.from(companyMap.entries()).map(([company, { volumes }]) => {
-      const count = volumes.length
-      const totalVolume = volumes.reduce((a, b) => a + b, 0)
+    return Array.from(companyMap.entries()).map(([company, { settlementVolumes, concreteVolumes }]) => {
+      const count = settlementVolumes.length
+      const totalSettlementVolume = settlementVolumes.reduce((a, b) => a + b, 0)
+      const totalConcreteVolume = concreteVolumes.reduce((a, b) => a + b, 0)
       return {
         company,
         count,
-        totalVolume,
-        maxVolume: volumes.length > 0 ? Math.max(...volumes) : 0,
-        minVolume: volumes.length > 0 ? Math.min(...volumes) : 0,
-        avgVolume: count > 0 ? totalVolume / count : 0
+        totalSettlementVolume,
+        totalConcreteVolume,
+        maxSettlementVolume: settlementVolumes.length > 0 ? Math.max(...settlementVolumes) : 0,
+        minSettlementVolume: settlementVolumes.length > 0 ? Math.min(...settlementVolumes) : 0,
+        avgSettlementVolume: count > 0 ? totalSettlementVolume / count : 0
       } as TankerCompanyStats
     })
   }, [tankerDepartureReceipts, businessType])
@@ -361,27 +387,32 @@ const ReceiptAnalytics = () => {
   const tankerDriverStats = useMemo(() => {
     if (businessType !== '罐车') return []
 
-    const driverMap = new Map<string, { volumes: number[] }>()
+    const driverMap = new Map<string, { settlementVolumes: number[]; concreteVolumes: number[] }>()
 
     tankerDepartureReceipts.forEach((r: any) => {
       const driver = r.driver_name || '未知司机'
-      const volume = parseFloat(r.concrete_volume) || 0
+      const settlementVolume = parseFloat(r.settlement_volume) || 0
+      const concreteVolume = parseFloat(r.concrete_volume) || 0
       if (!driverMap.has(driver)) {
-        driverMap.set(driver, { volumes: [] })
+        driverMap.set(driver, { settlementVolumes: [], concreteVolumes: [] })
       }
-      driverMap.get(driver)!.volumes.push(volume)
+      const entry = driverMap.get(driver)!
+      entry.settlementVolumes.push(settlementVolume)
+      entry.concreteVolumes.push(concreteVolume)
     })
 
-    return Array.from(driverMap.entries()).map(([driver, { volumes }]) => {
-      const count = volumes.length
-      const totalVolume = volumes.reduce((a, b) => a + b, 0)
+    return Array.from(driverMap.entries()).map(([driver, { settlementVolumes, concreteVolumes }]) => {
+      const count = settlementVolumes.length
+      const totalSettlementVolume = settlementVolumes.reduce((a, b) => a + b, 0)
+      const totalConcreteVolume = concreteVolumes.reduce((a, b) => a + b, 0)
       return {
         driver,
         count,
-        totalVolume,
-        maxVolume: volumes.length > 0 ? Math.max(...volumes) : 0,
-        minVolume: volumes.length > 0 ? Math.min(...volumes) : 0,
-        avgVolume: count > 0 ? totalVolume / count : 0
+        totalSettlementVolume,
+        totalConcreteVolume,
+        maxSettlementVolume: settlementVolumes.length > 0 ? Math.max(...settlementVolumes) : 0,
+        minSettlementVolume: settlementVolumes.length > 0 ? Math.min(...settlementVolumes) : 0,
+        avgSettlementVolume: count > 0 ? totalSettlementVolume / count : 0
       } as TankerDriverStats
     })
   }, [tankerDepartureReceipts, businessType])
@@ -390,29 +421,34 @@ const ReceiptAnalytics = () => {
   const tankerVehicleStats = useMemo(() => {
     if (businessType !== '罐车') return []
 
-    const vehicleMap = new Map<string, { plateNumber: string; volumes: number[] }>()
+    const vehicleMap = new Map<string, { plateNumber: string; settlementVolumes: number[]; concreteVolumes: number[] }>()
 
     tankerDepartureReceipts.forEach((r: any) => {
       const vehicleCode = r.tanker_vehicle_code || r.vehicle_no || '未知车号'
       const plateNumber = r.vehicle_no || ''
-      const volume = parseFloat(r.concrete_volume) || 0
+      const settlementVolume = parseFloat(r.settlement_volume) || 0
+      const concreteVolume = parseFloat(r.concrete_volume) || 0
       if (!vehicleMap.has(vehicleCode)) {
-        vehicleMap.set(vehicleCode, { plateNumber, volumes: [] })
+        vehicleMap.set(vehicleCode, { plateNumber, settlementVolumes: [], concreteVolumes: [] })
       }
-      vehicleMap.get(vehicleCode)!.volumes.push(volume)
+      const entry = vehicleMap.get(vehicleCode)!
+      entry.settlementVolumes.push(settlementVolume)
+      entry.concreteVolumes.push(concreteVolume)
     })
 
-    return Array.from(vehicleMap.entries()).map(([vehicleCode, { plateNumber, volumes }]) => {
-      const count = volumes.length
-      const totalVolume = volumes.reduce((a, b) => a + b, 0)
+    return Array.from(vehicleMap.entries()).map(([vehicleCode, { plateNumber, settlementVolumes, concreteVolumes }]) => {
+      const count = settlementVolumes.length
+      const totalSettlementVolume = settlementVolumes.reduce((a, b) => a + b, 0)
+      const totalConcreteVolume = concreteVolumes.reduce((a, b) => a + b, 0)
       return {
         vehicleCode,
         plateNumber,
         count,
-        totalVolume,
-        maxVolume: volumes.length > 0 ? Math.max(...volumes) : 0,
-        minVolume: volumes.length > 0 ? Math.min(...volumes) : 0,
-        avgVolume: count > 0 ? totalVolume / count : 0
+        totalSettlementVolume,
+        totalConcreteVolume,
+        maxSettlementVolume: settlementVolumes.length > 0 ? Math.max(...settlementVolumes) : 0,
+        minSettlementVolume: settlementVolumes.length > 0 ? Math.min(...settlementVolumes) : 0,
+        avgSettlementVolume: count > 0 ? totalSettlementVolume / count : 0
       } as TankerVehicleStats
     })
   }, [tankerDepartureReceipts, businessType])
@@ -516,20 +552,22 @@ const ReceiptAnalytics = () => {
   const tankerCompanyColumns: ColumnsType<TankerCompanyStats> = [
     { title: '装料公司', dataIndex: 'company' },
     { title: '总车次', dataIndex: 'count', sorter: (a, b) => a.count - b.count },
-    { title: '总方量(m³)', dataIndex: 'totalVolume', render: v => v?.toFixed(2), sorter: (a, b) => a.totalVolume - b.totalVolume },
-    { title: '最大方量(m³)', dataIndex: 'maxVolume', render: v => v?.toFixed(2) },
-    { title: '最小方量(m³)', dataIndex: 'minVolume', render: v => v?.toFixed(2) },
-    { title: '平均方量(m³)', dataIndex: 'avgVolume', render: v => v?.toFixed(2) },
+    { title: '结算方量(m³)', dataIndex: 'totalSettlementVolume', render: v => v?.toFixed(2), sorter: (a, b) => a.totalSettlementVolume - b.totalSettlementVolume },
+    { title: '方量(m³)', dataIndex: 'totalConcreteVolume', render: v => v?.toFixed(2), sorter: (a, b) => a.totalConcreteVolume - b.totalConcreteVolume },
+    { title: '最大结算方量', dataIndex: 'maxSettlementVolume', render: v => v?.toFixed(2) },
+    { title: '最小结算方量', dataIndex: 'minSettlementVolume', render: v => v?.toFixed(2) },
+    { title: '平均结算方量', dataIndex: 'avgSettlementVolume', render: v => v?.toFixed(2) },
   ]
 
   // 罐车按司机统计列
   const tankerDriverColumns: ColumnsType<TankerDriverStats> = [
     { title: '司机姓名', dataIndex: 'driver' },
     { title: '总车次', dataIndex: 'count', sorter: (a, b) => a.count - b.count },
-    { title: '总方量(m³)', dataIndex: 'totalVolume', render: v => v?.toFixed(2), sorter: (a, b) => a.totalVolume - b.totalVolume },
-    { title: '最大方量(m³)', dataIndex: 'maxVolume', render: v => v?.toFixed(2) },
-    { title: '最小方量(m³)', dataIndex: 'minVolume', render: v => v?.toFixed(2) },
-    { title: '平均方量(m³)', dataIndex: 'avgVolume', render: v => v?.toFixed(2) },
+    { title: '结算方量(m³)', dataIndex: 'totalSettlementVolume', render: v => v?.toFixed(2), sorter: (a, b) => a.totalSettlementVolume - b.totalSettlementVolume },
+    { title: '方量(m³)', dataIndex: 'totalConcreteVolume', render: v => v?.toFixed(2), sorter: (a, b) => a.totalConcreteVolume - b.totalConcreteVolume },
+    { title: '最大结算方量', dataIndex: 'maxSettlementVolume', render: v => v?.toFixed(2) },
+    { title: '最小结算方量', dataIndex: 'minSettlementVolume', render: v => v?.toFixed(2) },
+    { title: '平均结算方量', dataIndex: 'avgSettlementVolume', render: v => v?.toFixed(2) },
   ]
 
   // 罐车按车号统计列
@@ -537,10 +575,11 @@ const ReceiptAnalytics = () => {
     { title: '车号', dataIndex: 'vehicleCode' },
     { title: '车牌号', dataIndex: 'plateNumber' },
     { title: '总车次', dataIndex: 'count', sorter: (a, b) => a.count - b.count },
-    { title: '总方量(m³)', dataIndex: 'totalVolume', render: v => v?.toFixed(2), sorter: (a, b) => a.totalVolume - b.totalVolume },
-    { title: '最大方量(m³)', dataIndex: 'maxVolume', render: v => v?.toFixed(2) },
-    { title: '最小方量(m³)', dataIndex: 'minVolume', render: v => v?.toFixed(2) },
-    { title: '平均方量(m³)', dataIndex: 'avgVolume', render: v => v?.toFixed(2) },
+    { title: '结算方量(m³)', dataIndex: 'totalSettlementVolume', render: v => v?.toFixed(2), sorter: (a, b) => a.totalSettlementVolume - b.totalSettlementVolume },
+    { title: '方量(m³)', dataIndex: 'totalConcreteVolume', render: v => v?.toFixed(2), sorter: (a, b) => a.totalConcreteVolume - b.totalConcreteVolume },
+    { title: '最大结算方量', dataIndex: 'maxSettlementVolume', render: v => v?.toFixed(2) },
+    { title: '最小结算方量', dataIndex: 'minSettlementVolume', render: v => v?.toFixed(2) },
+    { title: '平均结算方量', dataIndex: 'avgSettlementVolume', render: v => v?.toFixed(2) },
   ]
 
   const driverStatsColumns: ColumnsType<DriverVehicleStats> = [

@@ -524,6 +524,7 @@ const ReceiptsPage = () => {
         concrete_strength: r.concrete_strength,
         slump: r.slump,
         concrete_volume: r.concrete_volume,
+        settlement_volume: r.settlement_volume,
         total_volume: r.total_volume,
         total_vehicles: r.total_vehicles,
         bill_no: r.bill_no,
@@ -1139,6 +1140,12 @@ const ReceiptsPage = () => {
         render: (value: string) => value || '-',
       },
       {
+        title: '结算方量',
+        dataIndex: 'settlement_volume',
+        width: 100,
+        render: (value: string, record: any) => value || record.concrete_volume || '-',
+      },
+      {
         title: '累计方量',
         dataIndex: 'total_volume',
         width: 100,
@@ -1525,6 +1532,9 @@ const ReceiptsPage = () => {
                 </Descriptions.Item>
                 <Descriptions.Item label="方量">
                   {(receipt as any).concrete_volume || '-'}
+                </Descriptions.Item>
+                <Descriptions.Item label="结算方量">
+                  {(receipt as any).settlement_volume || (receipt as any).concrete_volume || '-'}
                 </Descriptions.Item>
                 <Descriptions.Item label="累计方量">
                   {(receipt as any).total_volume || '-'}
@@ -2186,6 +2196,9 @@ const ReceiptsPage = () => {
                 </Form.Item>
                 <Form.Item name="concrete_volume" label="方量">
                   <Input placeholder="请输入方量" />
+                </Form.Item>
+                <Form.Item name="settlement_volume" label="结算方量">
+                  <Input placeholder="请输入结算方量" />
                 </Form.Item>
                 <Form.Item name="total_volume" label="累计方量">
                   <Input placeholder="请输入累计方量" />

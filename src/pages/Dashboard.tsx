@@ -30,7 +30,8 @@ import {
   AccountBookOutlined,
   ArrowRightOutlined,
   ThunderboltFilled,
-  AuditOutlined
+  AuditOutlined,
+  AreaChartOutlined,
 } from '@ant-design/icons'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import dayjs from 'dayjs'
@@ -54,6 +55,12 @@ type ApprovalStatCard = {
 
 // --- 工具函数 ---
 const formatWeight = (value?: number | string | null) => {
+  if (value === null || value === undefined) return '0.00'
+  const num = Number(value)
+  return Number.isNaN(num) ? '0.00' : num.toFixed(2)
+}
+
+const formatVolume = (value?: number | string | null) => {
   if (value === null || value === undefined) return '0.00'
   const num = Number(value)
   return Number.isNaN(num) ? '0.00' : num.toFixed(2)
@@ -176,8 +183,40 @@ const DashboardPage = () => {
     
     const baseKpis = [
       { title: '运输订单总数', value: op.totalOrders || 0, suffix: '单', icon: <AccountBookOutlined />, color: '#1890ff', trend: finance.ordersTrend },
-      { title: '总运输重量', value: op.totalWeight ? Number(op.totalWeight).toFixed(1) : '0.0', suffix: '吨', icon: <RiseOutlined />, color: '#00b96b' },
     ]
+
+    if (businessType === '罐车') {
+      const summary = transportDetails?.tanker?.summary || {}
+      // 罐车模式：显示方量而非重量
+      // 总方量 (concrete_volume)
+      baseKpis.push({
+        title: '总运输方量',
+        value: formatVolume(summary.totalConcreteVolume || summary.totalVolume),
+        suffix: 'm³',
+        icon: <AreaChartOutlined />,
+        color: '#13c2c2',
+        trend: undefined,
+      })
+      // 总结算方量 (settlement_volume) - 后端的 totalWeight 实际存储的是这个值
+      baseKpis.push({
+        title: '总结算方量',
+        value: formatVolume(summary.totalSettlementVolume || op.totalWeight),
+        suffix: 'm³',
+        icon: <AreaChartOutlined />,
+        color: '#722ed1',
+        trend: undefined,
+      })
+    } else {
+      // 非罐车模式：显示重量
+      baseKpis.push({
+        title: '总运输重量',
+        value: op.totalWeight ? Number(op.totalWeight).toFixed(1) : '0.0',
+        suffix: '吨',
+        icon: <RiseOutlined />,
+        color: '#00b96b',
+        trend: undefined,
+      })
+    }
 
     // 挂车模式特有指标：磅差
     if (businessType === '挂车' && transportDetails?.trailer?.matched?.byCompanyPair) {
@@ -192,8 +231,8 @@ const DashboardPage = () => {
         color: totalDiff < 0 ? '#ff4d4f' : '#52c41a', // 亏吨显示红色警告，盈吨显示绿色
         trend: undefined
       })
-    } else {
-      // 其他模式显示车辆使用率
+    } else if (businessType !== '罐车') {
+      // 非罐车、非挂车匹配模式显示车辆使用率
       baseKpis.push({ 
         title: '车辆使用率', 
         value: op.vehicleUtilization || 0, 
@@ -278,19 +317,30 @@ const DashboardPage = () => {
     const { loadingByCompany = [], loadingByMaterial = [], waterTickets = {} } = tanker
     const waterTicketList = waterTickets.byCompany || []
 
-    // 图表数据转换
-    const companyChartData = loadingByCompany
-      .map((i: any) => ({
-        type: i.company || i.name || '未知公司',
-        value: Number(i.totalVolume || i.weight || 0),
-      }))
-      .sort((a:any,b:any) => b.value - a.value)
+    // 图表数据转换 - 分组柱状图：方量 vs 结算方量
+    // 先按公司聚合，然后根据总方量排序
+    const companyDataMap = new Map<string, { concrete: number, settlement: number }>()
+    loadingByCompany.forEach((i: any) => {
+      const company = i.company || i.name || '未知公司'
+      const concrete = Number(i.totalConcreteVolume || i.totalVolume || i.weight || 0)
+      const settlement = Number(i.totalSettlementVolume || 0)
+      companyDataMap.set(company, { concrete, settlement })
+    })
+    
+    // 按结算方量排序并展平为图表数据
+    const sortedCompanies = Array.from(companyDataMap.entries())
+      .sort((a, b) => b[1].settlement - a[1].settlement)
+    
+    const companyChartData = sortedCompanies.flatMap(([company, data]) => [
+      { company, category: '本车方量', value: data.concrete },
+      { company, category: '结算方量', value: data.settlement },
+    ])
 
-    // 饼图数据：各装料公司方量占比（复用 loadingByCompany 数据）
+    // 饼图数据：各装料公司结算方量占比
     const rawCompanyPieData = (loadingByCompany || [])
       .map((i: any) => ({
         type: i.company || i.name || '未知公司',
-        value: Number(i.totalVolume || i.weight || 0),
+        value: Number(i.totalSettlementVolume || i.totalVolume || i.weight || 0),
       }))
       .filter(item => item.value > 0)
       .sort((a:any,b:any) => b.value - a.value)
@@ -299,29 +349,64 @@ const DashboardPage = () => {
     return (
       <Row gutter={[24, 24]}>
         <Col xs={24} lg={14}>
-          <DashboardCard title="各公司装料方量对比">
+          <DashboardCard title="各公司方量 vs 结算方量对比">
             {companyChartData.length > 0 ? (
               <Column 
-                data={companyChartData} 
-                xField="type" 
-                yField="value" 
-                color="#1890ff"
-                xAxis={{ label: { autoRotate: true, autoHide: false, style: { fill: '#fff' } } }}
-                yAxis={{ label: { style: { fill: '#fff' } } }}
-                label={{ 
-                  position: 'top',
-                  offset: 4,
-                  style: { fill: '#fff', fontWeight: 'bold' }
+                {...{
+                  data: companyChartData,
+                  xField: 'company',
+                  yField: 'value',
+                  seriesField: 'category',
+                  isGroup: true,
+                  // 显式指定颜色字段和颜色序列（兼容 @ant-design/charts 2.x）
+                  colorField: 'category',
+                  color: ['#1890ff', '#fa541c'], // 本车方量=蓝，结算方量=红
+                  meta: {
+                    category: {
+                      values: ['本车方量', '结算方量'], // 固定顺序，确保颜色稳定
+                    },
+                  },
+                  xAxis: { 
+                    label: { 
+                      autoRotate: true, 
+                      autoHide: false, 
+                      style: { fill: '#fff', fontSize: 12 } 
+                    } 
+                  },
+                  yAxis: { 
+                    label: { style: { fill: '#fff' } },
+                    title: { text: '方量 (m³)', style: { fill: '#fff' } }
+                  },
+                  label: { 
+                    position: 'top' as const,
+                    offset: 4,
+                    style: { fill: '#fff', fontWeight: 'bold', fontSize: 11 },
+                    formatter: (datum: any) => {
+                      return datum.value > 0 ? `${datum.value.toFixed(1)}` : ''
+                    }
+                  },
+                  legend: { 
+                    position: 'top-right' as const,
+                    itemName: {
+                      style: { fill: '#fff', fontSize: 13 }
+                    }
+                  },
+                  tooltip: {
+                    formatter: (datum: any) => ({
+                      name: datum.category,
+                      value: `${datum.value.toFixed(2)} m³`
+                    })
+                  },
+                  theme: 'dark' as const,
+                  height: 280,
+                  autoFit: true
                 }}
-                theme="dark"
-                height={240}
-                autoFit
               />
             ) : <Empty description="暂无数据" image={Empty.PRESENTED_IMAGE_SIMPLE} />}
           </DashboardCard>
         </Col>
         <Col xs={24} lg={10}>
-          <DashboardCard title="各公司装料方量占比">
+          <DashboardCard title="各公司结算方量占比">
              {companyPieData.length > 0 ? (
                <Pie 
                 data={companyPieData} 

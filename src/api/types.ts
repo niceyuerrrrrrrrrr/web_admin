@@ -110,6 +110,7 @@ export interface DepartureReceipt {
   customer_name?: string // 客户名称
   construction_unit?: string // 施工单位
   concrete_volume?: string // 方量
+  settlement_volume?: string // 结算方量
   total_volume?: string // 累计方量
   total_vehicles?: string // 累计车次
   status?: string

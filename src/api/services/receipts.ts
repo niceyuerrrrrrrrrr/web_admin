@@ -255,6 +255,7 @@ export const updateDepartureReceipt = (
     concrete_strength?: string
     slump?: string
     concrete_volume?: string
+    settlement_volume?: string
     total_volume?: string
     total_vehicles?: string
     bill_no?: string
