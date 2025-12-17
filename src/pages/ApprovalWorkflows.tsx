@@ -46,7 +46,7 @@ const getApprovalTypeLabel = (value: string) =>
 
 const ApprovalWorkflowsPage = () => {
   const queryClient = useQueryClient()
-  const { message } = AntdApp.useApp()
+  const { message, modal } = AntdApp.useApp()
   const { user } = useAuthStore()
   const { selectedCompanyId } = useCompanyStore()
   const isSuperAdmin = user?.role === 'super_admin' || user?.positionType === '超级管理员'
@@ -205,13 +205,19 @@ const ApprovalWorkflowsPage = () => {
               type="link"
               danger
               loading={deleteMutation.isPending}
-              onClick={() =>
-                Modal.confirm({
+              onClick={() => {
+                modal.confirm({
                   title: '确认删除该流程？',
                   content: '删除后不可恢复，请谨慎操作。',
-                  onOk: () => deleteMutation.mutateAsync(record),
+                  onOk: async () => {
+                    try {
+                      await deleteMutation.mutateAsync(record)
+                    } catch (error) {
+                      console.error('删除失败:', error)
+                    }
+                  },
                 })
-              }
+              }}
             >
               删除
             </Button>
@@ -219,7 +225,7 @@ const ApprovalWorkflowsPage = () => {
         ),
       },
     ],
-    [deleteMutation, handleDrawerOpen],
+    [deleteMutation, handleDrawerOpen, modal],
   )
 
   const roleOptions = useMemo(
@@ -360,11 +366,14 @@ const ApprovalWorkflowsPage = () => {
                 label="审批类型"
                 rules={[{ required: true, message: '请选择审批类型' }]}
               >
-                <Select
-                  disabled={!!editingWorkflow}
-                  options={APPROVAL_TYPES}
-                  placeholder="请选择"
-                />
+                {editingWorkflow ? (
+                  <Input disabled value={getApprovalTypeLabel(editingWorkflow.approval_type)} />
+                ) : (
+                  <Select
+                    options={APPROVAL_TYPES}
+                    placeholder="请选择"
+                  />
+                )}
               </Form.Item>
             </Col>
             <Col span={12}>
