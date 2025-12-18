@@ -61,6 +61,16 @@ export interface User {
   bank_name?: string
   card_holder?: string
   
+  // 入职申请同步的字段
+  id_card?: string // 身份证号
+  gender?: string // 性别：male/female
+  birth_date?: string // 出生日期
+  address?: string // 地址
+  emergency_contact?: string // 紧急联系人
+  emergency_phone?: string // 紧急联系人电话
+  work_location?: string // 工作地点
+  mp_openid?: string // 服务号OpenID
+  
   // 其他字段
   avatar?: string
   name?: string // 兼容字段，通常映射到nickname
