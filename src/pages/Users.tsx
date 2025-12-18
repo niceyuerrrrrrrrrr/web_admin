@@ -363,6 +363,24 @@ const UsersPage = () => {
         width: 180,
         render: (value) => value || <Text type="secondary">-</Text>,
       },
+      {
+        title: '身份证号',
+        dataIndex: 'id_card',
+        width: 180,
+        render: (value) => value ? `${value.slice(0, 6)}****${value.slice(-4)}` : <Text type="secondary">-</Text>,
+      },
+      {
+        title: '性别',
+        dataIndex: 'gender',
+        width: 80,
+        render: (value) => value === 'male' ? '男' : value === 'female' ? '女' : <Text type="secondary">-</Text>,
+      },
+      {
+        title: '出生日期',
+        dataIndex: 'birth_date',
+        width: 120,
+        render: (value) => value ? dayjs(value).format('YYYY-MM-DD') : <Text type="secondary">-</Text>,
+      },
       // 只有罐车业务才显示自编车号列
       ...(isTankerBusiness ? [{
         title: '自编车号',
@@ -756,7 +774,7 @@ const UsersPage = () => {
               showSizeChanger: true,
               showTotal: (total) => `共 ${total} 个用户`,
             }}
-            scroll={{ x: 2700 }}
+            scroll={{ x: 3200 }}
           />
         </Space>
       </Card>
@@ -780,12 +798,42 @@ const UsersPage = () => {
                 <Descriptions.Item label="姓名">{userDetail.name || '-'}</Descriptions.Item>
                 <Descriptions.Item label="手机号">{userDetail.phone || '-'}</Descriptions.Item>
                 <Descriptions.Item label="邮箱">{userDetail.email || '-'}</Descriptions.Item>
+                <Descriptions.Item label="身份证号">
+                  {(userDetail as any).id_card ? (
+                    <Text copyable={{ text: (userDetail as any).id_card }}>
+                      {(userDetail as any).id_card}
+                    </Text>
+                  ) : '-'}
+                </Descriptions.Item>
+                <Descriptions.Item label="性别">
+                  {(userDetail as any).gender === 'male' ? '男' : (userDetail as any).gender === 'female' ? '女' : '-'}
+                </Descriptions.Item>
+                <Descriptions.Item label="出生日期">
+                  {(userDetail as any).birth_date ? dayjs((userDetail as any).birth_date).format('YYYY-MM-DD') : '-'}
+                </Descriptions.Item>
                 <Descriptions.Item label="状态">
                   <Tag color={userDetail.status === 'active' ? 'success' : 'error'}>
                     {userDetail.status === 'active' ? '启用' : '禁用'}
                   </Tag>
                 </Descriptions.Item>
+                <Descriptions.Item label="地址" span={2}>
+                  {(userDetail as any).address || '-'}
+                </Descriptions.Item>
+                <Descriptions.Item label="紧急联系人">
+                  {(userDetail as any).emergency_contact || '-'}
+                </Descriptions.Item>
+                <Descriptions.Item label="紧急联系人电话">
+                  {(userDetail as any).emergency_phone || '-'}
+                </Descriptions.Item>
+                <Descriptions.Item label="工作地点" span={2}>
+                  {(userDetail as any).work_location || '-'}
+                </Descriptions.Item>
                 <Descriptions.Item label="语言设置">{userDetail.app_lang || '-'}</Descriptions.Item>
+                <Descriptions.Item label="头像">
+                  {userDetail.avatar ? (
+                    <img src={userDetail.avatar} alt="头像" style={{ width: 40, height: 40, borderRadius: 4 }} />
+                  ) : '-'}
+                </Descriptions.Item>
               </Descriptions>
             </Card>
 
@@ -808,9 +856,11 @@ const UsersPage = () => {
                     </Text>
                   ) : '-'}
                 </Descriptions.Item>
-                <Descriptions.Item label="头像" span={2}>
-                  {userDetail.avatar ? (
-                    <img src={userDetail.avatar} alt="头像" style={{ width: 40, height: 40, borderRadius: 4 }} />
+                <Descriptions.Item label="服务号OpenID" span={2}>
+                  {(userDetail as any).mp_openid ? (
+                    <Text copyable={{ text: (userDetail as any).mp_openid }}>
+                      {(userDetail as any).mp_openid.slice(0, 12)}...
+                    </Text>
                   ) : '-'}
                 </Descriptions.Item>
               </Descriptions>
