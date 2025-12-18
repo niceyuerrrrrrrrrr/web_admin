@@ -49,19 +49,19 @@ const DepartmentsPage = () => {
   const isSuperAdmin = user?.role === 'super_admin' || user?.positionType === '超级管理员'
   // 如果是超级管理员但没有选择公司，使用用户的公司ID作为默认值
   const effectiveCompanyId = isSuperAdmin 
-    ? (selectedCompanyId ?? user?.company_id) 
-    : user?.company_id
+    ? (selectedCompanyId ?? user?.companyId) 
+    : user?.companyId
 
   // 调试信息
   useEffect(() => {
     console.log('部门管理页面调试信息:', {
       isSuperAdmin,
       selectedCompanyId,
-      userCompanyId: user?.company_id,
+      userCompanyId: user?.companyId,
       effectiveCompanyId,
       queryEnabled: !!effectiveCompanyId,
     })
-  }, [isSuperAdmin, selectedCompanyId, user?.company_id, effectiveCompanyId])
+  }, [isSuperAdmin, selectedCompanyId, user?.companyId, effectiveCompanyId])
 
   const [selectedDepartment, setSelectedDepartment] = useState<Department | null>(null)
   const [detailDrawerOpen, setDetailDrawerOpen] = useState(false)
@@ -320,7 +320,7 @@ const DepartmentsPage = () => {
             danger
             icon={<DeleteOutlined />}
             onClick={() => handleDelete(record)}
-            disabled={record.user_count && record.user_count > 0}
+            disabled={!!(record.user_count && record.user_count > 0)}
           >
             删除
           </Button>
