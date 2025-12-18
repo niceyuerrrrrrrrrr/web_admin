@@ -97,3 +97,5 @@ export const deleteDepartment = (departmentId: number) =>
   unwrap<{ message: string }>(client.delete(`/departments/${departmentId}`))
 
 
+
+
