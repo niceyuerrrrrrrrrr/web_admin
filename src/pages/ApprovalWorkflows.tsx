@@ -412,12 +412,17 @@ const ApprovalWorkflowsPage = () => {
           <Form.Item name="description" label="流程描述">
             <Input.TextArea rows={2} placeholder="可选" />
           </Form.Item>
-          <Form.Item name="departmentId" label="适用部门">
+          <Form.Item 
+            name="departmentId" 
+            label="适用部门"
+            tooltip="选择特定部门后，该审批流程仅适用于该部门的员工"
+          >
             <Select
               placeholder="请选择部门（不选则适用于所有部门）"
               allowClear
+              loading={departmentsQuery.isLoading}
               options={[
-                { value: null, label: '全部部门' },
+                { value: null, label: '全部部门（默认）' },
                 ...departments.map(dept => ({ value: dept.id, label: dept.title }))
               ]}
             />
