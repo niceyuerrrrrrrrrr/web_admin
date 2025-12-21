@@ -153,11 +153,13 @@ export interface WorkflowPayload {
   is_active: boolean
   nodes: WorkflowNodePayload[]
   companyId?: number
+  departmentId?: number | null
 }
 
 export interface Workflow extends WorkflowPayload {
   id: number
   company_id?: number | null
+  department_id?: number | null
   created_at?: string | null
   updated_at?: string | null
   nodes: WorkflowNode[]
@@ -282,10 +284,11 @@ export const fetchWorkflowDetail = (id: number) =>
   unwrap<{ workflow: Workflow }>(client.get(`/approval/workflows/${id}`))
 
 const transformWorkflowPayload = (payload: WorkflowPayload) => {
-  const { companyId, ...rest } = payload
+  const { companyId, departmentId, ...rest } = payload
   return {
     ...rest,
     company_id: companyId,
+    department_id: departmentId,
   }
 }
 

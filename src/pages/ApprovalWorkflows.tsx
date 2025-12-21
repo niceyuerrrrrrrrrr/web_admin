@@ -35,6 +35,7 @@ import {
   type WorkflowNode,
   type WorkflowPayload,
 } from '../api/services/approval'
+import { fetchDepartments, type Department } from '../api/services/departments'
 
 import useAuthStore from '../store/auth'
 import useCompanyStore from '../store/company'
@@ -73,8 +74,15 @@ const ApprovalWorkflowsPage = () => {
     enabled: !isSuperAdmin || !!effectiveCompanyId,
   })
 
+  const departmentsQuery = useQuery({
+    queryKey: ['departments', effectiveCompanyId],
+    queryFn: () => fetchDepartments({ company_id: effectiveCompanyId }),
+    enabled: !isSuperAdmin || !!effectiveCompanyId,
+  })
+
   const workflows = workflowsQuery.data?.workflows ?? []
   const roleUsersMap: RoleUsersMap = roleUsersQuery.data?.role_users ?? {}
+  const departments: Department[] = departmentsQuery.data?.records ?? []
 
   const openCreateModal = () => {
     setEditingWorkflow(null)
@@ -96,6 +104,7 @@ const ApprovalWorkflowsPage = () => {
       name: workflow.name,
       description: workflow.description,
       is_active: workflow.is_active,
+      departmentId: workflow.department_id,
       nodes: workflow.nodes.map((node) => ({
         node_name: node.node_name,
         approver_role: node.approver_role,
@@ -179,6 +188,16 @@ const ApprovalWorkflowsPage = () => {
         ),
       },
       {
+        title: '适用部门',
+        dataIndex: 'department_id',
+        width: 140,
+        render: (value: number | null) => {
+          if (!value) return <Tag>全部部门</Tag>
+          const dept = departments.find(d => d.id === value)
+          return dept ? dept.title : `部门${value}`
+        },
+      },
+      {
         title: '节点数',
         dataIndex: ['nodes'],
         width: 100,
@@ -225,7 +244,7 @@ const ApprovalWorkflowsPage = () => {
         ),
       },
     ],
-    [deleteMutation, handleDrawerOpen, modal],
+    [deleteMutation, handleDrawerOpen, modal, departments],
   )
 
   const roleOptions = useMemo(
@@ -392,6 +411,16 @@ const ApprovalWorkflowsPage = () => {
           </Form.Item>
           <Form.Item name="description" label="流程描述">
             <Input.TextArea rows={2} placeholder="可选" />
+          </Form.Item>
+          <Form.Item name="departmentId" label="适用部门">
+            <Select
+              placeholder="请选择部门（不选则适用于所有部门）"
+              allowClear
+              options={[
+                { value: null, label: '全部部门' },
+                ...departments.map(dept => ({ value: dept.id, label: dept.title }))
+              ]}
+            />
           </Form.Item>
 
           <Form.List name="nodes">
