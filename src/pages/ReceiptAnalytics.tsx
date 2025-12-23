@@ -1125,12 +1125,12 @@ const ReceiptAnalytics = () => {
                         materialMap.set(item.material, current + item.count)
                       })
                       return Array.from(materialMap.entries()).map(([material, count]) => ({
-                        material,
-                        count,
+                        type: material,
+                        value: count,
                       }))
                     })()}
-                    angleField="count"
-                    colorField="material"
+                    angleField="value"
+                    colorField="type"
                     height={350}
                     radius={0.8}
                     innerRadius={0.6}
@@ -1159,8 +1159,8 @@ const ReceiptAnalytics = () => {
                     tooltip={{
                       formatter: (datum: any) => {
                         return {
-                          name: datum.material,
-                          value: `${datum?.count || 0} 车次`,
+                          name: datum.type,
+                          value: `${datum?.value || 0} 车次`,
                         }
                       },
                     }}
