@@ -889,7 +889,7 @@ const ReceiptAnalytics = () => {
             </Col>
           </Row>
 
-          {/* 运输任务匹配分析图表 */}
+          {/* 运输任务匹配分析 - 排行榜 */}
           <Row gutter={[16, 16]}>
             <Col xs={24} lg={12}>
               <Card title="装料公司车次统计 TOP10" size="small">
@@ -984,6 +984,128 @@ const ReceiptAnalytics = () => {
                       ))
                     })()}
                   </div>
+                ) : (
+                  <Empty description="暂无数据" />
+                )}
+              </Card>
+            </Col>
+          </Row>
+
+          {/* 运输任务匹配分析 - 完整柱状图 */}
+          <Row gutter={[16, 16]}>
+            <Col xs={24} lg={12}>
+              <Card title="装料公司车次统计 - 完整数据" size="small">
+                {trailerMatchedStats.length > 0 ? (
+                  <Column
+                    data={(() => {
+                      const companyMap = new Map<string, number>()
+                      trailerMatchedStats.forEach(item => {
+                        const current = companyMap.get(item.loadingCompany) || 0
+                        companyMap.set(item.loadingCompany, current + item.count)
+                      })
+                      return Array.from(companyMap.entries())
+                        .map(([company, count]) => ({ company, count }))
+                        .sort((a, b) => b.count - a.count)
+                    })()}
+                    xField="company"
+                    yField="count"
+                    height={400}
+                    label={{
+                      position: 'top',
+                      style: {
+                        fill: '#1890ff',
+                        fontSize: 11,
+                      },
+                    }}
+                    xAxis={{
+                      label: {
+                        autoRotate: true,
+                        autoHide: true,
+                        style: {
+                          fontSize: 10,
+                        },
+                        formatter: (text: string) => {
+                          return text.length > 8 ? text.substring(0, 8) + '...' : text
+                        },
+                      },
+                    }}
+                    yAxis={{
+                      title: {
+                        text: '车次',
+                      },
+                    }}
+                    tooltip={{
+                      formatter: (datum: any) => {
+                        return {
+                          name: datum.company,
+                          value: `${datum?.count || 0} 车次`,
+                        }
+                      },
+                    }}
+                    columnStyle={{
+                      radius: [4, 4, 0, 0],
+                      fill: 'l(270) 0:#1890ff 1:#36cfc9',
+                    }}
+                  />
+                ) : (
+                  <Empty description="暂无数据" />
+                )}
+              </Card>
+            </Col>
+            <Col xs={24} lg={12}>
+              <Card title="卸货公司车次统计 - 完整数据" size="small">
+                {trailerMatchedStats.length > 0 ? (
+                  <Column
+                    data={(() => {
+                      const companyMap = new Map<string, number>()
+                      trailerMatchedStats.forEach(item => {
+                        const current = companyMap.get(item.unloadingCompany) || 0
+                        companyMap.set(item.unloadingCompany, current + item.count)
+                      })
+                      return Array.from(companyMap.entries())
+                        .map(([company, count]) => ({ company, count }))
+                        .sort((a, b) => b.count - a.count)
+                    })()}
+                    xField="company"
+                    yField="count"
+                    height={400}
+                    label={{
+                      position: 'top',
+                      style: {
+                        fill: '#52c41a',
+                        fontSize: 11,
+                      },
+                    }}
+                    xAxis={{
+                      label: {
+                        autoRotate: true,
+                        autoHide: true,
+                        style: {
+                          fontSize: 10,
+                        },
+                        formatter: (text: string) => {
+                          return text.length > 8 ? text.substring(0, 8) + '...' : text
+                        },
+                      },
+                    }}
+                    yAxis={{
+                      title: {
+                        text: '车次',
+                      },
+                    }}
+                    tooltip={{
+                      formatter: (datum: any) => {
+                        return {
+                          name: datum.company,
+                          value: `${datum?.count || 0} 车次`,
+                        }
+                      },
+                    }}
+                    columnStyle={{
+                      radius: [4, 4, 0, 0],
+                      fill: 'l(270) 0:#52c41a 1:#95de64',
+                    }}
+                  />
                 ) : (
                   <Empty description="暂无数据" />
                 )}
