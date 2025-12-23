@@ -570,13 +570,36 @@ const ReimbursementsPage = () => {
                               const item = data.data || data
                               if (!item || !item.type) return ''
                               const total = categoryChartData.reduce((sum: number, d: any) => sum + (d.value || 0), 0)
-                              const percent = total > 0 ? ((item.value / total) * 100).toFixed(0) : '0'
-                              return `${item.type}: ${percent}%`
+                              const percent = total > 0 ? ((item.value / total) * 100) : 0
+                              // 只显示占比大于5%的标签，避免重叠
+                              if (percent < 5) return ''
+                              return `${item.type}: ${percent.toFixed(0)}%`
                             },
-                            style: { fontWeight: 'bold' },
-                            connector: true
+                            style: { 
+                              fontWeight: 'bold',
+                              fontSize: 12,
+                            },
+                            connector: true,
+                            autoRotate: false,
+                            layout: [
+                              { type: 'limit-in-plot' },
+                              { type: 'adjust-color' },
+                              { type: 'pie-outer' },
+                              { type: 'hide-overlap' }
+                            ]
                           }}
-                          legend={{ position: 'bottom' }}
+                          legend={{ 
+                            position: 'bottom',
+                            itemName: {
+                              formatter: (text: string) => {
+                                const item = categoryChartData.find((d: any) => d.type === text)
+                                if (!item) return text
+                                const total = categoryChartData.reduce((sum: number, d: any) => sum + (d.value || 0), 0)
+                                const percent = total > 0 ? ((item.value / total) * 100).toFixed(1) : '0'
+                                return `${text} (${percent}%)`
+                              }
+                            }
+                          }}
                         />
                       ) : (
                         <Alert type="info" message="暂无分类数据" showIcon />
