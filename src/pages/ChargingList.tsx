@@ -114,7 +114,9 @@ const ChargingList = () => {
       { title: '充电桩', dataIndex: 'charging_pile', width: 120 },
       { title: '电量(kWh)', dataIndex: 'energy_kwh', width: 120, render: (v) => v?.toFixed(2) || '-' },
       { title: '金额(元)', dataIndex: 'amount', width: 120, render: (v) => v?.toFixed(2) || '-' },
-      { title: '充电时间', dataIndex: 'start_time', width: 180, render: (v: string) => v ? dayjs(v).format('YYYY-MM-DD HH:mm') : '-' },
+      { title: '开始充电时间', dataIndex: 'start_time', width: 180, render: (v: string) => v ? dayjs(v).format('YYYY-MM-DD HH:mm') : '-' },
+      { title: '结束充电时间', dataIndex: 'end_time', width: 180, render: (v: string) => v ? dayjs(v).format('YYYY-MM-DD HH:mm') : '-' },
+      { title: '充电时长(分钟)', dataIndex: 'duration_min', width: 120, render: (v) => v || '-' },
       {
         title: '操作',
         width: 150,
@@ -152,7 +154,7 @@ const ChargingList = () => {
           columns={columns}
           dataSource={receipts}
           loading={receiptsQuery.isLoading}
-          scroll={{ x: 1200 }}
+          scroll={{ x: 1600 }}
           pagination={{ pageSize: 20 }}
         />
       </Card>
