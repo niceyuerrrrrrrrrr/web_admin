@@ -15,7 +15,7 @@ import {
   Divider,
   Empty
 } from 'antd'
-import { Line } from '@ant-design/plots'
+import { Line, Column, Bar, Pie } from '@ant-design/plots'
 import { ReloadOutlined, SearchOutlined } from '@ant-design/icons'
 import { useQuery } from '@tanstack/react-query'
 import type { ColumnsType } from 'antd/es/table'
@@ -774,9 +774,97 @@ const ReceiptAnalytics = () => {
 
       {businessType === '挂车' && (
         <>
+          {/* 装料单和卸货单图表 */}
           <Row gutter={[16, 16]}>
             <Col xs={24} lg={12}>
-              <Card title="装料单统计 (按材料)" size="small">
+              <Card title="装料单统计 (按材料) - 图表" size="small">
+                {trailerIndividualStats.loading.length > 0 ? (
+                  <Column
+                    data={trailerIndividualStats.loading}
+                    xField="material"
+                    yField="totalWeight"
+                    height={300}
+                    label={{
+                      position: 'top',
+                      style: {
+                        fill: '#1890ff',
+                        fontSize: 12,
+                      },
+                      formatter: (datum: any) => `${datum.totalWeight.toFixed(2)}t`,
+                    }}
+                    xAxis={{
+                      label: {
+                        autoRotate: true,
+                        autoHide: true,
+                      },
+                    }}
+                    yAxis={{
+                      title: {
+                        text: '总重量(t)',
+                      },
+                    }}
+                    tooltip={{
+                      formatter: (datum: any) => {
+                        return {
+                          name: '总重量',
+                          value: `${datum.totalWeight.toFixed(2)}t (${datum.count}单)`,
+                        }
+                      },
+                    }}
+                  />
+                ) : (
+                  <Empty description="暂无数据" />
+                )}
+              </Card>
+            </Col>
+            <Col xs={24} lg={12}>
+              <Card title="卸货单统计 (按材料) - 图表" size="small">
+                {trailerIndividualStats.unloading.length > 0 ? (
+                  <Column
+                    data={trailerIndividualStats.unloading}
+                    xField="material"
+                    yField="totalWeight"
+                    height={300}
+                    label={{
+                      position: 'top',
+                      style: {
+                        fill: '#52c41a',
+                        fontSize: 12,
+                      },
+                      formatter: (datum: any) => `${datum.totalWeight.toFixed(2)}t`,
+                    }}
+                    xAxis={{
+                      label: {
+                        autoRotate: true,
+                        autoHide: true,
+                      },
+                    }}
+                    yAxis={{
+                      title: {
+                        text: '总重量(t)',
+                      },
+                    }}
+                    tooltip={{
+                      formatter: (datum: any) => {
+                        return {
+                          name: '总重量',
+                          value: `${datum.totalWeight.toFixed(2)}t (${datum.count}单)`,
+                        }
+                      },
+                    }}
+                    color="#52c41a"
+                  />
+                ) : (
+                  <Empty description="暂无数据" />
+                )}
+              </Card>
+            </Col>
+          </Row>
+
+          {/* 装料单和卸货单表格 */}
+          <Row gutter={[16, 16]}>
+            <Col xs={24} lg={12}>
+              <Card title="装料单统计 (按材料) - 详细数据" size="small">
                 <Table 
                   size="small"
                   columns={materialStatsColumns} 
@@ -788,7 +876,7 @@ const ReceiptAnalytics = () => {
               </Card>
             </Col>
             <Col xs={24} lg={12}>
-              <Card title="卸货单统计 (按材料)" size="small">
+              <Card title="卸货单统计 (按材料) - 详细数据" size="small">
                 <Table 
                   size="small"
                   columns={materialStatsColumns} 
@@ -801,7 +889,45 @@ const ReceiptAnalytics = () => {
             </Col>
           </Row>
 
-          <Card title="运输任务匹配分析 (装料 -> 卸货)" size="small">
+          {/* 运输任务匹配分析图表 */}
+          <Card title="运输任务匹配分析 (装料 -> 卸货) - 车次统计" size="small">
+            {trailerMatchedStats.length > 0 ? (
+              <Bar
+                data={trailerMatchedStats.map(item => ({
+                  route: `${item.loadingCompany} → ${item.unloadingCompany}`,
+                  count: item.count,
+                  material: item.material,
+                }))}
+                xField="count"
+                yField="route"
+                height={Math.max(300, trailerMatchedStats.length * 40)}
+                seriesField="material"
+                label={{
+                  position: 'right',
+                  style: {
+                    fill: '#000',
+                    fontSize: 12,
+                  },
+                }}
+                legend={{
+                  position: 'top-right',
+                }}
+                tooltip={{
+                  formatter: (datum: any) => {
+                    return {
+                      name: datum.material,
+                      value: `${datum.count} 车次`,
+                    }
+                  },
+                }}
+              />
+            ) : (
+              <Empty description="暂无数据" />
+            )}
+          </Card>
+
+          {/* 运输任务匹配分析表格 */}
+          <Card title="运输任务匹配分析 (装料 -> 卸货) - 详细数据" size="small">
             <Table
               columns={matchedTasksColumns}
               dataSource={trailerMatchedStats}
@@ -814,7 +940,48 @@ const ReceiptAnalytics = () => {
 
       {businessType === '罐车' && (
         <>
-          <Card title="方量统计 (按装料公司)" size="small">
+          {/* 按装料公司统计图表 */}
+          <Card title="方量统计 (按装料公司) - 图表" size="small">
+            {tankerCompanyStats.length > 0 ? (
+              <Column
+                data={tankerCompanyStats}
+                xField="company"
+                yField="totalSettlementVolume"
+                height={300}
+                label={{
+                  position: 'top',
+                  style: {
+                    fill: '#1890ff',
+                    fontSize: 12,
+                  },
+                  formatter: (datum: any) => `${datum.totalSettlementVolume.toFixed(2)}m³`,
+                }}
+                xAxis={{
+                  label: {
+                    autoRotate: true,
+                    autoHide: true,
+                  },
+                }}
+                yAxis={{
+                  title: {
+                    text: '结算方量(m³)',
+                  },
+                }}
+                tooltip={{
+                  formatter: (datum: any) => {
+                    return {
+                      name: '结算方量',
+                      value: `${datum.totalSettlementVolume.toFixed(2)}m³ (${datum.count}车次)`,
+                    }
+                  },
+                }}
+              />
+            ) : (
+              <Empty description="暂无数据" />
+            )}
+          </Card>
+
+          <Card title="方量统计 (按装料公司) - 详细数据" size="small">
             <Table
               columns={tankerCompanyColumns}
               dataSource={tankerCompanyStats}
@@ -823,9 +990,74 @@ const ReceiptAnalytics = () => {
             />
           </Card>
 
+          {/* 按司机和车号统计图表 */}
           <Row gutter={[16, 16]}>
             <Col xs={24} lg={12}>
-              <Card title="方量统计 (按司机)" size="small">
+              <Card title="方量统计 (按司机) - 图表" size="small">
+                {tankerDriverStats.length > 0 ? (
+                  <Bar
+                    data={tankerDriverStats}
+                    xField="totalSettlementVolume"
+                    yField="driver"
+                    height={Math.max(300, tankerDriverStats.length * 30)}
+                    label={{
+                      position: 'right',
+                      style: {
+                        fill: '#000',
+                        fontSize: 12,
+                      },
+                      formatter: (datum: any) => `${datum.totalSettlementVolume.toFixed(2)}m³`,
+                    }}
+                    tooltip={{
+                      formatter: (datum: any) => {
+                        return {
+                          name: '结算方量',
+                          value: `${datum.totalSettlementVolume.toFixed(2)}m³ (${datum.count}车次)`,
+                        }
+                      },
+                    }}
+                  />
+                ) : (
+                  <Empty description="暂无数据" />
+                )}
+              </Card>
+            </Col>
+            <Col xs={24} lg={12}>
+              <Card title="方量统计 (按车号) - 图表" size="small">
+                {tankerVehicleStats.length > 0 ? (
+                  <Bar
+                    data={tankerVehicleStats}
+                    xField="totalSettlementVolume"
+                    yField="vehicleCode"
+                    height={Math.max(300, tankerVehicleStats.length * 30)}
+                    label={{
+                      position: 'right',
+                      style: {
+                        fill: '#000',
+                        fontSize: 12,
+                      },
+                      formatter: (datum: any) => `${datum.totalSettlementVolume.toFixed(2)}m³`,
+                    }}
+                    tooltip={{
+                      formatter: (datum: any) => {
+                        return {
+                          name: '结算方量',
+                          value: `${datum.totalSettlementVolume.toFixed(2)}m³ (${datum.count}车次)`,
+                        }
+                      },
+                    }}
+                    color="#52c41a"
+                  />
+                ) : (
+                  <Empty description="暂无数据" />
+                )}
+              </Card>
+            </Col>
+          </Row>
+
+          <Row gutter={[16, 16]}>
+            <Col xs={24} lg={12}>
+              <Card title="方量统计 (按司机) - 详细数据" size="small">
                 <Table
                   size="small"
                   columns={tankerDriverColumns}
@@ -836,7 +1068,7 @@ const ReceiptAnalytics = () => {
               </Card>
             </Col>
             <Col xs={24} lg={12}>
-              <Card title="方量统计 (按车号)" size="small">
+              <Card title="方量统计 (按车号) - 详细数据" size="small">
                 <Table
                   size="small"
                   columns={tankerVehicleColumns}
@@ -852,30 +1084,98 @@ const ReceiptAnalytics = () => {
 
       {/* 司机和车辆统计 (仅挂车模式) */}
       {businessType === '挂车' && (
-      <Row gutter={[16, 16]}>
-        <Col xs={24} lg={12}>
-          <Card title="司机统计" size="small">
-            <Table
-              size="small"
-              columns={driverStatsColumns}
-              dataSource={driverVehicleStats.byDriver}
-              rowKey="key"
-              scroll={{ x: 800 }}
-            />
-          </Card>
-        </Col>
-        <Col xs={24} lg={12}>
-          <Card title="车辆统计" size="small">
-            <Table
-              size="small"
-              columns={vehicleStatsColumns}
-              dataSource={driverVehicleStats.byVehicle}
-              rowKey="key"
-              scroll={{ x: 800 }}
-            />
-          </Card>
-        </Col>
-      </Row>
+      <>
+        {/* 司机和车辆统计图表 */}
+        <Row gutter={[16, 16]}>
+          <Col xs={24} lg={12}>
+            <Card title="司机统计 - 图表" size="small">
+              {driverVehicleStats.byDriver.length > 0 ? (
+                <Bar
+                  data={driverVehicleStats.byDriver}
+                  xField="totalWeight"
+                  yField="name"
+                  height={Math.max(300, driverVehicleStats.byDriver.length * 30)}
+                  label={{
+                    position: 'right',
+                    style: {
+                      fill: '#000',
+                      fontSize: 12,
+                    },
+                    formatter: (datum: any) => `${datum.totalWeight.toFixed(2)}t`,
+                  }}
+                  tooltip={{
+                    formatter: (datum: any) => {
+                      return {
+                        name: '总重量',
+                        value: `${datum.totalWeight.toFixed(2)}t (${datum.totalCount}车次)`,
+                      }
+                    },
+                  }}
+                />
+              ) : (
+                <Empty description="暂无数据" />
+              )}
+            </Card>
+          </Col>
+          <Col xs={24} lg={12}>
+            <Card title="车辆统计 - 图表" size="small">
+              {driverVehicleStats.byVehicle.length > 0 ? (
+                <Bar
+                  data={driverVehicleStats.byVehicle}
+                  xField="totalWeight"
+                  yField="name"
+                  height={Math.max(300, driverVehicleStats.byVehicle.length * 30)}
+                  label={{
+                    position: 'right',
+                    style: {
+                      fill: '#000',
+                      fontSize: 12,
+                    },
+                    formatter: (datum: any) => `${datum.totalWeight.toFixed(2)}t`,
+                  }}
+                  tooltip={{
+                    formatter: (datum: any) => {
+                      return {
+                        name: '总重量',
+                        value: `${datum.totalWeight.toFixed(2)}t (${datum.totalCount}车次)`,
+                      }
+                    },
+                  }}
+                  color="#52c41a"
+                />
+              ) : (
+                <Empty description="暂无数据" />
+              )}
+            </Card>
+          </Col>
+        </Row>
+
+        {/* 司机和车辆统计表格 */}
+        <Row gutter={[16, 16]}>
+          <Col xs={24} lg={12}>
+            <Card title="司机统计 - 详细数据" size="small">
+              <Table
+                size="small"
+                columns={driverStatsColumns}
+                dataSource={driverVehicleStats.byDriver}
+                rowKey="key"
+                scroll={{ x: 800 }}
+              />
+            </Card>
+          </Col>
+          <Col xs={24} lg={12}>
+            <Card title="车辆统计 - 详细数据" size="small">
+              <Table
+                size="small"
+                columns={vehicleStatsColumns}
+                dataSource={driverVehicleStats.byVehicle}
+                rowKey="key"
+                scroll={{ x: 800 }}
+              />
+            </Card>
+          </Col>
+        </Row>
+      </>
       )}
     </Space>
   )
