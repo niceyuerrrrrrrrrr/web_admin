@@ -178,3 +178,27 @@ export const fetchChargingTrend = (params: { timeRange: string; companyId?: numb
     }),
   )
 
+export interface ChargingHourlyDistribution {
+  hourly_distribution: Array<{
+    time: string
+    count: number
+    minute: number
+  }>
+  statistics: {
+    max_count: number
+    avg_count: number
+    peak_hours: number[]
+    valley_hours: number[]
+  }
+}
+
+export const fetchChargingHourlyDistribution = (params: { timeRange: string; companyId?: number }) =>
+  unwrap<ChargingHourlyDistribution>(
+    client.get('/statistics/charging/hourly-distribution', {
+      params: {
+        time_range: params.timeRange,
+        company_id: params.companyId,
+      },
+    }),
+  )
+

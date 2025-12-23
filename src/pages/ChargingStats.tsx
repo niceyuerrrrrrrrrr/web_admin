@@ -12,8 +12,8 @@ import {
 } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import { useQuery } from '@tanstack/react-query'
-import { Line, Column, Bar } from '@ant-design/plots'
-import { fetchChargingStatsOverview, fetchChargingTrend } from '../api/services/charging'
+import { Line, Column, Bar, Area } from '@ant-design/plots'
+import { fetchChargingStatsOverview, fetchChargingTrend, fetchChargingHourlyDistribution } from '../api/services/charging'
 import useAuthStore from '../store/auth'
 import useCompanyStore from '../store/company'
 
@@ -39,10 +39,18 @@ const ChargingStats = () => {
     enabled: !isSuperAdmin || !!effectiveCompanyId,
   })
 
+  const hourlyQuery = useQuery({
+    queryKey: ['charging', 'hourly', timeRange, effectiveCompanyId],
+    queryFn: () => fetchChargingHourlyDistribution({ timeRange, companyId: effectiveCompanyId }),
+    enabled: !isSuperAdmin || !!effectiveCompanyId,
+  })
+
   const summary = statsQuery.data?.summary
   const byDriver = statsQuery.data?.by_driver || []
   const byVehicle = statsQuery.data?.by_vehicle || []
   const dailyTrend = trendQuery.data?.daily_trend || []
+  const hourlyDistribution = hourlyQuery.data?.hourly_distribution || []
+  const hourlyStats = hourlyQuery.data?.statistics
 
   const driverColumns: ColumnsType<any> = [
     { title: '司机', dataIndex: 'name', key: 'name' },
@@ -240,6 +248,107 @@ const ChargingStats = () => {
                 }}
                 smooth
               />
+            ) : (
+              <Empty description="暂无数据" />
+            )}
+          </Card>
+        </Col>
+      </Row>
+
+      {/* 24小时充电分布 */}
+      <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
+        <Col xs={24}>
+          <Card title="24小时充电分布 - 峰谷分析" size="small">
+            {hourlyDistribution.length > 0 ? (
+              <>
+                {/* 峰谷时段统计卡片 */}
+                {hourlyStats && (
+                  <Row gutter={16} style={{ marginBottom: 16 }}>
+                    <Col span={6}>
+                      <Card size="small">
+                        <Statistic 
+                          title="最高车辆数" 
+                          value={hourlyStats.max_count} 
+                          suffix="辆"
+                          valueStyle={{ color: '#cf1322' }}
+                        />
+                      </Card>
+                    </Col>
+                    <Col span={6}>
+                      <Card size="small">
+                        <Statistic 
+                          title="平均车辆数" 
+                          value={hourlyStats.avg_count} 
+                          suffix="辆"
+                          precision={1}
+                        />
+                      </Card>
+                    </Col>
+                    <Col span={6}>
+                      <Card size="small" style={{ backgroundColor: '#fff1f0' }}>
+                        <div style={{ fontSize: 14, color: '#8c8c8c', marginBottom: 8 }}>充电高峰时段</div>
+                        <div style={{ fontSize: 16, fontWeight: 'bold', color: '#cf1322' }}>
+                          {hourlyStats.peak_hours.length > 0 
+                            ? hourlyStats.peak_hours.map(h => `${h}:00`).join(', ')
+                            : '无'}
+                        </div>
+                      </Card>
+                    </Col>
+                    <Col span={6}>
+                      <Card size="small" style={{ backgroundColor: '#f6ffed' }}>
+                        <div style={{ fontSize: 14, color: '#8c8c8c', marginBottom: 8 }}>充电低谷时段</div>
+                        <div style={{ fontSize: 16, fontWeight: 'bold', color: '#52c41a' }}>
+                          {hourlyStats.valley_hours.length > 0 
+                            ? hourlyStats.valley_hours.map(h => `${h}:00`).join(', ')
+                            : '无'}
+                        </div>
+                      </Card>
+                    </Col>
+                  </Row>
+                )}
+                
+                {/* 24小时曲线图 */}
+                <Area
+                  data={hourlyDistribution}
+                  xField="time"
+                  yField="count"
+                  height={350}
+                  smooth
+                  style={{
+                    fill: 'l(270) 0:#1890ff 0.5:#69c0ff 1:#e6f7ff',
+                  }}
+                  xAxis={{
+                    label: {
+                      autoRotate: false,
+                      autoHide: true,
+                      formatter: (text: string) => {
+                        // 只显示整点时间
+                        if (text.endsWith(':00')) {
+                          return text.substring(0, 2) + ':00'
+                        }
+                        return ''
+                      },
+                    },
+                    title: {
+                      text: '时间（24小时）',
+                    },
+                  }}
+                  yAxis={{
+                    title: {
+                      text: '正在充电的车辆数（辆）',
+                    },
+                    min: 0,
+                  }}
+                  tooltip={{
+                    formatter: (datum: any) => {
+                      return {
+                        name: '充电车辆数',
+                        value: `${datum?.count || 0} 辆`,
+                      }
+                    },
+                  }}
+                />
+              </>
             ) : (
               <Empty description="暂无数据" />
             )}
