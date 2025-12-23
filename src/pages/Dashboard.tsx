@@ -342,8 +342,8 @@ const DashboardPage = () => {
         type: i.company || i.name || '未知公司',
         value: Number(i.totalSettlementVolume || i.totalVolume || i.weight || 0),
       }))
-      .filter(item => item.value > 0)
-      .sort((a:any,b:any) => b.value - a.value)
+      .filter((item: any) => item.value > 0)
+      .sort((a: any, b: any) => b.value - a.value)
     const companyPieData = processPieData(rawCompanyPieData)
 
     return (
@@ -474,8 +474,8 @@ const DashboardPage = () => {
         type: i.material || i.name || i.material_name || '未知材料',
         value: Number(i.totalWeight || i.weight || i.totalVolume || 0),
       }))
-      .filter(item => item.value > 0)
-      .sort((a:any,b:any) => b.value - a.value)
+      .filter((item: any) => item.value > 0)
+      .sort((a: any, b: any) => b.value - a.value)
     const loadingMaterials = processPieData(rawLoadingMaterials)
     
     const rawUnloadingMaterials = (unloading.byMaterial || [])
@@ -483,8 +483,8 @@ const DashboardPage = () => {
         type: i.material || i.name || i.material_name || '未知材料',
         value: Number(i.totalWeight || i.weight || i.totalVolume || 0),
       }))
-      .filter(item => item.value > 0)
-      .sort((a:any,b:any) => b.value - a.value)
+      .filter((item: any) => item.value > 0)
+      .sort((a: any, b: any) => b.value - a.value)
     const unloadingMaterials = processPieData(rawUnloadingMaterials)
 
     // 运输匹配 - 卡片化展示

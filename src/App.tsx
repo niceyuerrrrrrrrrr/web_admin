@@ -79,6 +79,7 @@ import CompanySelector from './components/CompanySelector'
 import LoginPage from './pages/Login'
 import NotFoundPage from './pages/NotFound'
 import AttendanceConfigPage from './pages/AttendanceConfig'
+import DriverSalaryPage from './pages/DriverSalary'
 import './App.css'
 import { fetchSystemConfig } from './api/services/systemConfig'
 
@@ -260,6 +261,13 @@ const routeDefinitions = [
         path: '/documents',
         icon: <FileProtectOutlined />,
         element: <DocumentsPage />,
+      },
+      {
+        key: 'salary',
+        label: '工资管理',
+        path: '/salary',
+        icon: <DollarOutlined />,
+        element: <DriverSalaryPage />,
       },
     ]
   },

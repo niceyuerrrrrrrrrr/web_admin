@@ -370,7 +370,7 @@ const AttendanceConfigPage = () => {
           items.push({
             user_id: userId,
             work_date: date,
-            shift_id: shiftId,
+            shift_id: shiftId || undefined,
             status: 'normal',
           })
         })
@@ -1214,7 +1214,7 @@ const AttendanceConfigPage = () => {
                     {
                       title: '剩余',
                       dataIndex: 'remaining',
-                      render: (remaining: number, record: MakeupQuota) => (
+                      render: (remaining: number) => (
                         <Tag color={remaining > 0 ? 'green' : 'red'}>{remaining}次</Tag>
                       ),
                     },
@@ -1363,7 +1363,7 @@ const AttendanceConfigPage = () => {
             <MapPicker
               lng={fenceForm.getFieldValue('center_lng')}
               lat={fenceForm.getFieldValue('center_lat')}
-              onChange={(lng, lat, address) => {
+              onChange={(lng, lat, _address) => {
                 fenceForm.setFieldsValue({
                   center_lng: lng,
                   center_lat: lat,
