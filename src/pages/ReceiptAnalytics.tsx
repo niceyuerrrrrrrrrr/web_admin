@@ -1128,7 +1128,7 @@ const ReceiptAnalytics = () => {
                     fill: '#1890ff',
                     fontSize: 12,
                   },
-                  formatter: (datum: any) => `${datum.totalSettlementVolume.toFixed(2)}m³`,
+                  formatter: (datum: any) => datum?.totalSettlementVolume ? `${datum.totalSettlementVolume.toFixed(2)}m³` : '',
                 }}
                 xAxis={{
                   label: {
@@ -1275,13 +1275,13 @@ const ReceiptAnalytics = () => {
                       fill: '#000',
                       fontSize: 12,
                     },
-                    formatter: (datum: any) => `${datum.totalWeight.toFixed(2)}t`,
+                    formatter: (datum: any) => datum?.totalWeight ? `${datum.totalWeight.toFixed(2)}t` : '',
                   }}
                   tooltip={{
                     formatter: (datum: any) => {
                       return {
                         name: '总重量',
-                        value: `${datum.totalWeight.toFixed(2)}t (${datum.totalCount}车次)`,
+                        value: `${datum?.totalWeight?.toFixed(2) || 0}t (${datum?.totalCount || 0}车次)`,
                       }
                     },
                   }}
@@ -1305,13 +1305,13 @@ const ReceiptAnalytics = () => {
                       fill: '#000',
                       fontSize: 12,
                     },
-                    formatter: (datum: any) => `${datum.totalWeight.toFixed(2)}t`,
+                    formatter: (datum: any) => datum?.totalWeight ? `${datum.totalWeight.toFixed(2)}t` : '',
                   }}
                   tooltip={{
                     formatter: (datum: any) => {
                       return {
                         name: '总重量',
-                        value: `${datum.totalWeight.toFixed(2)}t (${datum.totalCount}车次)`,
+                        value: `${datum?.totalWeight?.toFixed(2) || 0}t (${datum?.totalCount || 0}车次)`,
                       }
                     },
                   }}
