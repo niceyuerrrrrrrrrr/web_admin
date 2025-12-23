@@ -892,21 +892,37 @@ const ReceiptAnalytics = () => {
           {/* 运输任务匹配分析图表 */}
           <Card title="运输任务匹配分析 (装料 -> 卸货) - 车次统计" size="small">
             {trailerMatchedStats.length > 0 ? (
-              <Bar
+              <Column
                 data={trailerMatchedStats.map(item => ({
                   route: `${item.loadingCompany} → ${item.unloadingCompany}`,
                   count: item.count,
                   material: item.material,
+                  key: item.key,
                 }))}
-                xField="count"
-                yField="route"
-                height={Math.max(300, trailerMatchedStats.length * 40)}
+                xField="route"
+                yField="count"
                 seriesField="material"
+                height={400}
+                isGroup={true}
                 label={{
-                  position: 'right',
+                  position: 'top',
                   style: {
                     fill: '#000',
-                    fontSize: 12,
+                    fontSize: 11,
+                  },
+                }}
+                xAxis={{
+                  label: {
+                    autoRotate: true,
+                    autoHide: true,
+                    style: {
+                      fontSize: 10,
+                    },
+                  },
+                }}
+                yAxis={{
+                  title: {
+                    text: '车次',
                   },
                 }}
                 legend={{
