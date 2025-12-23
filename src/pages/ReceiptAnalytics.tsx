@@ -1134,9 +1134,6 @@ const ReceiptAnalytics = () => {
                     height={350}
                     radius={0.8}
                     innerRadius={0.6}
-                    label={{
-                      type: 'outer',
-                    }}
                     statistic={{
                       title: {
                         content: '总车次',
