@@ -892,21 +892,23 @@ const ReceiptAnalytics = () => {
           {/* 运输任务匹配分析图表 */}
           <Row gutter={[16, 16]}>
             <Col xs={24} lg={12}>
-              <Card title="运输路线车次统计 TOP10" size="small">
+              <Card title="装料公司车次统计 TOP10" size="small">
                 {trailerMatchedStats.length > 0 ? (
                   <Bar
-                    data={trailerMatchedStats
-                      .sort((a, b) => b.count - a.count)
-                      .slice(0, 10)
-                      .map(item => ({
-                        route: `${item.loadingCompany}\n→ ${item.unloadingCompany}`,
-                        count: item.count,
-                        material: item.material,
-                      }))}
+                    data={(() => {
+                      const companyMap = new Map<string, number>()
+                      trailerMatchedStats.forEach(item => {
+                        const current = companyMap.get(item.loadingCompany) || 0
+                        companyMap.set(item.loadingCompany, current + item.count)
+                      })
+                      return Array.from(companyMap.entries())
+                        .map(([company, count]) => ({ company, count }))
+                        .sort((a, b) => b.count - a.count)
+                        .slice(0, 10)
+                    })()}
                     xField="count"
-                    yField="route"
+                    yField="company"
                     height={400}
-                    seriesField="material"
                     label={{
                       position: 'right',
                       style: {
@@ -914,19 +916,27 @@ const ReceiptAnalytics = () => {
                         fontSize: 12,
                       },
                     }}
-                    legend={{
-                      position: 'top',
-                    }}
                     tooltip={{
                       formatter: (datum: any) => {
                         return {
-                          name: datum.material,
-                          value: `${datum.count} 车次`,
+                          name: '车次',
+                          value: `${datum.count}`,
                         }
                       },
                     }}
                     barStyle={{
                       radius: [0, 4, 4, 0],
+                      fill: 'l(0) 0:#1890ff 1:#36cfc9',
+                    }}
+                    yAxis={{
+                      label: {
+                        style: {
+                          fontSize: 11,
+                        },
+                        formatter: (text: string) => {
+                          return text.length > 12 ? text.substring(0, 12) + '...' : text
+                        },
+                      },
                     }}
                   />
                 ) : (
@@ -934,6 +944,62 @@ const ReceiptAnalytics = () => {
                 )}
               </Card>
             </Col>
+            <Col xs={24} lg={12}>
+              <Card title="卸货公司车次统计 TOP10" size="small">
+                {trailerMatchedStats.length > 0 ? (
+                  <Bar
+                    data={(() => {
+                      const companyMap = new Map<string, number>()
+                      trailerMatchedStats.forEach(item => {
+                        const current = companyMap.get(item.unloadingCompany) || 0
+                        companyMap.set(item.unloadingCompany, current + item.count)
+                      })
+                      return Array.from(companyMap.entries())
+                        .map(([company, count]) => ({ company, count }))
+                        .sort((a, b) => b.count - a.count)
+                        .slice(0, 10)
+                    })()}
+                    xField="count"
+                    yField="company"
+                    height={400}
+                    label={{
+                      position: 'right',
+                      style: {
+                        fill: '#000',
+                        fontSize: 12,
+                      },
+                    }}
+                    tooltip={{
+                      formatter: (datum: any) => {
+                        return {
+                          name: '车次',
+                          value: `${datum.count}`,
+                        }
+                      },
+                    }}
+                    barStyle={{
+                      radius: [0, 4, 4, 0],
+                      fill: 'l(0) 0:#52c41a 1:#95de64',
+                    }}
+                    yAxis={{
+                      label: {
+                        style: {
+                          fontSize: 11,
+                        },
+                        formatter: (text: string) => {
+                          return text.length > 12 ? text.substring(0, 12) + '...' : text
+                        },
+                      },
+                    }}
+                  />
+                ) : (
+                  <Empty description="暂无数据" />
+                )}
+              </Card>
+            </Col>
+          </Row>
+
+          <Row gutter={[16, 16]}>
             <Col xs={24} lg={12}>
               <Card title="材料运输分布" size="small">
                 {trailerMatchedStats.length > 0 ? (
@@ -951,7 +1017,7 @@ const ReceiptAnalytics = () => {
                     })()}
                     angleField="count"
                     colorField="material"
-                    height={400}
+                    height={350}
                     radius={0.8}
                     innerRadius={0.6}
                     label={{
@@ -961,9 +1027,16 @@ const ReceiptAnalytics = () => {
                     statistic={{
                       title: {
                         content: '总车次',
+                        style: {
+                          fontSize: '14px',
+                        },
                       },
                       content: {
                         content: trailerMatchedStats.reduce((sum, item) => sum + item.count, 0).toString(),
+                        style: {
+                          fontSize: '24px',
+                          fontWeight: 'bold',
+                        },
                       },
                     }}
                     legend={{
@@ -978,6 +1051,48 @@ const ReceiptAnalytics = () => {
                       },
                     }}
                   />
+                ) : (
+                  <Empty description="暂无数据" />
+                )}
+              </Card>
+            </Col>
+            <Col xs={24} lg={12}>
+              <Card title="运输路线热力 TOP5" size="small">
+                {trailerMatchedStats.length > 0 ? (
+                  <div style={{ padding: '20px 0' }}>
+                    {trailerMatchedStats
+                      .sort((a, b) => b.count - a.count)
+                      .slice(0, 5)
+                      .map((item, index) => (
+                        <div key={item.key} style={{ marginBottom: 24 }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+                            <span style={{ fontSize: 14, fontWeight: 500 }}>
+                              #{index + 1} {item.loadingCompany} → {item.unloadingCompany}
+                            </span>
+                            <span style={{ fontSize: 14, color: '#1890ff', fontWeight: 'bold' }}>
+                              {item.count} 车次
+                            </span>
+                          </div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <div style={{ 
+                              flex: 1, 
+                              height: 8, 
+                              backgroundColor: '#f0f0f0', 
+                              borderRadius: 4,
+                              overflow: 'hidden',
+                            }}>
+                              <div style={{ 
+                                width: `${(item.count / trailerMatchedStats[0].count) * 100}%`,
+                                height: '100%',
+                                background: `linear-gradient(90deg, ${['#1890ff', '#52c41a', '#faad14', '#f5222d', '#722ed1'][index]} 0%, ${['#36cfc9', '#95de64', '#ffd666', '#ff7875', '#b37feb'][index]} 100%)`,
+                                borderRadius: 4,
+                              }} />
+                            </div>
+                            <Tag color="blue">{item.material}</Tag>
+                          </div>
+                        </div>
+                      ))}
+                  </div>
                 ) : (
                   <Empty description="暂无数据" />
                 )}
