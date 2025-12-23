@@ -1279,26 +1279,44 @@ const ReceiptAnalytics = () => {
             <Col xs={24} lg={12}>
               <Card title="方量统计 (按司机) - 图表" size="small">
                 {tankerDriverStats.length > 0 ? (
-                  <Bar
+                  <Column
                     data={tankerDriverStats}
-                    xField="totalSettlementVolume"
-                    yField="driver"
-                    height={Math.max(300, tankerDriverStats.length * 30)}
+                    xField="driver"
+                    yField="totalSettlementVolume"
+                    height={400}
                     label={{
-                      position: 'right',
+                      position: 'top',
                       style: {
-                        fill: '#000',
-                        fontSize: 12,
+                        fill: '#1890ff',
+                        fontSize: 11,
                       },
                       formatter: (datum: any) => datum?.totalSettlementVolume ? `${datum.totalSettlementVolume.toFixed(2)}m³` : '',
+                    }}
+                    xAxis={{
+                      label: {
+                        autoRotate: true,
+                        autoHide: true,
+                        style: {
+                          fontSize: 10,
+                        },
+                      },
+                    }}
+                    yAxis={{
+                      title: {
+                        text: '结算方量(m³)',
+                      },
                     }}
                     tooltip={{
                       formatter: (datum: any) => {
                         return {
-                          name: '结算方量',
+                          name: datum.driver,
                           value: `${datum?.totalSettlementVolume?.toFixed(2) || 0}m³ (${datum?.count || 0}车次)`,
                         }
                       },
+                    }}
+                    columnStyle={{
+                      radius: [4, 4, 0, 0],
+                      fill: 'l(270) 0:#1890ff 1:#36cfc9',
                     }}
                   />
                 ) : (
@@ -1309,28 +1327,45 @@ const ReceiptAnalytics = () => {
             <Col xs={24} lg={12}>
               <Card title="方量统计 (按车号) - 图表" size="small">
                 {tankerVehicleStats.length > 0 ? (
-                  <Bar
+                  <Column
                     data={tankerVehicleStats}
-                    xField="totalSettlementVolume"
-                    yField="vehicleCode"
-                    height={Math.max(300, tankerVehicleStats.length * 30)}
+                    xField="vehicleCode"
+                    yField="totalSettlementVolume"
+                    height={400}
                     label={{
-                      position: 'right',
+                      position: 'top',
                       style: {
-                        fill: '#000',
-                        fontSize: 12,
+                        fill: '#52c41a',
+                        fontSize: 11,
                       },
                       formatter: (datum: any) => datum?.totalSettlementVolume ? `${datum.totalSettlementVolume.toFixed(2)}m³` : '',
+                    }}
+                    xAxis={{
+                      label: {
+                        autoRotate: true,
+                        autoHide: true,
+                        style: {
+                          fontSize: 10,
+                        },
+                      },
+                    }}
+                    yAxis={{
+                      title: {
+                        text: '结算方量(m³)',
+                      },
                     }}
                     tooltip={{
                       formatter: (datum: any) => {
                         return {
-                          name: '结算方量',
+                          name: datum.vehicleCode,
                           value: `${datum?.totalSettlementVolume?.toFixed(2) || 0}m³ (${datum?.count || 0}车次)`,
                         }
                       },
                     }}
-                    color="#52c41a"
+                    columnStyle={{
+                      radius: [4, 4, 0, 0],
+                      fill: 'l(270) 0:#52c41a 1:#95de64',
+                    }}
                   />
                 ) : (
                   <Empty description="暂无数据" />
@@ -1374,26 +1409,44 @@ const ReceiptAnalytics = () => {
           <Col xs={24} lg={12}>
             <Card title="司机统计 - 图表" size="small">
               {driverVehicleStats.byDriver.length > 0 ? (
-                <Bar
+                <Column
                   data={driverVehicleStats.byDriver}
-                  xField="totalWeight"
-                  yField="name"
-                  height={Math.max(300, driverVehicleStats.byDriver.length * 30)}
+                  xField="name"
+                  yField="totalWeight"
+                  height={400}
                   label={{
-                    position: 'right',
+                    position: 'top',
                     style: {
-                      fill: '#000',
-                      fontSize: 12,
+                      fill: '#1890ff',
+                      fontSize: 11,
                     },
                     formatter: (datum: any) => datum?.totalWeight ? `${datum.totalWeight.toFixed(2)}t` : '',
+                  }}
+                  xAxis={{
+                    label: {
+                      autoRotate: true,
+                      autoHide: true,
+                      style: {
+                        fontSize: 10,
+                      },
+                    },
+                  }}
+                  yAxis={{
+                    title: {
+                      text: '总重量(t)',
+                    },
                   }}
                   tooltip={{
                     formatter: (datum: any) => {
                       return {
-                        name: '总重量',
+                        name: datum.name,
                         value: `${datum?.totalWeight?.toFixed(2) || 0}t (${datum?.totalCount || 0}车次)`,
                       }
                     },
+                  }}
+                  columnStyle={{
+                    radius: [4, 4, 0, 0],
+                    fill: 'l(270) 0:#1890ff 1:#36cfc9',
                   }}
                 />
               ) : (
@@ -1404,28 +1457,45 @@ const ReceiptAnalytics = () => {
           <Col xs={24} lg={12}>
             <Card title="车辆统计 - 图表" size="small">
               {driverVehicleStats.byVehicle.length > 0 ? (
-                <Bar
+                <Column
                   data={driverVehicleStats.byVehicle}
-                  xField="totalWeight"
-                  yField="name"
-                  height={Math.max(300, driverVehicleStats.byVehicle.length * 30)}
+                  xField="name"
+                  yField="totalWeight"
+                  height={400}
                   label={{
-                    position: 'right',
+                    position: 'top',
                     style: {
-                      fill: '#000',
-                      fontSize: 12,
+                      fill: '#52c41a',
+                      fontSize: 11,
                     },
                     formatter: (datum: any) => datum?.totalWeight ? `${datum.totalWeight.toFixed(2)}t` : '',
+                  }}
+                  xAxis={{
+                    label: {
+                      autoRotate: true,
+                      autoHide: true,
+                      style: {
+                        fontSize: 10,
+                      },
+                    },
+                  }}
+                  yAxis={{
+                    title: {
+                      text: '总重量(t)',
+                    },
                   }}
                   tooltip={{
                     formatter: (datum: any) => {
                       return {
-                        name: '总重量',
+                        name: datum.name,
                         value: `${datum?.totalWeight?.toFixed(2) || 0}t (${datum?.totalCount || 0}车次)`,
                       }
                     },
                   }}
-                  color="#52c41a"
+                  columnStyle={{
+                    radius: [4, 4, 0, 0],
+                    fill: 'l(270) 0:#52c41a 1:#95de64',
+                  }}
                 />
               ) : (
                 <Empty description="暂无数据" />
