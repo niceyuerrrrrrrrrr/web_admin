@@ -894,51 +894,47 @@ const ReceiptAnalytics = () => {
             <Col xs={24} lg={12}>
               <Card title="装料公司车次统计 TOP10" size="small">
                 {trailerMatchedStats.length > 0 ? (
-                  <Bar
-                    data={(() => {
+                  <div style={{ padding: '20px 0' }}>
+                    {(() => {
                       const companyMap = new Map<string, number>()
                       trailerMatchedStats.forEach(item => {
                         const current = companyMap.get(item.loadingCompany) || 0
                         companyMap.set(item.loadingCompany, current + item.count)
                       })
-                      return Array.from(companyMap.entries())
+                      const topData = Array.from(companyMap.entries())
                         .map(([company, count]) => ({ company, count }))
                         .sort((a, b) => b.count - a.count)
                         .slice(0, 10)
+                      const maxCount = topData[0]?.count || 1
+                      
+                      return topData.map((item, index) => (
+                        <div key={item.company} style={{ marginBottom: 20 }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+                            <span style={{ fontSize: 13, fontWeight: 500, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={item.company}>
+                              #{index + 1} {item.company}
+                            </span>
+                            <span style={{ fontSize: 14, color: '#1890ff', fontWeight: 'bold', marginLeft: 12 }}>
+                              {item.count} 车次
+                            </span>
+                          </div>
+                          <div style={{ 
+                            height: 8, 
+                            backgroundColor: '#f0f0f0', 
+                            borderRadius: 4,
+                            overflow: 'hidden',
+                          }}>
+                            <div style={{ 
+                              width: `${(item.count / maxCount) * 100}%`,
+                              height: '100%',
+                              background: 'linear-gradient(90deg, #1890ff 0%, #36cfc9 100%)',
+                              borderRadius: 4,
+                              transition: 'width 0.3s ease',
+                            }} />
+                          </div>
+                        </div>
+                      ))
                     })()}
-                    xField="count"
-                    yField="company"
-                    height={400}
-                    label={{
-                      position: 'right',
-                      style: {
-                        fill: '#000',
-                        fontSize: 12,
-                      },
-                    }}
-                    tooltip={{
-                      formatter: (datum: any) => {
-                        return {
-                          name: '车次',
-                          value: `${datum.count}`,
-                        }
-                      },
-                    }}
-                    barStyle={{
-                      radius: [0, 4, 4, 0],
-                      fill: 'l(0) 0:#1890ff 1:#36cfc9',
-                    }}
-                    yAxis={{
-                      label: {
-                        style: {
-                          fontSize: 11,
-                        },
-                        formatter: (text: string) => {
-                          return text.length > 12 ? text.substring(0, 12) + '...' : text
-                        },
-                      },
-                    }}
-                  />
+                  </div>
                 ) : (
                   <Empty description="暂无数据" />
                 )}
@@ -947,51 +943,47 @@ const ReceiptAnalytics = () => {
             <Col xs={24} lg={12}>
               <Card title="卸货公司车次统计 TOP10" size="small">
                 {trailerMatchedStats.length > 0 ? (
-                  <Bar
-                    data={(() => {
+                  <div style={{ padding: '20px 0' }}>
+                    {(() => {
                       const companyMap = new Map<string, number>()
                       trailerMatchedStats.forEach(item => {
                         const current = companyMap.get(item.unloadingCompany) || 0
                         companyMap.set(item.unloadingCompany, current + item.count)
                       })
-                      return Array.from(companyMap.entries())
+                      const topData = Array.from(companyMap.entries())
                         .map(([company, count]) => ({ company, count }))
                         .sort((a, b) => b.count - a.count)
                         .slice(0, 10)
+                      const maxCount = topData[0]?.count || 1
+                      
+                      return topData.map((item, index) => (
+                        <div key={item.company} style={{ marginBottom: 20 }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+                            <span style={{ fontSize: 13, fontWeight: 500, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={item.company}>
+                              #{index + 1} {item.company}
+                            </span>
+                            <span style={{ fontSize: 14, color: '#52c41a', fontWeight: 'bold', marginLeft: 12 }}>
+                              {item.count} 车次
+                            </span>
+                          </div>
+                          <div style={{ 
+                            height: 8, 
+                            backgroundColor: '#f0f0f0', 
+                            borderRadius: 4,
+                            overflow: 'hidden',
+                          }}>
+                            <div style={{ 
+                              width: `${(item.count / maxCount) * 100}%`,
+                              height: '100%',
+                              background: 'linear-gradient(90deg, #52c41a 0%, #95de64 100%)',
+                              borderRadius: 4,
+                              transition: 'width 0.3s ease',
+                            }} />
+                          </div>
+                        </div>
+                      ))
                     })()}
-                    xField="count"
-                    yField="company"
-                    height={400}
-                    label={{
-                      position: 'right',
-                      style: {
-                        fill: '#000',
-                        fontSize: 12,
-                      },
-                    }}
-                    tooltip={{
-                      formatter: (datum: any) => {
-                        return {
-                          name: '车次',
-                          value: `${datum.count}`,
-                        }
-                      },
-                    }}
-                    barStyle={{
-                      radius: [0, 4, 4, 0],
-                      fill: 'l(0) 0:#52c41a 1:#95de64',
-                    }}
-                    yAxis={{
-                      label: {
-                        style: {
-                          fontSize: 11,
-                        },
-                        formatter: (text: string) => {
-                          return text.length > 12 ? text.substring(0, 12) + '...' : text
-                        },
-                      },
-                    }}
-                  />
+                  </div>
                 ) : (
                   <Empty description="暂无数据" />
                 )}
