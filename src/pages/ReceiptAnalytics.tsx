@@ -1136,7 +1136,6 @@ const ReceiptAnalytics = () => {
                     innerRadius={0.6}
                     label={{
                       type: 'outer',
-                      content: '{name} {percentage}',
                     }}
                     statistic={{
                       title: {
