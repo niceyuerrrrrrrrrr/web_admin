@@ -15,6 +15,7 @@ import {
   Divider,
   Empty
 } from 'antd'
+import { Line } from '@ant-design/plots'
 import { ReloadOutlined, SearchOutlined } from '@ant-design/icons'
 import { useQuery } from '@tanstack/react-query'
 import type { ColumnsType } from 'antd/es/table'
@@ -455,6 +456,25 @@ const ReceiptAnalytics = () => {
 
 
   // ----------------------------------------------------------------
+  // Daily Trend Statistics (按日期统计运单数量)
+  // ----------------------------------------------------------------
+  const dailyTrendData = useMemo(() => {
+    const dateMap = new Map<string, number>()
+    
+    filteredReceipts.forEach(r => {
+      const date = dayjs(r.created_at).format('YYYY-MM-DD')
+      dateMap.set(date, (dateMap.get(date) || 0) + 1)
+    })
+    
+    // 转换为数组并按日期排序
+    const data = Array.from(dateMap.entries())
+      .map(([date, count]) => ({ date, count }))
+      .sort((a, b) => a.date.localeCompare(b.date))
+    
+    return data
+  }, [filteredReceipts])
+
+  // ----------------------------------------------------------------
   // Driver & Vehicle Statistics Logic (Common)
   // ----------------------------------------------------------------
   const driverVehicleStats = useMemo(() => {
@@ -695,6 +715,62 @@ const ReceiptAnalytics = () => {
           </Button>
         </Space>
       </div>
+
+      {/* 运单数量趋势图 */}
+      <Card title="运单数量趋势" size="small">
+        {dailyTrendData.length > 0 ? (
+          <Line
+            data={dailyTrendData}
+            xField="date"
+            yField="count"
+            height={300}
+            point={{
+              size: 4,
+              shape: 'circle',
+            }}
+            label={{
+              style: {
+                fill: '#1890ff',
+                fontSize: 12,
+              },
+            }}
+            xAxis={{
+              label: {
+                autoRotate: true,
+                autoHide: true,
+              },
+              title: {
+                text: '日期',
+                style: {
+                  fontSize: 14,
+                },
+              },
+            }}
+            yAxis={{
+              title: {
+                text: '运单数',
+                style: {
+                  fontSize: 14,
+                },
+              },
+              label: {
+                formatter: (v: string) => `${v}`,
+              },
+            }}
+            tooltip={{
+              formatter: (datum: any) => {
+                return {
+                  name: '运单数',
+                  value: `${datum.count} 单`,
+                }
+              },
+            }}
+            smooth
+          />
+        ) : (
+          <Empty description="暂无数据" />
+        )}
+      </Card>
 
       {businessType === '挂车' && (
         <>
