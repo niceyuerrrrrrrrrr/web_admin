@@ -159,3 +159,22 @@ export const fetchChargingStatsOverview = (params: { timeRange: string; companyI
     }),
   )
 
+export interface ChargingTrendData {
+  daily_trend: Array<{
+    date: string
+    energy: number
+    amount: number
+    count: number
+  }>
+}
+
+export const fetchChargingTrend = (params: { timeRange: string; companyId?: number }) =>
+  unwrap<ChargingTrendData>(
+    client.get('/statistics/charging/trend', {
+      params: {
+        time_range: params.timeRange,
+        company_id: params.companyId,
+      },
+    }),
+  )
+
