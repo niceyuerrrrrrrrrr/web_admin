@@ -158,3 +158,22 @@ export const fetchVehicleDocuments = (plateNumber: string) =>
 export const fetchVehicleDriver = (plateNumber: string) =>
   unwrap<{ driver: VehicleDriver | null }>(client.get(`/vehicles/${plateNumber}/driver`))
 
+/**
+ * 车辆使用记录
+ */
+export interface VehicleUsageRecord {
+  plate: string
+  usage: Record<string, { driver_name: string; trip_count: number }>
+}
+
+/**
+ * 获取车辆使用日历数据
+ */
+export const fetchVehicleUsageCalendar = async (params: {
+  company_id?: number
+  start_date: string
+  end_date: string
+}): Promise<ApiResponse<VehicleUsageRecord[]>> => {
+  const response = await client.get('/vehicles/usage-calendar', { params })
+  return response.data
+}

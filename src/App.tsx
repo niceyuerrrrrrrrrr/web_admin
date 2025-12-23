@@ -6,6 +6,7 @@ import {
   BarChartOutlined,
   BranchesOutlined,
   BugOutlined,
+  CalendarOutlined,
   CarOutlined,
   CheckSquareOutlined,
   ClockCircleOutlined,
@@ -59,6 +60,7 @@ import InventoryPage from './pages/Inventory'
 import MaterialRequestsPage from './pages/MaterialRequests'
 import MaterialPricingPage from './pages/MaterialPricing'
 import VehiclesPage from './pages/Vehicles'
+import VehicleUsageCalendarPage from './pages/VehicleUsageCalendar'
 import UsersPage from './pages/Users'
 import RolesPage from './pages/Roles'
 import PermissionsPage from './pages/Permissions'
@@ -170,9 +172,23 @@ const routeDefinitions = [
       {
         key: 'vehicles',
         label: '车辆管理',
-        path: '/vehicles',
         icon: <CarOutlined />,
-        element: <VehiclesPage />,
+        children: [
+          {
+            key: 'vehicles-list',
+            label: '车辆列表',
+            path: '/vehicles',
+            icon: <CarOutlined />,
+            element: <VehiclesPage />,
+          },
+          {
+            key: 'vehicle-usage-calendar',
+            label: '使用日历',
+            path: '/vehicles/usage-calendar',
+            icon: <CalendarOutlined />,
+            element: <VehicleUsageCalendarPage />,
+          },
+        ],
       },
       {
         key: 'charging',

@@ -1,0 +1,766 @@
+import React, { useState } from 'react'
+import {
+  Card,
+  Tabs,
+  Form,
+  Input,
+  InputNumber,
+  Button,
+  Table,
+  Space,
+  message,
+  Modal,
+  Select,
+  Tag,
+  Popconfirm,
+  DatePicker,
+  Switch,
+  Statistic,
+  Row,
+  Col,
+  Descriptions,
+} from 'antd'
+import {
+  DollarOutlined,
+  SettingOutlined,
+  TeamOutlined,
+  CalculatorOutlined,
+  CheckCircleOutlined,
+  SendOutlined,
+  ReloadOutlined,
+  EyeOutlined,
+} from '@ant-design/icons'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import dayjs from 'dayjs'
+import type { Dayjs } from 'dayjs'
+import {
+  fetchGlobalConfig,
+  createOrUpdateGlobalConfig,
+  fetchDriverConfigList,
+  createOrUpdateDriverConfig,
+  fetchSalarySummaryList,
+  calculateDriverSalary,
+  batchCalculateSalary,
+  confirmSalary,
+  sendSalarySlip,
+  type GlobalConfig,
+  type DriverConfig,
+  type SalarySummary,
+} from '../api/services/driverSalary'
+import { fetchUsers } from '../api/services/users'
+
+const DriverSalaryPage: React.FC = () => {
+  const [activeTab, setActiveTab] = useState('summary')
+  const [selectedPeriod, setSelectedPeriod] = useState<string>(
+    dayjs().format('YYYY-MM'),
+  )
+  const [globalConfigForm] = Form.useForm()
+  const [driverConfigForm] = Form.useForm()
+  const [driverConfigModalVisible, setDriverConfigModalVisible] =
+    useState(false)
+  const [detailModalVisible, setDetailModalVisible] = useState(false)
+  const [selectedSummary, setSelectedSummary] = useState<SalarySummary | null>(
+    null,
+  )
+  const queryClient = useQueryClient()
+
+  // ==================== 全局配置 ====================
+
+  // 获取全局配置
+  const { data: globalConfigData, refetch: refetchGlobalConfig } = useQuery({
+    queryKey: ['globalConfig', selectedPeriod],
+    queryFn: () => fetchGlobalConfig(selectedPeriod),
+    enabled: activeTab === 'global',
+  })
+
+  // 保存全局配置
+  const saveGlobalConfigMutation = useMutation({
+    mutationFn: createOrUpdateGlobalConfig,
+    onSuccess: () => {
+      message.success('全局配置保存成功')
+      refetchGlobalConfig()
+    },
+    onError: (error: any) => {
+      message.error(error.response?.data?.message || '保存失败')
+    },
+  })
+
+  const handleSaveGlobalConfig = () => {
+    globalConfigForm.validateFields().then((values) => {
+      saveGlobalConfigMutation.mutate({
+        ...values,
+        effective_period: selectedPeriod,
+      })
+    })
+  }
+
+  // ==================== 司机配置 ====================
+
+  // 获取司机列表
+  const { data: usersData } = useQuery({
+    queryKey: ['users'],
+    queryFn: () => fetchUsers({}),
+  })
+
+  // 获取司机配置列表
+  const { data: driverConfigData, refetch: refetchDriverConfig } = useQuery({
+    queryKey: ['driverConfig', selectedPeriod],
+    queryFn: () => fetchDriverConfigList({ period: selectedPeriod }),
+    enabled: activeTab === 'driver',
+  })
+
+  // 保存司机配置
+  const saveDriverConfigMutation = useMutation({
+    mutationFn: createOrUpdateDriverConfig,
+    onSuccess: () => {
+      message.success('司机配置保存成功')
+      setDriverConfigModalVisible(false)
+      driverConfigForm.resetFields()
+      refetchDriverConfig()
+    },
+    onError: (error: any) => {
+      message.error(error.response?.data?.message || '保存失败')
+    },
+  })
+
+  const handleSaveDriverConfig = () => {
+    driverConfigForm.validateFields().then((values) => {
+      saveDriverConfigMutation.mutate({
+        ...values,
+        effective_period: selectedPeriod,
+      })
+    })
+  }
+
+  const handleEditDriverConfig = (record: DriverConfig) => {
+    driverConfigForm.setFieldsValue({
+      user_id: record.user_id,
+      has_safety_bonus: record.has_safety_bonus,
+      has_attendance_bonus: record.has_attendance_bonus,
+      has_hygiene_bonus: record.has_hygiene_bonus,
+      has_energy_saving_bonus: record.has_energy_saving_bonus,
+      deduction: record.deduction,
+      deduction_reason: record.deduction_reason,
+    })
+    setDriverConfigModalVisible(true)
+  }
+
+  // ==================== 工资计算 ====================
+
+  // 获取工资汇总列表
+  const { data: summaryData, refetch: refetchSummary } = useQuery({
+    queryKey: ['salarySummary', selectedPeriod],
+    queryFn: () => fetchSalarySummaryList({ period: selectedPeriod }),
+    enabled: activeTab === 'summary',
+  })
+
+  // 批量计算工资
+  const batchCalculateMutation = useMutation({
+    mutationFn: batchCalculateSalary,
+    onSuccess: () => {
+      message.success('批量计算完成')
+      refetchSummary()
+    },
+    onError: (error: any) => {
+      message.error(error.response?.data?.message || '计算失败')
+    },
+  })
+
+  // 单个计算工资
+  const calculateMutation = useMutation({
+    mutationFn: calculateDriverSalary,
+    onSuccess: () => {
+      message.success('计算完成')
+      refetchSummary()
+    },
+    onError: (error: any) => {
+      message.error(error.response?.data?.message || '计算失败')
+    },
+  })
+
+  // 确认工资
+  const confirmMutation = useMutation({
+    mutationFn: confirmSalary,
+    onSuccess: () => {
+      message.success('确认成功')
+      refetchSummary()
+    },
+    onError: (error: any) => {
+      message.error(error.response?.data?.message || '确认失败')
+    },
+  })
+
+  // 发放工资条
+  const sendMutation = useMutation({
+    mutationFn: sendSalarySlip,
+    onSuccess: () => {
+      message.success('发放成功')
+      refetchSummary()
+    },
+    onError: (error: any) => {
+      message.error(error.response?.data?.message || '发放失败')
+    },
+  })
+
+  const handleViewDetail = (record: SalarySummary) => {
+    setSelectedSummary(record)
+    setDetailModalVisible(true)
+  }
+
+  // ==================== 表格列定义 ====================
+
+  const driverConfigColumns = [
+    {
+      title: '司机姓名',
+      dataIndex: 'user_name',
+      key: 'user_name',
+    },
+    {
+      title: '安全奖',
+      dataIndex: 'has_safety_bonus',
+      key: 'has_safety_bonus',
+      render: (value: boolean) => (
+        <Tag color={value ? 'green' : 'default'}>{value ? '是' : '否'}</Tag>
+      ),
+    },
+    {
+      title: '全勤奖',
+      dataIndex: 'has_attendance_bonus',
+      key: 'has_attendance_bonus',
+      render: (value: boolean) => (
+        <Tag color={value ? 'green' : 'default'}>{value ? '是' : '否'}</Tag>
+      ),
+    },
+    {
+      title: '卫生奖',
+      dataIndex: 'has_hygiene_bonus',
+      key: 'has_hygiene_bonus',
+      render: (value: boolean) => (
+        <Tag color={value ? 'green' : 'default'}>{value ? '是' : '否'}</Tag>
+      ),
+    },
+    {
+      title: '节能奖',
+      dataIndex: 'has_energy_saving_bonus',
+      key: 'has_energy_saving_bonus',
+      render: (value: boolean) => (
+        <Tag color={value ? 'green' : 'default'}>{value ? '是' : '否'}</Tag>
+      ),
+    },
+    {
+      title: '扣款',
+      dataIndex: 'deduction',
+      key: 'deduction',
+      render: (value: number) => `¥${value.toFixed(2)}`,
+    },
+    {
+      title: '扣款原因',
+      dataIndex: 'deduction_reason',
+      key: 'deduction_reason',
+      ellipsis: true,
+    },
+    {
+      title: '操作',
+      key: 'action',
+      render: (_: any, record: DriverConfig) => (
+        <Button
+          type="link"
+          size="small"
+          onClick={() => handleEditDriverConfig(record)}
+        >
+          编辑
+        </Button>
+      ),
+    },
+  ]
+
+  const summaryColumns = [
+    {
+      title: '司机姓名',
+      dataIndex: 'user_name',
+      key: 'user_name',
+    },
+    {
+      title: '趟数',
+      dataIndex: 'trip_count',
+      key: 'trip_count',
+    },
+    {
+      title: '趟数收入',
+      dataIndex: 'trip_income',
+      key: 'trip_income',
+      render: (value: number) => `¥${value.toFixed(2)}`,
+    },
+    {
+      title: '总奖金',
+      dataIndex: 'total_bonus',
+      key: 'total_bonus',
+      render: (value: number) => `¥${value.toFixed(2)}`,
+    },
+    {
+      title: '扣款',
+      dataIndex: 'deduction',
+      key: 'deduction',
+      render: (value: number) => `¥${value.toFixed(2)}`,
+    },
+    {
+      title: '应发工资',
+      dataIndex: 'gross_salary',
+      key: 'gross_salary',
+      render: (value: number) => `¥${value.toFixed(2)}`,
+    },
+    {
+      title: '实发工资',
+      dataIndex: 'net_salary',
+      key: 'net_salary',
+      render: (value: number) => (
+        <span style={{ color: '#52c41a', fontWeight: 'bold' }}>
+          ¥{value.toFixed(2)}
+        </span>
+      ),
+    },
+    {
+      title: '状态',
+      dataIndex: 'status',
+      key: 'status',
+      render: (status: string) => {
+        const statusMap: Record<string, { color: string; text: string }> = {
+          pending: { color: 'default', text: '待确认' },
+          confirmed: { color: 'processing', text: '已确认' },
+          sent: { color: 'success', text: '已发放' },
+        }
+        const config = statusMap[status] || { color: 'default', text: status }
+        return <Tag color={config.color}>{config.text}</Tag>
+      },
+    },
+    {
+      title: '操作',
+      key: 'action',
+      render: (_: any, record: SalarySummary) => (
+        <Space>
+          <Button
+            type="link"
+            size="small"
+            icon={<EyeOutlined />}
+            onClick={() => handleViewDetail(record)}
+          >
+            查看
+          </Button>
+          {record.status === 'pending' && (
+            <>
+              <Button
+                type="link"
+                size="small"
+                onClick={() =>
+                  calculateMutation.mutate({
+                    user_id: record.user_id,
+                    period: selectedPeriod,
+                    force_recalculate: true,
+                  })
+                }
+              >
+                重算
+              </Button>
+              <Popconfirm
+                title="确认工资？"
+                onConfirm={() => confirmMutation.mutate(record.id)}
+              >
+                <Button type="link" size="small">
+                  确认
+                </Button>
+              </Popconfirm>
+            </>
+          )}
+          {record.status === 'confirmed' && (
+            <Popconfirm
+              title="发放工资条？"
+              onConfirm={() => sendMutation.mutate(record.id)}
+            >
+              <Button type="link" size="small">
+                发放
+              </Button>
+            </Popconfirm>
+          )}
+        </Space>
+      ),
+    },
+  ]
+
+  // ==================== 统计数据 ====================
+
+  const summaryList = summaryData?.data || []
+  const totalSalary = summaryList.reduce(
+    (sum, item) => sum + item.net_salary,
+    0,
+  )
+  const confirmedCount = summaryList.filter(
+    (item) => item.status === 'confirmed' || item.status === 'sent',
+  ).length
+  const sentCount = summaryList.filter((item) => item.status === 'sent').length
+
+  // ==================== 渲染 ====================
+
+  // 加载全局配置数据到表单
+  React.useEffect(() => {
+    if (globalConfigData?.data) {
+      globalConfigForm.setFieldsValue(globalConfigData.data)
+    }
+  }, [globalConfigData, globalConfigForm])
+
+  return (
+    <div style={{ padding: '24px' }}>
+      <Card
+        title={
+          <Space>
+            <DollarOutlined />
+            <span>司机工资管理</span>
+          </Space>
+        }
+        extra={
+          <Space>
+            <DatePicker
+              picker="month"
+              value={dayjs(selectedPeriod)}
+              onChange={(date) =>
+                setSelectedPeriod(date?.format('YYYY-MM') || '')
+              }
+            />
+            <Button
+              icon={<ReloadOutlined />}
+              onClick={() => {
+                if (activeTab === 'global') refetchGlobalConfig()
+                if (activeTab === 'driver') refetchDriverConfig()
+                if (activeTab === 'summary') refetchSummary()
+              }}
+            >
+              刷新
+            </Button>
+          </Space>
+        }
+      >
+        <Tabs activeKey={activeTab} onChange={setActiveTab}>
+          {/* 全局配置 */}
+          <Tabs.TabPane
+            tab={
+              <span>
+                <SettingOutlined />
+                全局配置
+              </span>
+            }
+            key="global"
+          >
+            <Form
+              form={globalConfigForm}
+              layout="vertical"
+              style={{ maxWidth: 600 }}
+            >
+              <Form.Item
+                label="单趟价格"
+                name="price_per_trip"
+                rules={[{ required: true, message: '请输入单趟价格' }]}
+              >
+                <InputNumber
+                  style={{ width: '100%' }}
+                  prefix="¥"
+                  min={0}
+                  precision={2}
+                />
+              </Form.Item>
+              <Form.Item
+                label="安全奖金额"
+                name="safety_bonus_amount"
+                rules={[{ required: true, message: '请输入安全奖金额' }]}
+              >
+                <InputNumber
+                  style={{ width: '100%' }}
+                  prefix="¥"
+                  min={0}
+                  precision={2}
+                />
+              </Form.Item>
+              <Form.Item
+                label="全勤奖金额"
+                name="attendance_bonus_amount"
+                rules={[{ required: true, message: '请输入全勤奖金额' }]}
+              >
+                <InputNumber
+                  style={{ width: '100%' }}
+                  prefix="¥"
+                  min={0}
+                  precision={2}
+                />
+              </Form.Item>
+              <Form.Item
+                label="卫生奖金额"
+                name="hygiene_bonus_amount"
+                rules={[{ required: true, message: '请输入卫生奖金额' }]}
+              >
+                <InputNumber
+                  style={{ width: '100%' }}
+                  prefix="¥"
+                  min={0}
+                  precision={2}
+                />
+              </Form.Item>
+              <Form.Item
+                label="节能奖金额"
+                name="energy_saving_bonus_amount"
+                rules={[{ required: true, message: '请输入节能奖金额' }]}
+              >
+                <InputNumber
+                  style={{ width: '100%' }}
+                  prefix="¥"
+                  min={0}
+                  precision={2}
+                />
+              </Form.Item>
+              <Form.Item>
+                <Button
+                  type="primary"
+                  onClick={handleSaveGlobalConfig}
+                  loading={saveGlobalConfigMutation.isPending}
+                >
+                  保存配置
+                </Button>
+              </Form.Item>
+            </Form>
+          </Tabs.TabPane>
+
+          {/* 司机配置 */}
+          <Tabs.TabPane
+            tab={
+              <span>
+                <TeamOutlined />
+                司机配置
+              </span>
+            }
+            key="driver"
+          >
+            <div style={{ marginBottom: 16 }}>
+              <Button
+                type="primary"
+                onClick={() => {
+                  driverConfigForm.resetFields()
+                  setDriverConfigModalVisible(true)
+                }}
+              >
+                新增配置
+              </Button>
+            </div>
+            <Table
+              columns={driverConfigColumns}
+              dataSource={driverConfigData?.data || []}
+              rowKey="id"
+              pagination={false}
+            />
+          </Tabs.TabPane>
+
+          {/* 工资汇总 */}
+          <Tabs.TabPane
+            tab={
+              <span>
+                <CalculatorOutlined />
+                工资汇总
+              </span>
+            }
+            key="summary"
+          >
+            {/* 统计卡片 */}
+            <Row gutter={16} style={{ marginBottom: 24 }}>
+              <Col span={6}>
+                <Card>
+                  <Statistic
+                    title="总人数"
+                    value={summaryList.length}
+                    prefix={<TeamOutlined />}
+                  />
+                </Card>
+              </Col>
+              <Col span={6}>
+                <Card>
+                  <Statistic
+                    title="工资总额"
+                    value={totalSalary}
+                    precision={2}
+                    prefix="¥"
+                    valueStyle={{ color: '#3f8600' }}
+                  />
+                </Card>
+              </Col>
+              <Col span={6}>
+                <Card>
+                  <Statistic
+                    title="已确认"
+                    value={confirmedCount}
+                    suffix={`/ ${summaryList.length}`}
+                  />
+                </Card>
+              </Col>
+              <Col span={6}>
+                <Card>
+                  <Statistic
+                    title="已发放"
+                    value={sentCount}
+                    suffix={`/ ${summaryList.length}`}
+                  />
+                </Card>
+              </Col>
+            </Row>
+
+            <div style={{ marginBottom: 16 }}>
+              <Space>
+                <Button
+                  type="primary"
+                  icon={<CalculatorOutlined />}
+                  onClick={() => batchCalculateMutation.mutate(selectedPeriod)}
+                  loading={batchCalculateMutation.isPending}
+                >
+                  批量计算工资
+                </Button>
+              </Space>
+            </div>
+            <Table
+              columns={summaryColumns}
+              dataSource={summaryList}
+              rowKey="id"
+              scroll={{ x: 1200 }}
+            />
+          </Tabs.TabPane>
+        </Tabs>
+      </Card>
+
+      {/* 司机配置弹窗 */}
+      <Modal
+        title="司机配置"
+        open={driverConfigModalVisible}
+        onOk={handleSaveDriverConfig}
+        onCancel={() => {
+          setDriverConfigModalVisible(false)
+          driverConfigForm.resetFields()
+        }}
+        confirmLoading={saveDriverConfigMutation.isPending}
+      >
+        <Form form={driverConfigForm} layout="vertical">
+          <Form.Item
+            label="选择司机"
+            name="user_id"
+            rules={[{ required: true, message: '请选择司机' }]}
+          >
+            <Select
+              showSearch
+              placeholder="请选择司机"
+              optionFilterProp="children"
+              options={(usersData as any)?.data?.records?.map((user: any) => ({
+                label: user.name,
+                value: user.id,
+              }))}
+            />
+          </Form.Item>
+          <Form.Item label="安全奖" name="has_safety_bonus" valuePropName="checked">
+            <Switch />
+          </Form.Item>
+          <Form.Item
+            label="全勤奖"
+            name="has_attendance_bonus"
+            valuePropName="checked"
+          >
+            <Switch />
+          </Form.Item>
+          <Form.Item label="卫生奖" name="has_hygiene_bonus" valuePropName="checked">
+            <Switch />
+          </Form.Item>
+          <Form.Item
+            label="节能奖"
+            name="has_energy_saving_bonus"
+            valuePropName="checked"
+          >
+            <Switch />
+          </Form.Item>
+          <Form.Item label="扣款金额" name="deduction" initialValue={0}>
+            <InputNumber style={{ width: '100%' }} prefix="¥" min={0} precision={2} />
+          </Form.Item>
+          <Form.Item label="扣款原因" name="deduction_reason">
+            <Input.TextArea rows={3} />
+          </Form.Item>
+        </Form>
+      </Modal>
+
+      {/* 工资详情弹窗 */}
+      <Modal
+        title="工资详情"
+        open={detailModalVisible}
+        onCancel={() => setDetailModalVisible(false)}
+        footer={[
+          <Button key="close" onClick={() => setDetailModalVisible(false)}>
+            关闭
+          </Button>,
+        ]}
+        width={700}
+      >
+        {selectedSummary && (
+          <Descriptions column={2} bordered>
+            <Descriptions.Item label="司机姓名">
+              {selectedSummary.user_name}
+            </Descriptions.Item>
+            <Descriptions.Item label="工资周期">
+              {selectedSummary.period}
+            </Descriptions.Item>
+            <Descriptions.Item label="趟数">
+              {selectedSummary.trip_count}
+            </Descriptions.Item>
+            <Descriptions.Item label="趟数收入">
+              ¥{selectedSummary.trip_income.toFixed(2)}
+            </Descriptions.Item>
+            <Descriptions.Item label="安全奖">
+              ¥{selectedSummary.safety_bonus.toFixed(2)}
+            </Descriptions.Item>
+            <Descriptions.Item label="全勤奖">
+              ¥{selectedSummary.attendance_bonus.toFixed(2)}
+            </Descriptions.Item>
+            <Descriptions.Item label="卫生奖">
+              ¥{selectedSummary.hygiene_bonus.toFixed(2)}
+            </Descriptions.Item>
+            <Descriptions.Item label="节能奖">
+              ¥{selectedSummary.energy_saving_bonus.toFixed(2)}
+            </Descriptions.Item>
+            <Descriptions.Item label="总奖金">
+              ¥{selectedSummary.total_bonus.toFixed(2)}
+            </Descriptions.Item>
+            <Descriptions.Item label="扣款">
+              ¥{selectedSummary.deduction.toFixed(2)}
+            </Descriptions.Item>
+            <Descriptions.Item label="应发工资">
+              <span style={{ fontWeight: 'bold' }}>
+                ¥{selectedSummary.gross_salary.toFixed(2)}
+              </span>
+            </Descriptions.Item>
+            <Descriptions.Item label="实发工资">
+              <span style={{ color: '#52c41a', fontWeight: 'bold' }}>
+                ¥{selectedSummary.net_salary.toFixed(2)}
+              </span>
+            </Descriptions.Item>
+            <Descriptions.Item label="状态" span={2}>
+              <Tag
+                color={
+                  selectedSummary.status === 'sent'
+                    ? 'success'
+                    : selectedSummary.status === 'confirmed'
+                      ? 'processing'
+                      : 'default'
+                }
+              >
+                {selectedSummary.status === 'sent'
+                  ? '已发放'
+                  : selectedSummary.status === 'confirmed'
+                    ? '已确认'
+                    : '待确认'}
+              </Tag>
+            </Descriptions.Item>
+          </Descriptions>
+        )}
+      </Modal>
+    </div>
+  )
+}
+
+export default DriverSalaryPage
