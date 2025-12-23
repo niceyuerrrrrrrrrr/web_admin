@@ -411,6 +411,11 @@ const AppLayout = () => {
     token: { colorBgContainer },
   } = theme.useToken()
 
+  // 认证守卫：未登录立即跳转到登录页
+  if (!user) {
+    return <Navigate to="/login" replace />
+  }
+
   const configQuery = useQuery({
     queryKey: ['system-config-layout'],
     queryFn: fetchSystemConfig,
