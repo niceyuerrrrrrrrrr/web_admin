@@ -890,57 +890,100 @@ const ReceiptAnalytics = () => {
           </Row>
 
           {/* 运输任务匹配分析图表 */}
-          <Card title="运输任务匹配分析 (装料 -> 卸货) - 车次统计" size="small">
-            {trailerMatchedStats.length > 0 ? (
-              <Column
-                data={trailerMatchedStats.map(item => ({
-                  route: `${item.loadingCompany} → ${item.unloadingCompany}`,
-                  count: item.count,
-                  material: item.material,
-                  key: item.key,
-                }))}
-                xField="route"
-                yField="count"
-                seriesField="material"
-                height={400}
-                isGroup={true}
-                label={{
-                  position: 'top',
-                  style: {
-                    fill: '#000',
-                    fontSize: 11,
-                  },
-                }}
-                xAxis={{
-                  label: {
-                    autoRotate: true,
-                    autoHide: true,
-                    style: {
-                      fontSize: 10,
-                    },
-                  },
-                }}
-                yAxis={{
-                  title: {
-                    text: '车次',
-                  },
-                }}
-                legend={{
-                  position: 'top-right',
-                }}
-                tooltip={{
-                  formatter: (datum: any) => {
-                    return {
-                      name: datum.material,
-                      value: `${datum.count} 车次`,
-                    }
-                  },
-                }}
-              />
-            ) : (
-              <Empty description="暂无数据" />
-            )}
-          </Card>
+          <Row gutter={[16, 16]}>
+            <Col xs={24} lg={12}>
+              <Card title="运输路线车次统计 TOP10" size="small">
+                {trailerMatchedStats.length > 0 ? (
+                  <Bar
+                    data={trailerMatchedStats
+                      .sort((a, b) => b.count - a.count)
+                      .slice(0, 10)
+                      .map(item => ({
+                        route: `${item.loadingCompany}\n→ ${item.unloadingCompany}`,
+                        count: item.count,
+                        material: item.material,
+                      }))}
+                    xField="count"
+                    yField="route"
+                    height={400}
+                    seriesField="material"
+                    label={{
+                      position: 'right',
+                      style: {
+                        fill: '#000',
+                        fontSize: 12,
+                      },
+                    }}
+                    legend={{
+                      position: 'top',
+                    }}
+                    tooltip={{
+                      formatter: (datum: any) => {
+                        return {
+                          name: datum.material,
+                          value: `${datum.count} 车次`,
+                        }
+                      },
+                    }}
+                    barStyle={{
+                      radius: [0, 4, 4, 0],
+                    }}
+                  />
+                ) : (
+                  <Empty description="暂无数据" />
+                )}
+              </Card>
+            </Col>
+            <Col xs={24} lg={12}>
+              <Card title="材料运输分布" size="small">
+                {trailerMatchedStats.length > 0 ? (
+                  <Pie
+                    data={(() => {
+                      const materialMap = new Map<string, number>()
+                      trailerMatchedStats.forEach(item => {
+                        const current = materialMap.get(item.material) || 0
+                        materialMap.set(item.material, current + item.count)
+                      })
+                      return Array.from(materialMap.entries()).map(([material, count]) => ({
+                        material,
+                        count,
+                      }))
+                    })()}
+                    angleField="count"
+                    colorField="material"
+                    height={400}
+                    radius={0.8}
+                    innerRadius={0.6}
+                    label={{
+                      type: 'outer',
+                      content: '{name} {percentage}',
+                    }}
+                    statistic={{
+                      title: {
+                        content: '总车次',
+                      },
+                      content: {
+                        content: trailerMatchedStats.reduce((sum, item) => sum + item.count, 0).toString(),
+                      },
+                    }}
+                    legend={{
+                      position: 'bottom',
+                    }}
+                    tooltip={{
+                      formatter: (datum: any) => {
+                        return {
+                          name: datum.material,
+                          value: `${datum.count} 车次`,
+                        }
+                      },
+                    }}
+                  />
+                ) : (
+                  <Empty description="暂无数据" />
+                )}
+              </Card>
+            </Col>
+          </Row>
 
           {/* 运输任务匹配分析表格 */}
           <Card title="运输任务匹配分析 (装料 -> 卸货) - 详细数据" size="small">
