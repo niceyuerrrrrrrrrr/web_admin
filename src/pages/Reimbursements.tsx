@@ -31,6 +31,7 @@ import {
   CloseCircleOutlined,
   CommentOutlined,
   DollarOutlined,
+  EyeOutlined,
   FileSearchOutlined,
   PlusOutlined,
   ReloadOutlined,
@@ -306,7 +307,7 @@ const ReimbursementsPage = () => {
         fixed: 'right',
         render: (_, record) => (
           <Space>
-            <Button type="link" icon={<FileSearchOutlined />} onClick={() => openDetail(record)}>
+            <Button type="link" icon={<EyeOutlined />} onClick={() => openDetail(record)}>
               详情
             </Button>
             {record.status === 'submitted' && record.user_id === (user as any)?.id && (
