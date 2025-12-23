@@ -790,7 +790,7 @@ const ReceiptAnalytics = () => {
                         fill: '#1890ff',
                         fontSize: 12,
                       },
-                      formatter: (datum: any) => `${datum.totalWeight.toFixed(2)}t`,
+                      formatter: (datum: any) => datum?.totalWeight ? `${datum.totalWeight.toFixed(2)}t` : '',
                     }}
                     xAxis={{
                       label: {
@@ -807,7 +807,7 @@ const ReceiptAnalytics = () => {
                       formatter: (datum: any) => {
                         return {
                           name: '总重量',
-                          value: `${datum.totalWeight.toFixed(2)}t (${datum.count}单)`,
+                          value: `${datum?.totalWeight?.toFixed(2) || 0}t (${datum?.count || 0}单)`,
                         }
                       },
                     }}
@@ -831,7 +831,7 @@ const ReceiptAnalytics = () => {
                         fill: '#52c41a',
                         fontSize: 12,
                       },
-                      formatter: (datum: any) => `${datum.totalWeight.toFixed(2)}t`,
+                      formatter: (datum: any) => datum?.totalWeight ? `${datum.totalWeight.toFixed(2)}t` : '',
                     }}
                     xAxis={{
                       label: {
@@ -848,7 +848,7 @@ const ReceiptAnalytics = () => {
                       formatter: (datum: any) => {
                         return {
                           name: '总重量',
-                          value: `${datum.totalWeight.toFixed(2)}t (${datum.count}单)`,
+                          value: `${datum?.totalWeight?.toFixed(2) || 0}t (${datum?.count || 0}单)`,
                         }
                       },
                     }}
@@ -1046,7 +1046,7 @@ const ReceiptAnalytics = () => {
                       formatter: (datum: any) => {
                         return {
                           name: datum.material,
-                          value: `${datum.count} 车次`,
+                          value: `${datum?.count || 0} 车次`,
                         }
                       },
                     }}
@@ -1180,13 +1180,13 @@ const ReceiptAnalytics = () => {
                         fill: '#000',
                         fontSize: 12,
                       },
-                      formatter: (datum: any) => `${datum.totalSettlementVolume.toFixed(2)}m³`,
+                      formatter: (datum: any) => datum?.totalSettlementVolume ? `${datum.totalSettlementVolume.toFixed(2)}m³` : '',
                     }}
                     tooltip={{
                       formatter: (datum: any) => {
                         return {
                           name: '结算方量',
-                          value: `${datum.totalSettlementVolume.toFixed(2)}m³ (${datum.count}车次)`,
+                          value: `${datum?.totalSettlementVolume?.toFixed(2) || 0}m³ (${datum?.count || 0}车次)`,
                         }
                       },
                     }}
@@ -1210,13 +1210,13 @@ const ReceiptAnalytics = () => {
                         fill: '#000',
                         fontSize: 12,
                       },
-                      formatter: (datum: any) => `${datum.totalSettlementVolume.toFixed(2)}m³`,
+                      formatter: (datum: any) => datum?.totalSettlementVolume ? `${datum.totalSettlementVolume.toFixed(2)}m³` : '',
                     }}
                     tooltip={{
                       formatter: (datum: any) => {
                         return {
                           name: '结算方量',
-                          value: `${datum.totalSettlementVolume.toFixed(2)}m³ (${datum.count}车次)`,
+                          value: `${datum?.totalSettlementVolume?.toFixed(2) || 0}m³ (${datum?.count || 0}车次)`,
                         }
                       },
                     }}
