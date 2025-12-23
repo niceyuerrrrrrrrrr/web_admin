@@ -380,8 +380,8 @@ const ReimbursementsPage = () => {
     value: item.amount,
   }))
 
-  const trendChartData = (stats?.monthly_trend || []).map((item) => ({
-    month: item.month,
+  const trendChartData = (stats?.daily_trend || []).map((item) => ({
+    date: item.date,
     amount: item.amount,
   }))
 
@@ -611,10 +611,16 @@ const ReimbursementsPage = () => {
                       {trendChartData.length > 0 ? (
                         <Line 
                           data={trendChartData} 
-                          xField="month" 
+                          xField="date" 
                           yField="amount" 
                           smooth 
                           point={{ size: 4 }}
+                          xAxis={{
+                            label: {
+                              autoRotate: true,
+                              autoHide: true,
+                            }
+                          }}
                           label={{
                             text: (d: any) => `¥${d.amount}`,
                             style: { fontWeight: 'bold' }

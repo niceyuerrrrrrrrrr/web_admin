@@ -320,7 +320,7 @@ export interface ReimbursementStats {
   >
   category_stats: Array<{ category: string; count: number; amount: number }>
   user_stats: Array<{ user_id: number; user_name: string; count: number; amount: number }>
-  monthly_trend: Array<{ month: string; count: number; amount: number }>
+  daily_trend: Array<{ date: string; count: number; amount: number }>
   time_range: {
     begin_date?: string
     end_date?: string
