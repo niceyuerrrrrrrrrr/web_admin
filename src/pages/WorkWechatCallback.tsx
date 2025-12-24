@@ -24,7 +24,7 @@ function WorkWechatCallback() {
       try {
         // 调用后端登录接口
         const response = await fetch(
-          `https://api.hodaruner.cn/api/v1/work-wechat-auth/login?code=${code}`
+          `/api/v1/work-wechat-auth/login?code=${code}`
         );
         const result = await response.json();
 

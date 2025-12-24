@@ -49,7 +49,7 @@ const LoginPage = () => {
       )
       
       const response = await fetch(
-        `https://api.hodaruner.cn/api/v1/work-wechat-auth/get-auth-url?redirect_uri=${redirectUri}`
+        `/api/v1/work-wechat-auth/get-auth-url?redirect_uri=${redirectUri}`
       )
       const result = await response.json()
       
