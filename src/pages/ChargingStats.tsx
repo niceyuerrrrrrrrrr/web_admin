@@ -313,40 +313,6 @@ const ChargingStats = () => {
                   xField="time"
                   yField="count"
                   height={350}
-                  smooth
-                  style={{
-                    fill: 'l(270) 0:#1890ff 0.5:#69c0ff 1:#e6f7ff',
-                  }}
-                  xAxis={{
-                    label: {
-                      autoRotate: false,
-                      autoHide: true,
-                      formatter: (text: string) => {
-                        // 只显示整点时间
-                        if (text.endsWith(':00')) {
-                          return text.substring(0, 2) + ':00'
-                        }
-                        return ''
-                      },
-                    },
-                    title: {
-                      text: '时间（24小时）',
-                    },
-                  }}
-                  yAxis={{
-                    title: {
-                      text: '正在充电的车辆数（辆）',
-                    },
-                    min: 0,
-                  }}
-                  tooltip={{
-                    formatter: (datum: any) => {
-                      return {
-                        name: '充电车辆数',
-                        value: `${datum?.count || 0} 辆`,
-                      }
-                    },
-                  }}
                 />
               </>
             ) : (

@@ -171,7 +171,7 @@ export interface MakeupQuotaUpdate {
 }
 
 export const listMakeupQuotas = (companyId?: number, search?: string) =>
-  unwrap(client.get<MakeupQuota[]>('/attendance/config/makeup-quotas', { 
+  unwrap(client.get<ApiResponse<MakeupQuota[]>>('/attendance/config/makeup-quotas', { 
     params: { 
       ...(companyId ? { company_id: companyId } : {}),
       ...(search ? { search } : {})

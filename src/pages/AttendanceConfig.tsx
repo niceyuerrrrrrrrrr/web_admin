@@ -109,7 +109,7 @@ const AttendanceConfigPage = () => {
   const [editingQuota, setEditingQuota] = useState<MakeupQuota | null>(null)
   const [quotaModalOpen, setQuotaModalOpen] = useState(false)
   const [quotaForm] = Form.useForm()
-  const currentCompanyId = useCompanyStore((s) => s.currentCompany?.id)
+  const currentCompanyId = useCompanyStore((s) => s.selectedCompanyId)
   const { user } = useAuthStore()
   
   // 检查是否有权限操作电子围栏（只有总经理和统计可以）
@@ -207,7 +207,7 @@ const AttendanceConfigPage = () => {
     setLoadingMakeupQuotas(true)
     try {
       const data = await listMakeupQuotas(currentCompanyId || undefined, makeupQuotaSearch || undefined)
-      setMakeupQuotas(data)
+      setMakeupQuotas(Array.isArray(data) ? data : [])
     } catch (err: any) {
       antdMessage.error(err.message || '获取补卡配额列表失败')
     } finally {
@@ -293,7 +293,7 @@ const AttendanceConfigPage = () => {
       const start = rosterStartDate.format('YYYY-MM-DD')
       const end = endDate.format('YYYY-MM-DD')
       const data = await listRosters({ start_date: start, end_date: end }, currentCompanyId || undefined)
-      setRosterData(data || [])
+      setRosterData(Array.isArray(data) ? data : [])
     } catch (err: any) {
       antdMessage.error(err.message || '获取排班失败')
     } finally {
@@ -343,7 +343,7 @@ const AttendanceConfigPage = () => {
           {
             user_id: userId,
             work_date: date,
-            shift_id: shiftId,
+            shift_id: shiftId || undefined,
             status: 'normal',
           },
         ],
