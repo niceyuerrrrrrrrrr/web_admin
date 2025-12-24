@@ -84,10 +84,18 @@ const LoginPage = () => {
         </Paragraph>
         <Form form={form} layout="vertical" onFinish={handleFinish}>
           <Form.Item label="手机号" name="phone" rules={[{ required: true, message: '请输入手机号' }]}>
-            <Input prefix={<UserOutlined />} placeholder="请输入手机号" />
+            <Input 
+              prefix={<UserOutlined />} 
+              placeholder="请输入手机号" 
+              autoComplete="username"
+            />
           </Form.Item>
           <Form.Item label="密码" name="password" rules={[{ required: true, message: '请输入密码' }]}>
-            <Input.Password prefix={<LockOutlined />} placeholder="登录密码" />
+            <Input.Password 
+              prefix={<LockOutlined />} 
+              placeholder="登录密码"
+              autoComplete="current-password"
+            />
           </Form.Item>
           <Button type="primary" htmlType="submit" block loading={loginMutation.isPending}>
             登录
