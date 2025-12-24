@@ -79,6 +79,7 @@ import useAuthStore from './store/auth'
 import useCompanyStore from './store/company'
 import CompanySelector from './components/CompanySelector'
 import LoginPage from './pages/Login'
+import WorkWechatCallback from './pages/WorkWechatCallback'
 import NotFoundPage from './pages/NotFound'
 import AttendanceConfigPage from './pages/AttendanceConfig'
 import DriverSalaryPage from './pages/DriverSalary'
@@ -610,6 +611,7 @@ function App() {
         <Route path="/statistics" element={<StatisticsPage />} />
       </Route>
       <Route path="/login" element={<LoginPage />} />
+      <Route path="/work-wechat-callback" element={<WorkWechatCallback />} />
       <Route path="*" element={<NotFoundPage />} />
     </Routes>
   )

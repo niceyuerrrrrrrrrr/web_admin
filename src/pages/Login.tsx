@@ -1,5 +1,5 @@
-import { App as AntdApp, Button, Card, Form, Input, Typography } from 'antd'
-import { LockOutlined, UserOutlined } from '@ant-design/icons'
+import { App as AntdApp, Button, Card, Form, Input, Typography, Divider } from 'antd'
+import { LockOutlined, UserOutlined, WechatOutlined } from '@ant-design/icons'
 import { useMutation } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 import { login } from '../api/services/auth'
@@ -42,6 +42,28 @@ const LoginPage = () => {
     })
   }
 
+  const handleWorkWechatLogin = async () => {
+    try {
+      const redirectUri = encodeURIComponent(
+        `${window.location.origin}/work-wechat-callback`
+      )
+      
+      const response = await fetch(
+        `https://api.hodaruner.cn/api/v1/work-wechat-auth/get-auth-url?redirect_uri=${redirectUri}`
+      )
+      const result = await response.json()
+      
+      if (result.success) {
+        window.location.href = result.data.auth_url
+      } else {
+        message.error('获取授权URL失败')
+      }
+    } catch (error) {
+      console.error('获取授权URL失败:', error)
+      message.error('网络错误，请重试')
+    }
+  }
+
   return (
     <div
       style={{
@@ -69,6 +91,21 @@ const LoginPage = () => {
           </Form.Item>
           <Button type="primary" htmlType="submit" block loading={loginMutation.isPending}>
             登录
+          </Button>
+          
+          <Divider plain style={{ margin: '16px 0' }}>或</Divider>
+          
+          <Button
+            type="default"
+            icon={<WechatOutlined style={{ color: '#07C160' }} />}
+            onClick={handleWorkWechatLogin}
+            block
+            style={{ 
+              borderColor: '#07C160',
+              color: '#07C160'
+            }}
+          >
+            企业微信登录
           </Button>
         </Form>
       </Card>

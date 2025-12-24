@@ -940,6 +940,7 @@ export interface LoginUserInfo {
   companyId?: number
   companyBusinessType?: string
   role?: string
+  mpBound?: boolean  // 服务号绑定状态
 }
 
 export interface LoginResponse {
