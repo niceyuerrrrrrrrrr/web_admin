@@ -26,6 +26,24 @@ function WorkWechatCallback() {
         const response = await fetch(
           `/api/v1/work-wechat-auth/login?code=${code}`
         );
+        
+        // 检查HTTP状态码
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error('HTTP错误:', response.status, errorText);
+          
+          // 尝试解析错误信息
+          try {
+            const errorJson = JSON.parse(errorText);
+            message.error(errorJson.detail || errorJson.message || `登录失败 (${response.status})`);
+          } catch {
+            message.error(`登录失败: ${response.status} ${response.statusText}`);
+          }
+          
+          navigate('/login');
+          return;
+        }
+        
         const result = await response.json();
 
         if (result.success) {
