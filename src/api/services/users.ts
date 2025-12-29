@@ -119,6 +119,21 @@ export const updateUser = (userId: number, data: Partial<User>) =>
   unwrap<{ user: User }>(client.patch(`/users/${userId}`, data))
 
 /**
+ * 创建用户
+ */
+export const createUser = (data: {
+  nickname: string
+  phone: string
+  username?: string
+  password?: string
+  position_type?: string
+  company_id?: number
+  department_id?: number
+  role?: string
+  status?: string
+}) => unwrap<{ user: User; message: string }>(client.post('/users', data))
+
+/**
  * 删除用户
  */
 export const deleteUser = (userId: number) => unwrap(client.delete(`/users/${userId}`))

@@ -62,8 +62,11 @@ import {
   type MakeupApplication,
 } from '../api/services/attendance'
 import { fetchUsers } from '../api/services/users'
+import { fetchDepartments, type Department } from '../api/services/departments'
 import useAuthStore from '../store/auth'
 import useCompanyStore from '../store/company'
+import ColumnSettings from '../components/ColumnSettings'
+import type { ColumnConfig } from '../components/ColumnSettings'
 
 const { Title, Paragraph } = Typography
 const { RangePicker } = DatePicker
@@ -86,6 +89,7 @@ const AttendancePage = () => {
   const effectiveCompanyId = isSuperAdmin ? selectedCompanyId : undefined
 
   const [activeTab, setActiveTab] = useState('history')
+  const [companyViewTab, setCompanyViewTab] = useState<'summary' | 'records'>('summary')
   const [selectedUserId, setSelectedUserId] = useState<number | 'all' | undefined>('all')
   const [summaryRange, setSummaryRange] = useState<'today' | 'week' | 'month' | 'year'>('month')
   
@@ -100,6 +104,20 @@ const AttendancePage = () => {
   const [editingFence, setEditingFence] = useState<AttendanceFence | null>(null)
   const [fenceForm] = Form.useForm()
   const [makeupStatusFilter, setMakeupStatusFilter] = useState<string>('pending')
+  
+  // 列配置状态
+  const [historyColumnConfig, setHistoryColumnConfig] = useState<ColumnConfig[]>([])
+  
+  // 选中行状态
+  const [selectedSummaryRows, setSelectedSummaryRows] = useState<any[]>([])
+  const [selectedShiftRows, setSelectedShiftRows] = useState<any[]>([])
+  
+  // 公司视图筛选条件
+  const [companyFilters, setCompanyFilters] = useState<{
+    departmentId?: number
+    startDate?: string
+    endDate?: string
+  }>({})
 
   // 获取用户列表
   const usersQuery = useQuery({
@@ -113,7 +131,15 @@ const AttendancePage = () => {
   const resolvedUserId = showCompanySummary ? (users[0]?.id || 1) : (selectedUserId || users[0]?.id || 1)
   const userQueriesEnabled = !showCompanySummary && !!resolvedUserId
 
-  // 获取打卡历史
+  // 获取部门列表
+  const departmentsQuery = useQuery({
+    queryKey: ['departments', effectiveCompanyId],
+    queryFn: () => fetchDepartments({ company_id: effectiveCompanyId }),
+    enabled: showCompanySummary,
+  })
+  const departments = departmentsQuery.data?.records || []
+
+  // 获取打卡历史（个人）
   const historyQuery = useQuery({
     queryKey: ['attendance', 'history', resolvedUserId, filters],
     queryFn: () =>
@@ -125,6 +151,21 @@ const AttendancePage = () => {
         pageSize: 100,
       }),
     enabled: userQueriesEnabled,
+  })
+
+  // 获取全员打卡历史
+  const allHistoryQuery = useQuery({
+    queryKey: ['attendance', 'all-history', effectiveCompanyId, companyFilters.startDate, companyFilters.endDate],
+    queryFn: () =>
+      fetchAttendanceHistory({
+        scope: 'all',
+        companyId: effectiveCompanyId,
+        startDate: companyFilters.startDate,
+        endDate: companyFilters.endDate,
+        page: 1,
+        pageSize: 500,
+      }),
+    enabled: showCompanySummary,
   })
 
   // 获取今日班次
@@ -172,18 +213,73 @@ const AttendancePage = () => {
   })
   const companySummary = companySummaryQuery.data
 
-  // 获取补卡申请
+  // 获取补卡申请（选择具体员工时按员工过滤，公司汇总时显示全部）
   const makeupQuery = useQuery({
-    queryKey: ['attendance', 'makeup', makeupStatusFilter],
-    queryFn: () => fetchMakeupApplications({ status: makeupStatusFilter as any }),
+    queryKey: ['attendance', 'makeup', makeupStatusFilter, showCompanySummary ? null : selectedUserId],
+    queryFn: () => fetchMakeupApplications({ 
+      status: makeupStatusFilter as any,
+      userId: showCompanySummary ? undefined : (selectedUserId as number),
+    }),
   })
 
   const records = historyQuery.data?.records || []
+  const allRecords = allHistoryQuery.data?.records || []
   const shifts = todayShiftsQuery.data?.shifts || []
   const statistics = statisticsQuery.data
   const alerts = alertsQuery.data?.alerts || []
   const fences = fencesQuery.data?.fences || []
   const makeupApplications = makeupQuery.data?.applications || []
+
+  // 将打卡记录按班次合并（按用户+日期分组）
+  const shiftRecords = useMemo(() => {
+    const groupedMap = new Map<string, any>()
+    
+    for (const record of allRecords) {
+      const r = record as any
+      const key = `${r.user_id}_${r.work_date}`
+      
+      if (!groupedMap.has(key)) {
+        groupedMap.set(key, {
+          key,
+          user_id: (record as any).user_id,
+          user_name: (record as any).user_name || '',
+          work_date: record.work_date,
+          check_in_time: null,
+          check_in_location: null,
+          check_outs: [] as Array<{ time: string; location: string }>,
+        })
+      }
+      
+      const shift = groupedMap.get(key)!
+      
+      if (record.clock_type === 'check_in') {
+        // 上班打卡（取最早的）
+        if (!shift.check_in_time || record.clock_time < shift.check_in_time) {
+          shift.check_in_time = record.clock_time
+          shift.check_in_location = record.location_text
+        }
+      } else if (record.clock_type === 'check_out') {
+        // 下班打卡（可能有多次）
+        shift.check_outs.push({
+          time: record.clock_time,
+          location: record.location_text || '',
+        })
+      }
+    }
+    
+    // 对每个班次的下班记录按时间排序
+    for (const shift of groupedMap.values()) {
+      shift.check_outs.sort((a: any, b: any) => a.time.localeCompare(b.time))
+    }
+    
+    // 转换为数组并按日期降序排序
+    return Array.from(groupedMap.values()).sort((a, b) => {
+      if (a.work_date !== b.work_date) {
+        return b.work_date.localeCompare(a.work_date)
+      }
+      return a.user_name.localeCompare(b.user_name)
+    })
+  }, [allRecords])
 
   const companySummaryColumns: ColumnsType<CompanyAttendanceSummary['list'][number]> = useMemo(
     () => [
@@ -221,6 +317,146 @@ const AttendancePage = () => {
     ],
     [],
   )
+
+  // 班次记录列定义（按班次合并后的数据）
+  const shiftRecordColumns: ColumnsType<any> = useMemo(
+    () => [
+      {
+        title: '用户ID',
+        dataIndex: 'user_id',
+        key: 'user_id',
+        width: 80,
+      },
+      {
+        title: '姓名',
+        dataIndex: 'user_name',
+        key: 'user_name',
+        width: 100,
+      },
+      {
+        title: '日期',
+        dataIndex: 'work_date',
+        key: 'work_date',
+        width: 120,
+        render: (value: string) => (value ? dayjs(value).format('YYYY-MM-DD') : '-'),
+      },
+      {
+        title: '上班打卡时间',
+        dataIndex: 'check_in_time',
+        key: 'check_in_time',
+        width: 180,
+        render: (value: string) => (value ? dayjs(value).format('YYYY-MM-DD HH:mm:ss') : '-'),
+      },
+      {
+        title: '上班打卡地点',
+        dataIndex: 'check_in_location',
+        key: 'check_in_location',
+        width: 200,
+        ellipsis: true,
+        render: (value: string) => value || '-',
+      },
+      {
+        title: '第一次下班时间',
+        key: 'check_out_1_time',
+        width: 180,
+        render: (_: any, record: any) => {
+          const checkOut = record.check_outs?.[0]
+          return checkOut ? dayjs(checkOut.time).format('YYYY-MM-DD HH:mm:ss') : '-'
+        },
+      },
+      {
+        title: '第一次下班地点',
+        key: 'check_out_1_location',
+        width: 200,
+        ellipsis: true,
+        render: (_: any, record: any) => {
+          const checkOut = record.check_outs?.[0]
+          return checkOut?.location || '-'
+        },
+      },
+      {
+        title: '第二次下班时间',
+        key: 'check_out_2_time',
+        width: 180,
+        render: (_: any, record: any) => {
+          const checkOut = record.check_outs?.[1]
+          return checkOut ? dayjs(checkOut.time).format('YYYY-MM-DD HH:mm:ss') : '-'
+        },
+      },
+      {
+        title: '第二次下班地点',
+        key: 'check_out_2_location',
+        width: 200,
+        ellipsis: true,
+        render: (_: any, record: any) => {
+          const checkOut = record.check_outs?.[1]
+          return checkOut?.location || '-'
+        },
+      },
+      {
+        title: '第三次下班时间',
+        key: 'check_out_3_time',
+        width: 180,
+        render: (_: any, record: any) => {
+          const checkOut = record.check_outs?.[2]
+          return checkOut ? dayjs(checkOut.time).format('YYYY-MM-DD HH:mm:ss') : '-'
+        },
+      },
+      {
+        title: '第三次下班地点',
+        key: 'check_out_3_location',
+        width: 200,
+        ellipsis: true,
+        render: (_: any, record: any) => {
+          const checkOut = record.check_outs?.[2]
+          return checkOut?.location || '-'
+        },
+      },
+    ],
+    [],
+  )
+
+  // 班次记录列配置
+  const [shiftColumnConfig, setShiftColumnConfig] = useState<ColumnConfig[]>([])
+  
+  const shiftColumnSettingsConfig = useMemo(() => {
+    return shiftRecordColumns.map((col) => ({
+      key: String((col as any).dataIndex || (col as any).key || col.title || ''),
+      title: String(col.title || ''),
+      visible: true,
+      fixed: col.fixed,
+    }))
+  }, [shiftRecordColumns])
+
+  const handleShiftColumnConfigChange = useCallback((config: ColumnConfig[]) => {
+    setShiftColumnConfig(config)
+  }, [])
+
+  const displayShiftColumns = useMemo(() => {
+    if (!shiftColumnConfig.length) return shiftRecordColumns
+
+    const orderedColumns: ColumnsType<any> = []
+    
+    for (const cfg of shiftColumnConfig) {
+      if (!cfg.visible) continue
+      const col = shiftRecordColumns.find((c) => {
+        const key = String((c as any).dataIndex || (c as any).key || c.title || '')
+        return key === cfg.key
+      })
+      if (col) {
+        orderedColumns.push(col)
+      }
+    }
+
+    for (const col of shiftRecordColumns) {
+      const key = String((col as any).dataIndex || (col as any).key || col.title || '')
+      if (!shiftColumnConfig.find((c) => c.key === key)) {
+        orderedColumns.push(col)
+      }
+    }
+
+    return orderedColumns
+  }, [shiftRecordColumns, shiftColumnConfig])
 
   // 解决告警
   const resolveAlertMutation = useMutation({
@@ -303,18 +539,47 @@ const AttendancePage = () => {
     setSelectedRecord(null)
   }
 
-  // 打卡历史列定义
-  const historyColumns: ColumnsType<AttendanceRecord> = useMemo(
+  // 打卡历史原始列定义（包含所有数据库字段）
+  const originalHistoryColumns: ColumnsType<AttendanceRecord> = useMemo(
     () => [
+      {
+        title: '用户ID',
+        dataIndex: 'user_id',
+        key: 'user_id',
+        width: 80,
+      },
+      {
+        title: '用户姓名',
+        dataIndex: 'user_name',
+        key: 'user_name',
+        width: 100,
+        render: (value: string) => value || '-',
+      },
+      {
+        title: '打卡记录ID',
+        dataIndex: 'attendance_id',
+        key: 'attendance_id',
+        width: 180,
+        render: (value: string) => value || '-',
+      },
+      {
+        title: '班次ID',
+        dataIndex: 'shift_id',
+        key: 'shift_id',
+        width: 150,
+        render: (value: string) => value || '-',
+      },
       {
         title: '日期',
         dataIndex: 'work_date',
+        key: 'work_date',
         width: 120,
         render: (value: string) => (value ? dayjs(value).format('YYYY-MM-DD') : '-'),
       },
       {
         title: '类型',
         dataIndex: 'clock_type',
+        key: 'clock_type',
         width: 100,
         render: (value: string) => (
           <Tag color={getClockTypeColor(value)}>{getClockTypeLabel(value)}</Tag>
@@ -323,16 +588,35 @@ const AttendancePage = () => {
       {
         title: '打卡时间',
         dataIndex: 'clock_time',
+        key: 'clock_time',
         width: 180,
         render: (value: string) => (value ? dayjs(value).format('YYYY-MM-DD HH:mm:ss') : '-'),
       },
       {
+        title: '经度',
+        dataIndex: 'longitude',
+        key: 'longitude',
+        width: 120,
+        render: (value: number) => (value ? value.toFixed(6) : '-'),
+      },
+      {
+        title: '纬度',
+        dataIndex: 'latitude',
+        key: 'latitude',
+        width: 120,
+        render: (value: number) => (value ? value.toFixed(6) : '-'),
+      },
+      {
         title: '位置',
         dataIndex: 'location_text',
+        key: 'location_text',
+        width: 250,
         ellipsis: true,
+        render: (value: string) => value || '-',
       },
       {
         title: '操作',
+        key: 'action',
         width: 100,
         fixed: 'right',
         render: (_, record) => (
@@ -344,6 +628,48 @@ const AttendancePage = () => {
     ],
     [openDetail],
   )
+
+  // 生成列配置
+  const historyColumnSettingsConfig = useMemo(() => {
+    return originalHistoryColumns.map((col) => ({
+      key: String((col as any).dataIndex || (col as any).key || col.title || ''),
+      title: String(col.title || ''),
+      visible: true,
+      fixed: col.fixed,
+    }))
+  }, [originalHistoryColumns])
+
+  // 列配置变更处理
+  const handleHistoryColumnConfigChange = useCallback((config: ColumnConfig[]) => {
+    setHistoryColumnConfig(config)
+  }, [])
+
+  // 应用列配置后的列
+  const historyColumns = useMemo(() => {
+    if (!historyColumnConfig.length) return originalHistoryColumns
+
+    const orderedColumns: ColumnsType<AttendanceRecord> = []
+    
+    for (const cfg of historyColumnConfig) {
+      if (!cfg.visible) continue
+      const col = originalHistoryColumns.find((c) => {
+        const key = String((c as any).dataIndex || (c as any).key || c.title || '')
+        return key === cfg.key
+      })
+      if (col) {
+        orderedColumns.push(col)
+      }
+    }
+
+    for (const col of originalHistoryColumns) {
+      const key = String((col as any).dataIndex || (col as any).key || col.title || '')
+      if (!historyColumnConfig.find((c) => c.key === key)) {
+        orderedColumns.push(col)
+      }
+    }
+
+    return orderedColumns
+  }, [originalHistoryColumns, historyColumnConfig])
 
   // 今日班次列定义
   const shiftsColumns: ColumnsType<AttendanceShift> = useMemo(
@@ -622,21 +948,89 @@ const AttendancePage = () => {
     [approveMakeupMutation],
   )
 
-  // 导出功能
+  // 导出功能（根据当前视图导出，优先导出选中的数据）
   const handleExport = useCallback(() => {
+    // 公司汇总视图
+    if (showCompanySummary) {
+      if (companyViewTab === 'summary') {
+        // 导出考勤汇总（优先导出选中的数据）
+        const dataToExport = selectedSummaryRows.length > 0 ? selectedSummaryRows : companySummary?.list
+        if (!dataToExport?.length) {
+          message.warning('没有数据可导出')
+          return
+        }
+        try {
+          const exportData = dataToExport.map((item: any) => ({
+            '姓名': item.name || '',
+            '出勤天数': item.attendedDays || 0,
+            '迟到天数': item.lateDays || 0,
+            '缺勤天数': item.missedDays || 0,
+            '状态': item.status || '',
+          }))
+          const ws = XLSX.utils.json_to_sheet(exportData)
+          const wb = XLSX.utils.book_new()
+          XLSX.utils.book_append_sheet(wb, ws, '考勤汇总')
+          const fileName = `考勤汇总_${dayjs().format('YYYY-MM-DD_HH-mm-ss')}.xlsx`
+          XLSX.writeFile(wb, fileName)
+          message.success(`导出成功，共 ${exportData.length} 条数据`)
+        } catch (error) {
+          message.error('导出失败：' + (error as Error).message)
+        }
+      } else {
+        // 导出考勤记录（优先导出选中的数据）
+        const dataToExport = selectedShiftRows.length > 0 ? selectedShiftRows : shiftRecords
+        if (!dataToExport.length) {
+          message.warning('没有数据可导出')
+          return
+        }
+        try {
+          const exportData = dataToExport.map((record: any) => {
+            const row: any = {
+              '用户ID': record.user_id || '',
+              '姓名': record.user_name || '',
+              '日期': record.work_date ? dayjs(record.work_date).format('YYYY-MM-DD') : '',
+              '上班打卡时间': record.check_in_time ? dayjs(record.check_in_time).format('YYYY-MM-DD HH:mm:ss') : '',
+              '上班打卡地点': record.check_in_location || '',
+            }
+            if (record.check_outs?.length > 0) {
+              record.check_outs.forEach((checkOut: any, index: number) => {
+                row[`第${index + 1}次下班时间`] = checkOut.time ? dayjs(checkOut.time).format('YYYY-MM-DD HH:mm:ss') : ''
+                row[`第${index + 1}次下班地点`] = checkOut.location || ''
+              })
+            }
+            return row
+          })
+          const ws = XLSX.utils.json_to_sheet(exportData)
+          const wb = XLSX.utils.book_new()
+          XLSX.utils.book_append_sheet(wb, ws, '考勤记录')
+          const fileName = `考勤记录_${dayjs().format('YYYY-MM-DD_HH-mm-ss')}.xlsx`
+          XLSX.writeFile(wb, fileName)
+          message.success(`导出成功，共 ${exportData.length} 条数据`)
+        } catch (error) {
+          message.error('导出失败：' + (error as Error).message)
+        }
+      }
+      return
+    }
+
+    // 个人视图 - 导出打卡记录
     if (records.length === 0) {
       message.warning('没有数据可导出')
       return
     }
 
     try {
-      const exportData = records.map((record) => ({
-        日期: record.work_date ? dayjs(record.work_date).format('YYYY-MM-DD') : '',
-        类型: getClockTypeLabel(record.clock_type),
-        打卡时间: record.clock_time ? dayjs(record.clock_time).format('YYYY-MM-DD HH:mm:ss') : '',
-        位置: record.location_text || '',
-        经度: record.longitude || 0,
-        纬度: record.latitude || 0,
+      const exportData = records.map((record: any) => ({
+        '用户ID': record.user_id || '',
+        '用户姓名': record.user_name || '',
+        '打卡记录ID': record.attendance_id || '',
+        '班次ID': record.shift_id || '',
+        '日期': record.work_date ? dayjs(record.work_date).format('YYYY-MM-DD') : '',
+        '类型': getClockTypeLabel(record.clock_type),
+        '打卡时间': record.clock_time ? dayjs(record.clock_time).format('YYYY-MM-DD HH:mm:ss') : '',
+        '经度': record.longitude || 0,
+        '纬度': record.latitude || 0,
+        '位置': record.location_text || '',
       }))
 
       const ws = XLSX.utils.json_to_sheet(exportData)
@@ -649,7 +1043,7 @@ const AttendancePage = () => {
     } catch (error) {
       message.error('导出失败：' + (error as Error).message)
     }
-  }, [records, message])
+  }, [records, message, showCompanySummary, companyViewTab, companySummary, shiftRecords, selectedSummaryRows, selectedShiftRows])
 
   return (
     <Space direction="vertical" size="large" style={{ width: '100%' }}>
@@ -698,59 +1092,152 @@ const AttendancePage = () => {
         </Space>
       </Flex>
 
-      {/* 公司汇总视图 */}
-      {showCompanySummary && companySummary && (
-        <Card
-          title="全员考勤汇总"
-          extra={
-            <Select
-              value={summaryRange}
-              onChange={setSummaryRange}
-              options={[
-                { value: 'today', label: '今日' },
-                { value: 'week', label: '本周' },
-                { value: 'month', label: '本月' },
-                { value: 'year', label: '本年' },
-              ]}
-              style={{ width: 120 }}
-            />
-          }
-        >
-          <Row gutter={16}>
-            <Col xs={24} sm={12} md={6}>
-              <Card bordered={false}>
-                <Statistic title="应到人数" value={companySummary.summary.should} loading={companySummaryQuery.isLoading} />
-              </Card>
-            </Col>
-            <Col xs={24} sm={12} md={6}>
-              <Card bordered={false}>
-                <Statistic title="实到人数" value={companySummary.summary.attended} loading={companySummaryQuery.isLoading} />
-              </Card>
-            </Col>
-            <Col xs={24} sm={12} md={6}>
-              <Card bordered={false}>
-                <Statistic title="迟到天数" value={companySummary.summary.late} loading={companySummaryQuery.isLoading} />
-              </Card>
-            </Col>
-            <Col xs={24} sm={12} md={6}>
-              <Card bordered={false}>
-                <Statistic
-                  title="出勤率"
-                  value={companySummary.summary.attendanceRate}
-                  suffix="%"
-                  precision={1}
-                  loading={companySummaryQuery.isLoading}
-                />
-              </Card>
-            </Col>
-          </Row>
-          <Table
-            style={{ marginTop: 24 }}
-            rowKey="userId"
-            columns={companySummaryColumns}
-            dataSource={companySummary.list}
-            loading={companySummaryQuery.isLoading}
-            pagination={false}
+      {/* 公司汇总视图 - 使用切换栏 */}
+      {showCompanySummary && (
+        <Card>
+          <Tabs
+            activeKey={companyViewTab}
+            onChange={(key) => setCompanyViewTab(key as 'summary' | 'records')}
+            items={[
+              {
+                key: 'summary',
+                label: '考勤汇总',
+                children: companySummary ? (
+                  <Space direction="vertical" size="large" style={{ width: '100%' }}>
+                    <Flex justify="space-between" align="center" wrap gap={16}>
+                      <Space wrap>
+                        <Select
+                          placeholder="选择部门"
+                          allowClear
+                          style={{ width: 150 }}
+                          value={companyFilters.departmentId}
+                          onChange={(value) => setCompanyFilters(prev => ({ ...prev, departmentId: value }))}
+                          options={departments.map((d: Department) => ({ value: d.id, label: d.title }))}
+                          loading={departmentsQuery.isLoading}
+                        />
+                        <Select
+                          value={summaryRange}
+                          onChange={setSummaryRange}
+                          options={[
+                            { value: 'today', label: '今日' },
+                            { value: 'week', label: '本周' },
+                            { value: 'month', label: '本月' },
+                            { value: 'year', label: '本年' },
+                          ]}
+                          style={{ width: 120 }}
+                        />
+                      </Space>
+                    </Flex>
+                    <Row gutter={16}>
+                      <Col xs={24} sm={12} md={6}>
+                        <Card bordered={false}>
+                          <Statistic title="应到人数" value={companySummary.summary.should} loading={companySummaryQuery.isLoading} />
+                        </Card>
+                      </Col>
+                      <Col xs={24} sm={12} md={6}>
+                        <Card bordered={false}>
+                          <Statistic title="实到人数" value={companySummary.summary.attended} loading={companySummaryQuery.isLoading} />
+                        </Card>
+                      </Col>
+                      <Col xs={24} sm={12} md={6}>
+                        <Card bordered={false}>
+                          <Statistic title="迟到天数" value={companySummary.summary.late} loading={companySummaryQuery.isLoading} />
+                        </Card>
+                      </Col>
+                      <Col xs={24} sm={12} md={6}>
+                        <Card bordered={false}>
+                          <Statistic
+                            title="出勤率"
+                            value={companySummary.summary.attendanceRate}
+                            suffix="%"
+                            precision={1}
+                            loading={companySummaryQuery.isLoading}
+                          />
+                        </Card>
+                      </Col>
+                    </Row>
+                    <Table
+                      rowKey="userId"
+                      columns={companySummaryColumns}
+                      dataSource={companySummary.list}
+                      loading={companySummaryQuery.isLoading}
+                      pagination={false}
+                      rowSelection={{
+                        type: 'checkbox',
+                        onChange: (_, selectedRows) => {
+                          setSelectedSummaryRows(selectedRows)
+                        },
+                      }}
+                    />
+                  </Space>
+                ) : (
+                  <Empty description="暂无数据" />
+                ),
+              },
+              {
+                key: 'records',
+                label: '考勤记录',
+                children: (
+                  <Space direction="vertical" size="large" style={{ width: '100%' }}>
+                    <Flex justify="space-between" align="center" wrap gap={16}>
+                      <Space wrap>
+                        <Select
+                          placeholder="选择部门"
+                          allowClear
+                          style={{ width: 150 }}
+                          value={companyFilters.departmentId}
+                          onChange={(value) => setCompanyFilters(prev => ({ ...prev, departmentId: value }))}
+                          options={departments.map((d: Department) => ({ value: d.id, label: d.title }))}
+                          loading={departmentsQuery.isLoading}
+                        />
+                        <RangePicker
+                          allowClear
+                          value={companyFilters.startDate && companyFilters.endDate ? [dayjs(companyFilters.startDate), dayjs(companyFilters.endDate)] : null}
+                          onChange={(dates) => {
+                            if (dates && dates[0] && dates[1]) {
+                              setCompanyFilters(prev => ({
+                                ...prev,
+                                startDate: dates[0]!.format('YYYY-MM-DD'),
+                                endDate: dates[1]!.format('YYYY-MM-DD'),
+                              }))
+                            } else {
+                              setCompanyFilters(prev => ({
+                                ...prev,
+                                startDate: undefined,
+                                endDate: undefined,
+                              }))
+                            }
+                          }}
+                        />
+                      </Space>
+                      <ColumnSettings
+                        storageKey="attendance-shift-records-columns"
+                        defaultColumns={shiftColumnSettingsConfig}
+                        onColumnsChange={handleShiftColumnConfigChange}
+                      />
+                    </Flex>
+                    <Table
+                      rowKey="key"
+                      columns={displayShiftColumns}
+                      dataSource={shiftRecords}
+                      loading={allHistoryQuery.isLoading}
+                      pagination={{
+                        pageSize: 20,
+                        showSizeChanger: true,
+                        showTotal: (total) => `共 ${total} 条班次记录`,
+                      }}
+                      scroll={{ x: 2000 }}
+                      rowSelection={{
+                        type: 'checkbox',
+                        onChange: (_, selectedRows) => {
+                          setSelectedShiftRows(selectedRows)
+                        },
+                      }}
+                    />
+                  </Space>
+                ),
+              },
+            ]}
           />
         </Card>
       )}
@@ -828,19 +1315,26 @@ const AttendancePage = () => {
                 label: '打卡记录',
                 children: (
                   <Space direction="vertical" size="large" style={{ width: '100%' }}>
-                    <Form layout="inline" onFinish={handleSearch} onReset={handleReset}>
-                      <Form.Item name="dateRange" label="日期范围">
-                        <RangePicker allowClear />
-                      </Form.Item>
-                      <Form.Item>
-                        <Space>
-                          <Button type="primary" htmlType="submit">
-                            查询
-                          </Button>
-                          <Button htmlType="reset">重置</Button>
-                        </Space>
-                      </Form.Item>
-                    </Form>
+                    <Flex justify="space-between" align="center" wrap gap={16}>
+                      <Form layout="inline" onFinish={handleSearch} onReset={handleReset} style={{ marginBottom: 0 }}>
+                        <Form.Item name="dateRange" label="日期范围" style={{ marginBottom: 0 }}>
+                          <RangePicker allowClear />
+                        </Form.Item>
+                        <Form.Item style={{ marginBottom: 0 }}>
+                          <Space>
+                            <Button type="primary" htmlType="submit">
+                              查询
+                            </Button>
+                            <Button htmlType="reset">重置</Button>
+                          </Space>
+                        </Form.Item>
+                      </Form>
+                      <ColumnSettings
+                        storageKey="attendance-history-columns"
+                        defaultColumns={historyColumnSettingsConfig}
+                        onColumnsChange={handleHistoryColumnConfigChange}
+                      />
+                    </Flex>
 
                     {historyQuery.error && (
                       <Alert
@@ -861,7 +1355,7 @@ const AttendancePage = () => {
                         showSizeChanger: true,
                         showTotal: (total) => `共 ${total} 条`,
                       }}
-                      scroll={{ x: 1000 }}
+                      scroll={{ x: 1500 }}
                     />
                   </Space>
                 ),

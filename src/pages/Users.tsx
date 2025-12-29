@@ -23,6 +23,7 @@ import {
   DeleteOutlined,
   EditOutlined,
   KeyOutlined,
+  PlusOutlined,
   ReloadOutlined,
   UserOutlined,
 } from '@ant-design/icons'
@@ -30,6 +31,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import dayjs from 'dayjs'
 import {
   batchOperateUsers,
+  createUser,
   deleteUser,
   fetchUserDetail,
   fetchUsers,
@@ -55,7 +57,7 @@ const POSITION_TYPES = [
 
 const UsersPage = () => {
   const queryClient = useQueryClient()
-  const { message } = AntdApp.useApp()
+  const { message, modal } = AntdApp.useApp()
   const { user } = useAuthStore()
   const { selectedCompanyId, setSelectedCompanyId } = useCompanyStore()
 
@@ -73,6 +75,8 @@ const UsersPage = () => {
   const [editDrawerOpen, setEditDrawerOpen] = useState(false)
   const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([])
   const [editForm] = Form.useForm()
+  const [createDrawerOpen, setCreateDrawerOpen] = useState(false)
+  const [createForm] = Form.useForm()
   const [batchDepartmentModalOpen, setBatchDepartmentModalOpen] = useState(false)
   const [selectedBatchDepartmentId, setSelectedBatchDepartmentId] = useState<number | undefined>()
 
@@ -191,6 +195,30 @@ const UsersPage = () => {
     },
   })
 
+  // 创建用户
+  const createUserMutation = useMutation({
+    mutationFn: (data: {
+      nickname: string
+      phone: string
+      username?: string
+      password?: string
+      position_type?: string
+      company_id?: number
+      department_id?: number
+      role?: string
+      status?: string
+    }) => createUser(data),
+    onSuccess: (data) => {
+      message.success(data.message || '用户创建成功')
+      setCreateDrawerOpen(false)
+      createForm.resetFields()
+      queryClient.invalidateQueries({ queryKey: ['users'] })
+    },
+    onError: (error) => {
+      message.error((error as Error).message || '创建失败')
+    },
+  })
+
   // 删除用户
   const deleteUserMutation = useMutation({
     mutationFn: (userId: number) => deleteUser(userId),
@@ -236,7 +264,7 @@ const UsersPage = () => {
       message.warning('请选择要删除的用户')
       return
     }
-    Modal.confirm({
+    modal.confirm({
       title: '确认删除',
       content: `确定要删除选中的 ${selectedRowKeys.length} 个用户吗？`,
       onOk: () => {
@@ -557,51 +585,57 @@ const UsersPage = () => {
       },
       {
         title: '操作',
-        width: 200,
+        width: 140,
         fixed: 'right',
         render: (_, record) => (
-          <Space>
-            <Button type="link" icon={<UserOutlined />} onClick={() => openDetail(record)}>
-              详情
-            </Button>
-            <Button type="link" icon={<EditOutlined />} onClick={() => openEdit(record)}>
-              编辑
-            </Button>
-            <Button
-              type="link"
-              icon={<KeyOutlined />}
-              onClick={() => {
-                Modal.confirm({
-                  title: '确认重置密码',
-                  content: '确定要将该用户密码重置为默认密码（123456）吗？',
-                  onOk: () => resetPasswordMutation.mutate(record.id),
-                })
-              }}
-              loading={resetPasswordMutation.isPending}
-            >
-              重置密码
-            </Button>
-            <Button
-              type="link"
-              danger
-              icon={<DeleteOutlined />}
-              onClick={() => {
-                Modal.confirm({
-                  title: '确认删除',
-                  content: '确定要删除该用户吗？',
-                  onOk: () => deleteUserMutation.mutate(record.id),
-                })
-              }}
-              loading={deleteUserMutation.isPending}
-            >
-              删除
-            </Button>
+          <Space direction="vertical" size={0} style={{ width: '100%' }}>
+            <Space size={0}>
+              <Button type="link" size="small" icon={<UserOutlined />} onClick={() => openDetail(record)}>
+                详情
+              </Button>
+              <Button type="link" size="small" icon={<EditOutlined />} onClick={() => openEdit(record)}>
+                编辑
+              </Button>
+            </Space>
+            <Space size={0}>
+              <Button
+                type="link"
+                size="small"
+                icon={<KeyOutlined />}
+                onClick={() => {
+                  modal.confirm({
+                    title: '确认重置密码',
+                    content: '确定要将该用户密码重置为默认密码（123456）吗？',
+                    onOk: () => resetPasswordMutation.mutate(record.id),
+                  })
+                }}
+                loading={resetPasswordMutation.isPending}
+              >
+                重置
+              </Button>
+              <Button
+                type="link"
+                size="small"
+                danger
+                icon={<DeleteOutlined />}
+                onClick={() => {
+                  modal.confirm({
+                    title: '确认删除',
+                    content: '确定要删除该用户吗？',
+                    onOk: () => deleteUserMutation.mutate(record.id),
+                  })
+                }}
+                loading={deleteUserMutation.isPending}
+              >
+                删除
+              </Button>
+            </Space>
           </Space>
         ),
       },
     ]
     },
-    [currentCompanyBusinessType, openDetail, openEdit, resetPasswordMutation, deleteUserMutation],
+    [currentCompanyBusinessType, openDetail, openEdit, resetPasswordMutation, deleteUserMutation, modal],
   )
 
   const handleEditSubmit = () => {
@@ -666,6 +700,13 @@ const UsersPage = () => {
             onClick={() => queryClient.invalidateQueries({ queryKey: ['users'] })}
           >
             刷新
+          </Button>
+          <Button
+            type="primary"
+            icon={<PlusOutlined />}
+            onClick={() => setCreateDrawerOpen(true)}
+          >
+            新增用户
           </Button>
           {selectedRowKeys.length > 0 && (
             <>
@@ -1172,6 +1213,101 @@ const UsersPage = () => {
           />
         </div>
       </Modal>
+
+      {/* 新增用户Drawer */}
+      <Drawer
+        title="新增用户"
+        width={500}
+        open={createDrawerOpen}
+        onClose={() => {
+          setCreateDrawerOpen(false)
+          createForm.resetFields()
+        }}
+        extra={
+          <Space>
+            <Button onClick={() => {
+              setCreateDrawerOpen(false)
+              createForm.resetFields()
+            }}>
+              取消
+            </Button>
+            <Button
+              type="primary"
+              loading={createUserMutation.isPending}
+              onClick={() => {
+                createForm.validateFields().then((values) => {
+                  createUserMutation.mutate({
+                    ...values,
+                    company_id: isSuperAdmin ? selectedCompanyId : undefined,
+                  })
+                })
+              }}
+            >
+              创建
+            </Button>
+          </Space>
+        }
+      >
+        <Form form={createForm} layout="vertical">
+          <Form.Item
+            name="nickname"
+            label="姓名"
+            rules={[{ required: true, message: '请输入姓名' }]}
+          >
+            <Input placeholder="请输入姓名" />
+          </Form.Item>
+          <Form.Item
+            name="phone"
+            label="手机号"
+            rules={[
+              { required: true, message: '请输入手机号' },
+              { pattern: /^1\d{10}$/, message: '请输入正确的手机号' },
+            ]}
+          >
+            <Input placeholder="请输入手机号" />
+          </Form.Item>
+          <Form.Item name="username" label="用户名">
+            <Input placeholder="留空则自动生成" />
+          </Form.Item>
+          <Form.Item name="password" label="密码" initialValue="123456">
+            <Input.Password placeholder="默认密码：123456" />
+          </Form.Item>
+          <Form.Item name="position_type" label="职位类型">
+            <Select
+              placeholder="请选择职位类型"
+              allowClear
+              options={POSITION_TYPES}
+            />
+          </Form.Item>
+          <Form.Item name="department_id" label="部门">
+            <Select
+              placeholder="请选择部门"
+              allowClear
+              loading={departmentsQuery.isLoading}
+              options={departmentsQuery.data?.records.map((dept) => ({
+                value: dept.id,
+                label: dept.title,
+              }))}
+            />
+          </Form.Item>
+          <Form.Item name="role" label="角色" initialValue="user">
+            <Select
+              options={[
+                { value: 'user', label: '普通用户' },
+                { value: 'admin', label: '管理员' },
+              ]}
+            />
+          </Form.Item>
+          <Form.Item name="status" label="状态" initialValue="active">
+            <Select
+              options={[
+                { value: 'active', label: '启用' },
+                { value: 'inactive', label: '禁用' },
+              ]}
+            />
+          </Form.Item>
+        </Form>
+      </Drawer>
     </Space>
   )
 }

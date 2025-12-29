@@ -106,11 +106,13 @@ export interface MakeupApplication {
  * 获取打卡历史
  */
 export const fetchAttendanceHistory = (params: {
-  userId: number
+  userId?: number
   startDate?: string
   endDate?: string
   page?: number
   pageSize?: number
+  scope?: 'mine' | 'all'
+  companyId?: number
 }) =>
   unwrap<{
     records: AttendanceRecord[]
@@ -125,6 +127,8 @@ export const fetchAttendanceHistory = (params: {
         end_date: params.endDate,
         page: params.page || 1,
         page_size: params.pageSize || 10,
+        scope: params.scope || 'mine',
+        company_id: params.companyId,
       },
     }),
   )

@@ -54,6 +54,8 @@ import type { Receipt, ReceiptType } from '../api/types'
 import useAuthStore from '../store/auth'
 import useCompanyStore from '../store/company'
 import client from '../api/client'
+import ColumnSettings from '../components/ColumnSettings'
+import { useColumnSettings } from '../hooks/useColumnSettings'
 
 const { Title, Paragraph } = Typography
 const { RangePicker } = DatePicker
@@ -645,6 +647,29 @@ const ReceiptsPage = () => {
         render: (value: string) => (value ? dayjs(value).format('YYYY-MM-DD HH:mm') : '-'),
       },
       {
+        title: '装料单图片',
+        dataIndex: 'thumb_url',
+        key: 'thumb_url',
+        width: 100,
+        render: (value: string) => {
+          if (!value || value.startsWith('wxfile://') || value.startsWith('file://')) {
+            return '-'
+          }
+          return (
+            <Image
+              src={value}
+              width={60}
+              height={60}
+              style={{ objectFit: 'cover', borderRadius: 4 }}
+              fallback="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAMIAAADDCAYAAADQvc6UAAABRWlDQ1BJQ0MgUHJvZmlsZQAAKJFjYGASSSwoyGFhYGDIzSspCnJ3UoiIjFJgf8LAwSDCIMogwMCcmFxc4BgQ4ANUwgCjUcG3awyMIPqyLsis7PPOq3QdDFcvjV3jOD1boQVTPQrgSkktTgbSf4A4LbmgqISBgTEFyFYuLykAsTuAbJEioKOA7DkgdjqEvQHEToKwj4DVhAQ5A9k3gGyB5IxEoBmML4BsnSQk8XQkNtReEOBxcfXxUQg1Mjc0dyHgXNJBSWpFCYh2zi+oLMpMzyhRcASGUqqCZ16yno6CkYGRAQMDKMwhqj/fAIcloxgHQqxAjIHBEugw5sUIsSQpBobtQPdLciLEVJYzMPBHMDBsayhILEqEO4DxG0txmrERhM29nYGBddr//5/DGRjYNRkY/l7////39v///y4Dmn+LgesAMT8BhpYAAAGdaVRYdFhNTDpjb20uYWRvYmUueG1wAAAAAAA8eDp4bXBtZXRhIHhtbG5zOng9ImFkb2JlOm5zOm1ldGEvIiB4OnhtcHRrPSJYTVAgQ29yZSA1LjQuMCI+CiAgIDxyZGY6UkRGIHhtbG5zOnJkZj0iaHR0cDovL3d3dy53My5vcmcvMTk5OS8wMi8yMi1yZGYtc3ludGF4LW5zIyI+CiAgICAgIDxyZGY6RGVzY3JpcHRpb24gcmRmOmFib3V0PSIiCiAgICAgICAgICAgIHhtbG5zOmV4aWY9Imh0dHA6Ly9ucy5hZG9iZS5jb20vZXhpZi8xLjAvIj4KICAgICAgICAgPGV4aWY6UGl4ZWxYRGltZW5zaW9uPjE5NDwvZXhpZjpQaXhlbFhEaW1lbnNpb24+CiAgICAgICAgIDxleGlmOlBpeGVsWURpbWVuc2lvbj4xOTU8L2V4aWY6UGl4ZWxZRGltZW5zaW9uPgogICAgICA8L3JkZjpEZXNjcmlwdGlvbj4KICAgPC9yZGY6UkRGPgo8L3g6eG1wbWV0YT4K"
+              preview={{
+                mask: '查看',
+              }}
+            />
+          )
+        },
+      },
+      {
         title: '操作',
         width: 80,
         fixed: 'right',
@@ -739,6 +764,29 @@ const ReceiptsPage = () => {
         render: (value: string) => (value ? dayjs(value).format('YYYY-MM-DD HH:mm') : '-'),
       },
       {
+        title: '卸货单图片',
+        dataIndex: 'thumb_url',
+        key: 'thumb_url',
+        width: 100,
+        render: (value: string) => {
+          if (!value || value.startsWith('wxfile://') || value.startsWith('file://')) {
+            return '-'
+          }
+          return (
+            <Image
+              src={value}
+              width={60}
+              height={60}
+              style={{ objectFit: 'cover', borderRadius: 4 }}
+              fallback="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAMIAAADDCAYAAADQvc6UAAABRWlDQ1BJQ0MgUHJvZmlsZQAAKJFjYGASSSwoyGFhYGDIzSspCnJ3UoiIjFJgf8LAwSDCIMogwMCcmFxc4BgQ4ANUwgCjUcG3awyMIPqyLsis7PPOq3QdDFcvjV3jOD1boQVTPQrgSkktTgbSf4A4LbmgqISBgTEFyFYuLykAsTuAbJEioKOA7DkgdjqEvQHEToKwj4DVhAQ5A9k3gGyB5IxEoBmML4BsnSQk8XQkNtReEOBxcfXxUQg1Mjc0dyHgXNJBSWpFCYh2zi+oLMpMzyhRcASGUqqCZ16yno6CkYGRAQMDKMwhqj/fAIcloxgHQqxAjIHBEugw5sUIsSQpBobtQPdLciLEVJYzMPBHMDBsayhILEqEO4DxG0txmrERhM29nYGBddr//5/DGRjYNRkY/l7////39v///y4Dmn+LgesAMT8BhpYAAAGdaVRYdFhNTDpjb20uYWRvYmUueG1wAAAAAAA8eDp4bXBtZXRhIHhtbG5zOng9ImFkb2JlOm5zOm1ldGEvIiB4OnhtcHRrPSJYTVAgQ29yZSA1LjQuMCI+CiAgIDxyZGY6UkRGIHhtbG5zOnJkZj0iaHR0cDovL3d3dy53My5vcmcvMTk5OS8wMi8yMi1yZGYtc3ludGF4LW5zIyI+CiAgICAgIDxyZGY6RGVzY3JpcHRpb24gcmRmOmFib3V0PSIiCiAgICAgICAgICAgIHhtbG5zOmV4aWY9Imh0dHA6Ly9ucy5hZG9iZS5jb20vZXhpZi8xLjAvIj4KICAgICAgICAgPGV4aWY6UGl4ZWxYRGltZW5zaW9uPjE5NDwvZXhpZjpQaXhlbFhEaW1lbnNpb24+CiAgICAgICAgIDxleGlmOlBpeGVsWURpbWVuc2lvbj4xOTU8L2V4aWY6UGl4ZWxZRGltZW5zaW9uPgogICAgICA8L3JkZjpEZXNjcmlwdGlvbj4KICAgPC9yZGY6UkRGPgo8L3g6eG1wbWV0YT4K"
+              preview={{
+                mask: '查看',
+              }}
+            />
+          )
+        },
+      },
+      {
         title: '操作',
         width: 80,
         fixed: 'right',
@@ -830,6 +878,29 @@ const ReceiptsPage = () => {
         dataIndex: 'created_at',
         width: 150,
         render: (value: string) => (value ? dayjs(value).format('YYYY-MM-DD HH:mm') : '-'),
+      },
+      {
+        title: '充电单图片',
+        dataIndex: 'thumb_url',
+        key: 'thumb_url',
+        width: 100,
+        render: (value: string) => {
+          if (!value || value.startsWith('wxfile://') || value.startsWith('file://')) {
+            return '-'
+          }
+          return (
+            <Image
+              src={value}
+              width={60}
+              height={60}
+              style={{ objectFit: 'cover', borderRadius: 4 }}
+              fallback="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="
+              preview={{
+                mask: '查看',
+              }}
+            />
+          )
+        },
       },
       {
         title: '操作',
@@ -1037,6 +1108,52 @@ const ReceiptsPage = () => {
         render: (value: string) => (value ? dayjs(value).format('YYYY-MM-DD HH:mm') : '-'),
       },
       {
+        title: '装料单图片',
+        dataIndex: ['loadBill', 'thumb_url'],
+        key: 'loadBill_thumb_url',
+        width: 100,
+        render: (value: string) => {
+          if (!value || value.startsWith('wxfile://') || value.startsWith('file://')) {
+            return '-'
+          }
+          return (
+            <Image
+              src={value}
+              width={60}
+              height={60}
+              style={{ objectFit: 'cover', borderRadius: 4 }}
+              fallback="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="
+              preview={{
+                mask: '查看',
+              }}
+            />
+          )
+        },
+      },
+      {
+        title: '卸货单图片',
+        dataIndex: ['unloadBill', 'thumb_url'],
+        key: 'unloadBill_thumb_url',
+        width: 100,
+        render: (value: string) => {
+          if (!value || value.startsWith('wxfile://') || value.startsWith('file://')) {
+            return '-'
+          }
+          return (
+            <Image
+              src={value}
+              width={60}
+              height={60}
+              style={{ objectFit: 'cover', borderRadius: 4 }}
+              fallback="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="
+              preview={{
+                mask: '查看',
+              }}
+            />
+          )
+        },
+      },
+      {
         title: '操作',
         width: 150,
         fixed: 'right',
@@ -1197,7 +1314,11 @@ const ReceiptsPage = () => {
     [renderActions],
   )
 
-  const getColumns = (type: ReceiptType | 'matched'): ColumnsType<Receipt | any> => {
+  // 列配置状态
+  const [columnConfig, setColumnConfig] = useState<import('../components/ColumnSettings').ColumnConfig[]>([])
+
+  // 获取当前 Tab 的原始列定义
+  const getCurrentColumns = useCallback((type: ReceiptType | 'matched'): ColumnsType<Receipt | any> => {
     switch (type) {
       case 'loading':
         return loadingColumns
@@ -1214,7 +1335,53 @@ const ReceiptsPage = () => {
       default:
         return loadingColumns
     }
-  }
+  }, [loadingColumns, unloadingColumns, chargingColumns, waterColumns, departureColumns, matchedColumns])
+
+  // 生成列配置（用于 ColumnSettings 组件）
+  const columnSettingsConfig = useMemo(() => {
+    const cols = getCurrentColumns(activeTab)
+    return cols.map((col) => ({
+      key: String((col as any).dataIndex || (col as any).key || col.title || ''),
+      title: String(col.title || ''),
+      visible: true,
+      fixed: col.fixed,
+    }))
+  }, [activeTab, getCurrentColumns])
+
+  // 列配置变更处理
+  const handleColumnConfigChange = useCallback((config: import('../components/ColumnSettings').ColumnConfig[]) => {
+    setColumnConfig(config)
+  }, [])
+
+  // 应用列配置后的列
+  const getColumns = useCallback((type: ReceiptType | 'matched'): ColumnsType<Receipt | any> => {
+    const originalColumns = getCurrentColumns(type)
+    if (!columnConfig.length) return originalColumns
+
+    // 按配置顺序排序，并过滤不可见的列
+    const orderedColumns: ColumnsType<Receipt | any> = []
+    
+    for (const cfg of columnConfig) {
+      if (!cfg.visible) continue
+      const col = originalColumns.find((c) => {
+        const key = String((c as any).dataIndex || (c as any).key || c.title || '')
+        return key === cfg.key
+      })
+      if (col) {
+        orderedColumns.push(col)
+      }
+    }
+
+    // 添加配置中没有的新列
+    for (const col of originalColumns) {
+      const key = String((col as any).dataIndex || (col as any).key || col.title || '')
+      if (!columnConfig.find((c) => c.key === key)) {
+        orderedColumns.push(col)
+      }
+    }
+
+    return orderedColumns
+  }, [getCurrentColumns, columnConfig])
 
   const renderDetail = () => {
     if (!selectedReceipt) return null
@@ -1923,6 +2090,11 @@ const ReceiptsPage = () => {
           <Button icon={<ReloadOutlined />} onClick={() => queryClient.invalidateQueries({ queryKey: ['receipts'] })}>
             刷新
           </Button>
+          <ColumnSettings
+            storageKey={`receipts-columns-${activeTab}`}
+            defaultColumns={columnSettingsConfig}
+            onColumnsChange={handleColumnConfigChange}
+          />
           {canEditDelete && (
             <>
               {selectedRowKeys.length > 0 && activeTab !== 'matched' && (

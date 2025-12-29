@@ -789,7 +789,9 @@ const HRPage = () => {
         destroyOnClose
       >
         {detailQuery.isLoading ? (
-          <p>加载中...</p>
+          <Spin tip="加载中..." />
+        ) : detailQuery.isError ? (
+          <Alert type="error" message="加载失败" description={(detailQuery.error as Error)?.message || '未知错误'} />
         ) : detailQuery.data ? (
           <Space direction="vertical" style={{ width: '100%' }} size="large">
             <Descriptions column={2} bordered size="small">

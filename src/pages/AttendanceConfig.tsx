@@ -57,6 +57,7 @@ import {
   type MakeupQuota,
 } from '../api/services/attendanceConfig'
 import { fetchUsers, type User } from '../api/services/users'
+import { fetchRoles, type Role } from '../api/services/roles'
 import useCompanyStore from '../store/company'
 import useAuthStore from '../store/auth'
 import MapPicker from '../components/MapPicker'
@@ -109,6 +110,11 @@ const AttendanceConfigPage = () => {
   const [editingQuota, setEditingQuota] = useState<MakeupQuota | null>(null)
   const [quotaModalOpen, setQuotaModalOpen] = useState(false)
   const [quotaForm] = Form.useForm()
+  
+  // 角色列表
+  const [roleOptions, setRoleOptions] = useState<{ label: string; value: string }[]>([])
+  const [loadingRoles, setLoadingRoles] = useState(false)
+  
   const currentCompanyId = useCompanyStore((s) => s.selectedCompanyId)
   const { user } = useAuthStore()
   
@@ -173,6 +179,19 @@ const AttendanceConfigPage = () => {
     console.warn('fetchRoster已废弃，请使用fetchRosterMatrix')
   }
 
+  // 获取角色列表
+  const fetchRoleOptions = async () => {
+    setLoadingRoles(true)
+    try {
+      const data = await fetchRoles({ size: 100 })
+      setRoleOptions(data.items.map((r: Role) => ({ label: r.title || r.name, value: r.name })))
+    } catch (err: any) {
+      console.error('获取角色列表失败:', err)
+    } finally {
+      setLoadingRoles(false)
+    }
+  }
+
   useEffect(() => {
     fetchShifts()
     fetchPolicy()
@@ -180,6 +199,7 @@ const AttendanceConfigPage = () => {
     fetchFenceList()
     fetchUserOptions()
     fetchMakeupQuotas()
+    fetchRoleOptions()
   }, [currentCompanyId])
 
   useEffect(() => {
@@ -1285,7 +1305,13 @@ const AttendanceConfigPage = () => {
             <InputNumber min={0} max={120} className="w-full" />
           </Form.Item>
           <Form.Item label="角色(多选)" name="roles">
-            <Select mode="tags" placeholder="输入角色名称后回车" />
+            <Select 
+              mode="multiple" 
+              placeholder="选择角色" 
+              options={roleOptions}
+              loading={loadingRoles}
+              allowClear
+            />
           </Form.Item>
           <Form.Item label="启用" name="is_active" valuePropName="checked">
             <Switch defaultChecked />
@@ -1382,7 +1408,13 @@ const AttendanceConfigPage = () => {
             <InputNumber min={10} max={2000} className="w-full" />
           </Form.Item>
           <Form.Item label="角色(多选)" name="allowed_roles">
-            <Select mode="tags" placeholder="输入角色后回车" />
+            <Select 
+              mode="multiple" 
+              placeholder="选择角色" 
+              options={roleOptions}
+              loading={loadingRoles}
+              allowClear
+            />
           </Form.Item>
           <Form.Item label="位置类型" name="location_type">
             <Select

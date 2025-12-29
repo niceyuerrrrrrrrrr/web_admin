@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import {
   App as AntdApp,
   Button,
@@ -6,21 +6,25 @@ import {
   DatePicker,
   Descriptions,
   Drawer,
+  Flex,
   Form,
+  Image,
   Input,
   InputNumber,
   Space,
   Table,
-  Typography,
 } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import dayjs from 'dayjs'
-import { EditOutlined, EyeOutlined } from '@ant-design/icons'
+import { DownloadOutlined, EditOutlined, EyeOutlined } from '@ant-design/icons'
+import * as XLSX from 'xlsx'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { fetchReceipts, updateChargingReceipt } from '../api/services/receipts'
 import type { Receipt } from '../api/types'
 import useAuthStore from '../store/auth'
 import useCompanyStore from '../store/company'
+import ColumnSettings from '../components/ColumnSettings'
+import type { ColumnConfig } from '../components/ColumnSettings'
 
 const { RangePicker } = DatePicker
 
@@ -58,6 +62,34 @@ const ChargingList = () => {
   })
 
   const receipts = receiptsQuery.data || []
+
+  const handleExport = useCallback(() => {
+    if (!receipts.length) {
+      message.warning('没有数据可导出')
+      return
+    }
+
+    const exportData = receipts.map((r: any) => ({
+      '单据编号': r.receipt_number || '',
+      '车牌号': r.vehicle_no || '',
+      '充电站': r.charging_station || '',
+      '充电桩': r.charging_pile || '',
+      '电量(kWh)': r.energy_kwh || 0,
+      '金额(元)': r.amount || 0,
+      '开始充电时间': r.start_time ? dayjs(r.start_time).format('YYYY-MM-DD HH:mm') : '',
+      '结束充电时间': r.end_time ? dayjs(r.end_time).format('YYYY-MM-DD HH:mm') : '',
+      '充电时长(分钟)': r.duration_min || '',
+      '创建时间': r.created_at ? dayjs(r.created_at).format('YYYY-MM-DD HH:mm') : '',
+    }))
+
+    const ws = XLSX.utils.json_to_sheet(exportData)
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, ws, '充电单数据')
+
+    const fileName = `充电单数据_${dayjs().format('YYYY-MM-DD_HH-mm-ss')}.xlsx`
+    XLSX.writeFile(wb, fileName)
+    message.success('导出成功')
+  }, [receipts, message])
 
   const updateMutation = useMutation({
     mutationFn: ({ id, data }: { id: number; data: any }) => updateChargingReceipt(id, data),
@@ -107,18 +139,45 @@ const ChargingList = () => {
     })
   }
 
-  const columns: ColumnsType<Receipt> = useMemo(() => [
-      { title: '单据编号', dataIndex: 'receipt_number', width: 150 },
-      { title: '车牌号', dataIndex: 'vehicle_no', width: 120 },
-      { title: '充电站', dataIndex: 'charging_station', width: 150 },
-      { title: '充电桩', dataIndex: 'charging_pile', width: 120 },
-      { title: '电量(kWh)', dataIndex: 'energy_kwh', width: 120, render: (v) => v?.toFixed(2) || '-' },
-      { title: '金额(元)', dataIndex: 'amount', width: 120, render: (v) => v?.toFixed(2) || '-' },
-      { title: '开始充电时间', dataIndex: 'start_time', width: 180, render: (v: string) => v ? dayjs(v).format('YYYY-MM-DD HH:mm') : '-' },
-      { title: '结束充电时间', dataIndex: 'end_time', width: 180, render: (v: string) => v ? dayjs(v).format('YYYY-MM-DD HH:mm') : '-' },
-      { title: '充电时长(分钟)', dataIndex: 'duration_min', width: 120, render: (v) => v || '-' },
+  // 列配置状态
+  const [columnConfig, setColumnConfig] = useState<ColumnConfig[]>([])
+
+  const originalColumns: ColumnsType<Receipt> = useMemo(() => [
+      { title: '单据编号', dataIndex: 'receipt_number', key: 'receipt_number', width: 150 },
+      { title: '车牌号', dataIndex: 'vehicle_no', key: 'vehicle_no', width: 120 },
+      { title: '充电站', dataIndex: 'charging_station', key: 'charging_station', width: 150 },
+      { title: '充电桩', dataIndex: 'charging_pile', key: 'charging_pile', width: 120 },
+      { title: '电量(kWh)', dataIndex: 'energy_kwh', key: 'energy_kwh', width: 120, render: (v) => v?.toFixed(2) || '-' },
+      { title: '金额(元)', dataIndex: 'amount', key: 'amount', width: 120, render: (v) => v?.toFixed(2) || '-' },
+      { title: '开始充电时间', dataIndex: 'start_time', key: 'start_time', width: 180, render: (v: string) => v ? dayjs(v).format('YYYY-MM-DD HH:mm') : '-' },
+      { title: '结束充电时间', dataIndex: 'end_time', key: 'end_time', width: 180, render: (v: string) => v ? dayjs(v).format('YYYY-MM-DD HH:mm') : '-' },
+      { title: '充电时长(分钟)', dataIndex: 'duration_min', key: 'duration_min', width: 120, render: (v) => v || '-' },
+      {
+        title: '充电单图片',
+        dataIndex: 'thumb_url',
+        key: 'thumb_url',
+        width: 100,
+        render: (value: string) => {
+          if (!value || value.startsWith('wxfile://') || value.startsWith('file://')) {
+            return '-'
+          }
+          return (
+            <Image
+              src={value}
+              width={60}
+              height={60}
+              style={{ objectFit: 'cover', borderRadius: 4 }}
+              fallback="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="
+              preview={{
+                mask: '查看',
+              }}
+            />
+          )
+        },
+      },
       {
         title: '操作',
+        key: 'action',
         width: 150,
         fixed: 'right',
         render: (_, record) => (
@@ -129,6 +188,48 @@ const ChargingList = () => {
         ),
       },
   ], [])
+
+  // 生成列配置
+  const columnSettingsConfig = useMemo(() => {
+    return originalColumns.map((col) => ({
+      key: String((col as any).dataIndex || (col as any).key || col.title || ''),
+      title: String(col.title || ''),
+      visible: true,
+      fixed: col.fixed,
+    }))
+  }, [originalColumns])
+
+  // 列配置变更处理
+  const handleColumnConfigChange = useCallback((config: ColumnConfig[]) => {
+    setColumnConfig(config)
+  }, [])
+
+  // 应用列配置后的列
+  const columns = useMemo(() => {
+    if (!columnConfig.length) return originalColumns
+
+    const orderedColumns: ColumnsType<Receipt> = []
+    
+    for (const cfg of columnConfig) {
+      if (!cfg.visible) continue
+      const col = originalColumns.find((c) => {
+        const key = String((c as any).dataIndex || (c as any).key || c.title || '')
+        return key === cfg.key
+      })
+      if (col) {
+        orderedColumns.push(col)
+      }
+    }
+
+    for (const col of originalColumns) {
+      const key = String((col as any).dataIndex || (col as any).key || col.title || '')
+      if (!columnConfig.find((c) => c.key === key)) {
+        orderedColumns.push(col)
+      }
+    }
+
+    return orderedColumns
+  }, [originalColumns, columnConfig])
 
   return (
     <Space direction="vertical" size="large" style={{ width: '100%' }}>
@@ -149,6 +250,16 @@ const ChargingList = () => {
         </Form>
       </Card>
       <Card>
+        <Flex justify="flex-end" gap={8} style={{ marginBottom: 16 }}>
+          <Button type="primary" icon={<DownloadOutlined />} onClick={handleExport}>
+            导出
+          </Button>
+          <ColumnSettings
+            storageKey="charging-list-columns"
+            defaultColumns={columnSettingsConfig}
+            onColumnsChange={handleColumnConfigChange}
+          />
+        </Flex>
         <Table
           rowKey="id"
           columns={columns}
