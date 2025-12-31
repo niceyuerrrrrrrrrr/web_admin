@@ -255,7 +255,7 @@ const VehiclesPage = () => {
     }
   }
 
-  const handleDelete = async (plateNumber: string) => {
+  const handleDelete = useCallback(async (plateNumber: string) => {
     Modal.confirm({
       title: '确认删除',
       content: `确定要删除车辆 ${plateNumber} 吗？此操作不可恢复。`,
@@ -272,9 +272,9 @@ const VehiclesPage = () => {
         }
       },
     })
-  }
+  }, [queryClient])
 
-  const handleBatchDelete = async () => {
+  const handleBatchDelete = useCallback(async () => {
     if (selectedRowKeys.length === 0) {
       message.warning('请先选择要删除的车辆')
       return
@@ -323,7 +323,7 @@ const VehiclesPage = () => {
         }
       },
     })
-  }
+  }, [selectedRowKeys, queryClient])
 
   // 车辆列表列定义
   const vehicleColumns: ColumnsType<Vehicle> = useMemo(
@@ -413,7 +413,7 @@ const VehiclesPage = () => {
         ),
       },
     ],
-    [openDetail],
+    [openDetail, handleDelete],
   )
 
   // 绑定历史列定义
