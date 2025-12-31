@@ -116,6 +116,26 @@ export const fetchAvailablePlates = (params?: { includeDriverDocs?: boolean }) =
   )
 
 /**
+ * 创建车辆
+ */
+export const createVehicle = (data: {
+  plate_number: string
+  tanker_vehicle_code?: string
+  doc_type?: string
+  doc_no?: string
+  expire_date?: string
+  remark?: string
+}) =>
+  unwrap<{
+    message: string
+    vehicle: {
+      plate_number: string
+      tanker_vehicle_code?: string
+      doc_id: number
+    }
+  }>(client.post('/vehicles/create', data))
+
+/**
  * 绑定车牌
  */
 export const bindPlate = (data: { plate_number: string }) =>

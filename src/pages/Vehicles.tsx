@@ -4,12 +4,15 @@ import {
   Button,
   Card,
   Col,
+  DatePicker,
   Descriptions,
   Drawer,
   Empty,
   Flex,
   Form,
   Input,
+  message,
+  Modal,
   Row,
   Select,
   Space,
@@ -23,6 +26,7 @@ import type { ColumnsType } from 'antd/es/table'
 import {
   CarOutlined,
   EyeOutlined,
+  PlusOutlined,
   ReloadOutlined,
   UserOutlined,
   WarningOutlined,
@@ -30,6 +34,7 @@ import {
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import dayjs from 'dayjs'
 import {
+  createVehicle,
   fetchPlateHistory,
   fetchVehicleDocuments,
   fetchVehicleDriver,
@@ -71,6 +76,8 @@ const VehiclesPage = () => {
   const [detailDrawerOpen, setDetailDrawerOpen] = useState(false)
   const [selectedPlate, setSelectedPlate] = useState<string | null>(null)
   const [historyUserId, setHistoryUserId] = useState<number | undefined>(undefined)
+  const [createModalOpen, setCreateModalOpen] = useState(false)
+  const [createForm] = Form.useForm()
 
   // 获取车辆列表
   const vehiclesQuery = useQuery({
@@ -152,6 +159,27 @@ const VehiclesPage = () => {
     setDetailDrawerOpen(false)
     setSelectedVehicle(null)
     setSelectedPlate(null)
+  }
+
+  const handleCreateVehicle = async (values: any) => {
+    try {
+      const payload = {
+        plate_number: values.plate_number,
+        tanker_vehicle_code: values.tanker_vehicle_code,
+        doc_type: values.doc_type,
+        doc_no: values.doc_no,
+        expire_date: values.expire_date ? dayjs(values.expire_date).format('YYYY-MM-DD') : undefined,
+        remark: values.remark,
+      }
+      
+      await createVehicle(payload)
+      message.success('车辆创建成功')
+      setCreateModalOpen(false)
+      createForm.resetFields()
+      queryClient.invalidateQueries({ queryKey: ['vehicles'] })
+    } catch (error) {
+      message.error((error as Error).message || '创建车辆失败')
+    }
   }
 
   // 车辆列表列定义
@@ -283,6 +311,13 @@ const VehiclesPage = () => {
           </Paragraph>
         </div>
         <Space>
+          <Button
+            type="primary"
+            icon={<PlusOutlined />}
+            onClick={() => setCreateModalOpen(true)}
+          >
+            新增车辆
+          </Button>
           <Button
             icon={<ReloadOutlined />}
             onClick={() => queryClient.invalidateQueries({ queryKey: ['vehicles'] })}
@@ -611,6 +646,75 @@ const VehiclesPage = () => {
           </Space>
         )}
       </Drawer>
+
+      {/* 新增车辆Modal */}
+      <Modal
+        title="新增车辆"
+        open={createModalOpen}
+        onCancel={() => {
+          setCreateModalOpen(false)
+          createForm.resetFields()
+        }}
+        onOk={() => createForm.submit()}
+        width={600}
+        okText="创建"
+        cancelText="取消"
+      >
+        <Form
+          form={createForm}
+          layout="vertical"
+          onFinish={handleCreateVehicle}
+          style={{ marginTop: 24 }}
+        >
+          <Form.Item
+            label="车牌号"
+            name="plate_number"
+            rules={[
+              { required: true, message: '请输入车牌号' },
+              { min: 5, max: 20, message: '车牌号长度应在5-20个字符之间' },
+            ]}
+          >
+            <Input placeholder="请输入车牌号，如：京A12345" />
+          </Form.Item>
+
+          <Form.Item
+            label="自编车号"
+            name="tanker_vehicle_code"
+            tooltip="罐车业务专用，可选填"
+          >
+            <Input placeholder="请输入自编车号" maxLength={50} />
+          </Form.Item>
+
+          <Form.Item
+            label="初始证件类型"
+            name="doc_type"
+            tooltip="创建车辆时可以同时添加一个初始证件"
+          >
+            <Input placeholder="如：行驶证、保险单等" maxLength={100} />
+          </Form.Item>
+
+          <Form.Item
+            label="证件号"
+            name="doc_no"
+          >
+            <Input placeholder="请输入证件号" maxLength={200} />
+          </Form.Item>
+
+          <Form.Item
+            label="证件到期日期"
+            name="expire_date"
+          >
+            <DatePicker style={{ width: '100%' }} placeholder="请选择到期日期" />
+          </Form.Item>
+
+          <Form.Item
+            label="备注"
+            name="remark"
+          >
+            <Input.TextArea rows={3} placeholder="请输入备注信息" maxLength={500} />
+          </Form.Item>
+        </Form>
+      </Modal>
     </Space>
   )
 }
