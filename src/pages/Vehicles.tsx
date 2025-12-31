@@ -25,6 +25,7 @@ import {
 import type { ColumnsType } from 'antd/es/table'
 import {
   CarOutlined,
+  DeleteOutlined,
   EyeOutlined,
   PlusOutlined,
   ReloadOutlined,
@@ -35,7 +36,9 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import dayjs from 'dayjs'
 import {
   batchCreateVehicles,
+  batchDeleteVehicles,
   createVehicle,
+  deleteVehicle,
   fetchPlateHistory,
   fetchVehicleDocuments,
   fetchVehicleDriver,
@@ -81,6 +84,7 @@ const VehiclesPage = () => {
   const [createForm] = Form.useForm()
   const [batchCreateModalOpen, setBatchCreateModalOpen] = useState(false)
   const [batchVehiclesText, setBatchVehiclesText] = useState('')
+  const [selectedRowKeys, setSelectedRowKeys] = useState<string[]>([])
 
   // 获取车辆列表
   const vehiclesQuery = useQuery({
@@ -251,6 +255,76 @@ const VehiclesPage = () => {
     }
   }
 
+  const handleDelete = async (plateNumber: string) => {
+    Modal.confirm({
+      title: '确认删除',
+      content: `确定要删除车辆 ${plateNumber} 吗？此操作不可恢复。`,
+      okText: '确定',
+      cancelText: '取消',
+      okType: 'danger',
+      onOk: async () => {
+        try {
+          await deleteVehicle(plateNumber)
+          message.success('车辆删除成功')
+          queryClient.invalidateQueries({ queryKey: ['vehicles'] })
+        } catch (error) {
+          message.error((error as Error).message || '删除车辆失败')
+        }
+      },
+    })
+  }
+
+  const handleBatchDelete = async () => {
+    if (selectedRowKeys.length === 0) {
+      message.warning('请先选择要删除的车辆')
+      return
+    }
+
+    Modal.confirm({
+      title: '确认批量删除',
+      content: `确定要删除选中的 ${selectedRowKeys.length} 辆车吗？此操作不可恢复。`,
+      okText: '确定',
+      cancelText: '取消',
+      okType: 'danger',
+      onOk: async () => {
+        try {
+          const result = await batchDeleteVehicles(selectedRowKeys)
+          
+          if (result.failed_count > 0) {
+            Modal.info({
+              title: '批量删除完成',
+              width: 600,
+              content: (
+                <div>
+                  <p>成功删除 {result.success_count} 辆车，失败 {result.failed_count} 辆</p>
+                  {result.failed_vehicles.length > 0 && (
+                    <div style={{ marginTop: 16 }}>
+                      <Text strong>失败列表：</Text>
+                      <ul style={{ marginTop: 8 }}>
+                        {result.failed_vehicles.map((v, i) => (
+                          <li key={i}>
+                            {v.plate_number}: {v.reason}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+              ),
+            })
+          } else {
+            message.success(`成功删除 ${result.success_count} 辆车`)
+          }
+          
+          setSelectedRowKeys([])
+          queryClient.invalidateQueries({ queryKey: ['vehicles'] })
+        } catch (error) {
+          message.error((error as Error).message || '批量删除失败')
+        }
+      },
+    })
+  }
+
   // 车辆列表列定义
   const vehicleColumns: ColumnsType<Vehicle> = useMemo(
     () => [
@@ -320,12 +394,22 @@ const VehiclesPage = () => {
       },
       {
         title: '操作',
-        width: 120,
+        width: 180,
         fixed: 'right',
         render: (_, record) => (
-          <Button type="link" icon={<EyeOutlined />} onClick={() => openDetail(record)}>
-            查看详情
-          </Button>
+          <Space>
+            <Button type="link" icon={<EyeOutlined />} onClick={() => openDetail(record)}>
+              查看
+            </Button>
+            <Button
+              type="link"
+              danger
+              icon={<DeleteOutlined />}
+              onClick={() => handleDelete(record.plate_number)}
+            >
+              删除
+            </Button>
+          </Space>
         ),
       },
     ],
@@ -392,6 +476,14 @@ const VehiclesPage = () => {
             onClick={() => setBatchCreateModalOpen(true)}
           >
             批量新增
+          </Button>
+          <Button
+            danger
+            icon={<DeleteOutlined />}
+            onClick={handleBatchDelete}
+            disabled={selectedRowKeys.length === 0}
+          >
+            批量删除 {selectedRowKeys.length > 0 && `(${selectedRowKeys.length})`}
           </Button>
           <Button
             icon={<ReloadOutlined />}
@@ -508,6 +600,10 @@ const VehiclesPage = () => {
                     columns={vehicleColumns}
                     dataSource={vehicles}
                     loading={vehiclesQuery.isLoading}
+                    rowSelection={{
+                      selectedRowKeys,
+                      onChange: (keys) => setSelectedRowKeys(keys as string[]),
+                    }}
                     pagination={{
                       total: vehiclesQuery.data?.total || 0,
                       pageSize: 20,

@@ -178,6 +178,30 @@ export const batchCreateVehicles = (
   )
 
 /**
+ * 删除车辆
+ */
+export const deleteVehicle = (plateNumber: string) =>
+  unwrap<{
+    message: string
+    plate_number: string
+    deleted_count: number
+  }>(client.delete(`/vehicles/delete/${plateNumber}`))
+
+/**
+ * 批量删除车辆
+ */
+export const batchDeleteVehicles = (plateNumbers: string[]) =>
+  unwrap<{
+    message: string
+    success_count: number
+    failed_count: number
+    failed_vehicles: Array<{
+      plate_number: string
+      reason: string
+    }>
+  }>(client.post('/vehicles/batch-delete', plateNumbers))
+
+/**
  * 绑定车牌
  */
 export const bindPlate = (data: { plate_number: string }) =>
