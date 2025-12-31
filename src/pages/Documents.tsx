@@ -40,6 +40,7 @@ import {
   deleteDocument,
   fetchDocumentStats,
   fetchDocuments,
+  updateDocument,
   uploadDocumentAsset,
 } from '../api/services/documents'
 import dayjs from 'dayjs'
@@ -118,7 +119,10 @@ const DocumentsPage = () => {
   })
   const [detailRecord, setDetailRecord] = useState<DocumentRecord | null>(null)
   const [createModalOpen, setCreateModalOpen] = useState(false)
+  const [editModalOpen, setEditModalOpen] = useState(false)
+  const [editingRecord, setEditingRecord] = useState<DocumentRecord | null>(null)
   const [form] = Form.useForm()
+  const [editForm] = Form.useForm()
 
   const listQuery = useQuery({
     queryKey: ['documents', filters, effectiveCompanyId],
@@ -146,6 +150,19 @@ const DocumentsPage = () => {
       queryClient.invalidateQueries({ queryKey: ['documents', 'stats'] })
     },
     onError: (error) => message.error((error as Error).message || '新增失败'),
+  })
+
+  const updateMutation = useMutation({
+    mutationFn: ({ id, payload }: { id: number; payload: any }) => updateDocument(id, payload),
+    onSuccess: () => {
+      message.success('证件已更新')
+      setEditModalOpen(false)
+      setEditingRecord(null)
+      editForm.resetFields()
+      queryClient.invalidateQueries({ queryKey: ['documents'] })
+      queryClient.invalidateQueries({ queryKey: ['documents', 'stats'] })
+    },
+    onError: (error) => message.error((error as Error).message || '更新失败'),
   })
 
   const deleteMutation = useMutation({
@@ -214,11 +231,27 @@ const DocumentsPage = () => {
     },
     {
       title: '操作',
-      width: 220,
+      width: 280,
       render: (_, record) => (
         <Space>
           <Button size="small" icon={<FileSearchOutlined />} onClick={() => setDetailRecord(record)}>
             查看
+          </Button>
+          <Button
+            size="small"
+            icon={<CloudUploadOutlined />}
+            onClick={() => {
+              setEditingRecord(record)
+              editForm.setFieldsValue({
+                doc_type: record.doc_type,
+                doc_no: record.doc_no,
+                expire_date: record.expire_date ? dayjs(record.expire_date) : null,
+                remark: record.remark,
+              })
+              setEditModalOpen(true)
+            }}
+          >
+            编辑
           </Button>
           <Button
             size="small"
@@ -273,6 +306,20 @@ const DocumentsPage = () => {
     createMutation.mutate({
       ...values,
       assets: values.assets || [],
+    })
+  }
+
+  const handleUpdate = async () => {
+    if (!editingRecord) return
+    const values = await editForm.validateFields()
+    updateMutation.mutate({
+      id: editingRecord.id,
+      payload: {
+        doc_type: values.doc_type,
+        doc_no: values.doc_no,
+        expire_date: values.expire_date ? values.expire_date.format('YYYY-MM-DD') : undefined,
+        remark: values.remark,
+      },
     })
   }
 
@@ -479,6 +526,34 @@ const DocumentsPage = () => {
                 />
               ))}
             </Space>
+          </Form.Item>
+        </Form>
+      </Modal>
+
+      <Modal
+        title="编辑证件"
+        open={editModalOpen}
+        onCancel={() => {
+          setEditModalOpen(false)
+          setEditingRecord(null)
+          editForm.resetFields()
+        }}
+        onOk={handleUpdate}
+        confirmLoading={updateMutation.isPending}
+        width={600}
+      >
+        <Form form={editForm} layout="vertical">
+          <Form.Item label="证件类型" name="doc_type" rules={[{ required: true }]}>
+            <Input placeholder="如：驾驶证、行驶证" />
+          </Form.Item>
+          <Form.Item label="证件号码" name="doc_no" rules={[{ required: true }]}>
+            <Input />
+          </Form.Item>
+          <Form.Item label="到期日期" name="expire_date">
+            <DatePicker className="w-full" />
+          </Form.Item>
+          <Form.Item label="备注" name="remark">
+            <Input.TextArea rows={3} />
           </Form.Item>
         </Form>
       </Modal>
