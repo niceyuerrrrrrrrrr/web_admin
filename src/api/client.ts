@@ -5,7 +5,7 @@ const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://api.hodaruner
 
 const client = axios.create({
   baseURL: `${API_BASE_URL}/api/v1`,
-  timeout: 15000,
+  timeout: 30000, // 增加到30秒，避免编辑证件时超时
   headers: {
     'Content-Type': 'application/json',
   },
