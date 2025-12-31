@@ -164,24 +164,22 @@ const DocumentsPage = () => {
     {
       title: '证件类型',
       dataIndex: 'doc_type',
-      render: (text, record) => (
-        <Space>
-          <Tag>{record.category}</Tag>
-          <span>{text}</span>
-        </Space>
-      ),
+      width: 120,
     },
     {
       title: '证件号',
       dataIndex: 'doc_no',
+      width: 150,
     },
     {
       title: '所属对象',
       dataIndex: 'subject_display',
+      width: 150,
     },
     {
       title: '到期日',
       dataIndex: 'expire_date',
+      width: 200,
       render: (value) => {
         if (!value) return '-'
         const diff = dayjs(value).diff(dayjs(), 'day')
@@ -189,9 +187,11 @@ const DocumentsPage = () => {
         if (diff < 0) color = 'red'
         else if (diff <= 30) color = 'orange'
         return (
-          <Space>
+          <Space direction="vertical" size={0}>
             <Tag color={color}>{value}</Tag>
-            <span>{diff < 0 ? '已过期' : diff === 0 ? '今天到期' : `${diff}天后到期`}</span>
+            <span style={{ fontSize: '12px', color: '#666' }}>
+              {diff < 0 ? '已过期' : diff === 0 ? '今天到期' : `${diff}天后到期`}
+            </span>
           </Space>
         )
       },
@@ -200,6 +200,7 @@ const DocumentsPage = () => {
       title: '备注',
       dataIndex: 'remark',
       ellipsis: true,
+      width: 200,
     },
     {
       title: '操作',
