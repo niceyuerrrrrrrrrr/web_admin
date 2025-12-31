@@ -43,6 +43,8 @@ import {
   uploadDocumentAsset,
 } from '../api/services/documents'
 import dayjs from 'dayjs'
+import useAuthStore from '../store/auth'
+import useCompanyStore from '../store/company'
 
 const categoryOptions = [
   { value: 'driver_personal', label: '司机个人证件' },
@@ -96,6 +98,12 @@ const docTypeOptions: Record<string, Array<{ value: string; label: string }>> = 
 const DocumentsPage = () => {
   const { message, modal } = AntdApp.useApp()
   const queryClient = useQueryClient()
+  const { user } = useAuthStore()
+  const { selectedCompanyId } = useCompanyStore()
+
+  const isSuperAdmin = user?.role === 'super_admin' || user?.positionType === '超级管理员'
+  const effectiveCompanyId = isSuperAdmin ? selectedCompanyId : undefined
+
   const [filters, setFilters] = useState<{
     category: string
     doc_type?: string
@@ -113,17 +121,19 @@ const DocumentsPage = () => {
   const [form] = Form.useForm()
 
   const listQuery = useQuery({
-    queryKey: ['documents', filters],
-    queryFn: () => fetchDocuments(filters),
-    enabled: !!filters.category,
+    queryKey: ['documents', filters, effectiveCompanyId],
+    queryFn: () => fetchDocuments({ ...filters, company_id: effectiveCompanyId }),
+    enabled: !!filters.category && (!isSuperAdmin || !!effectiveCompanyId),
   })
 
   const statsQuery = useQuery({
-    queryKey: ['documents', 'stats', filters.category],
+    queryKey: ['documents', 'stats', filters.category, effectiveCompanyId],
     queryFn: () =>
       fetchDocumentStats({
         category: filters.category,
+        company_id: effectiveCompanyId,
       }),
+    enabled: !isSuperAdmin || !!effectiveCompanyId,
   })
 
   const createMutation = useMutation({

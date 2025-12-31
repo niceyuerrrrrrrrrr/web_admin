@@ -17,6 +17,7 @@ export interface DocumentListParams {
   expire_status?: string
   page?: number
   page_size?: number
+  company_id?: number
 }
 
 export interface DocumentPayload {
@@ -68,11 +69,12 @@ export const uploadDocumentAsset = (file: File) => {
   )
 }
 
-export const fetchDocumentStats = (params?: { category?: string }) =>
+export const fetchDocumentStats = (params?: { category?: string; company_id?: number }) =>
   unwrap<DocumentStats>(
     client.get('/documents/stats/overview', {
       params: {
         category: params?.category,
+        company_id: params?.company_id,
       },
     }),
   )
