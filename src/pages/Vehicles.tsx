@@ -175,7 +175,7 @@ const VehiclesPage = () => {
         remark: values.remark,
       }
       
-      await createVehicle(payload)
+      await createVehicle(payload, effectiveCompanyId)
       message.success('车辆创建成功')
       setCreateModalOpen(false)
       createForm.resetFields()
@@ -215,7 +215,7 @@ const VehiclesPage = () => {
         return
       }
 
-      const result = await batchCreateVehicles({ vehicles })
+      const result = await batchCreateVehicles({ vehicles }, effectiveCompanyId)
       
       if (result.failed_count > 0) {
         Modal.info({

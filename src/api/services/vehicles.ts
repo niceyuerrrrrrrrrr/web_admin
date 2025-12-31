@@ -118,14 +118,17 @@ export const fetchAvailablePlates = (params?: { includeDriverDocs?: boolean }) =
 /**
  * 创建车辆
  */
-export const createVehicle = (data: {
-  plate_number: string
-  tanker_vehicle_code?: string
-  doc_type?: string
-  doc_no?: string
-  expire_date?: string
-  remark?: string
-}) =>
+export const createVehicle = (
+  data: {
+    plate_number: string
+    tanker_vehicle_code?: string
+    doc_type?: string
+    doc_no?: string
+    expire_date?: string
+    remark?: string
+  },
+  companyId?: number,
+) =>
   unwrap<{
     message: string
     vehicle: {
@@ -133,21 +136,28 @@ export const createVehicle = (data: {
       tanker_vehicle_code?: string
       doc_id: number
     }
-  }>(client.post('/vehicles/create', data))
+  }>(
+    client.post('/vehicles/create', data, {
+      params: companyId ? { company_id: companyId } : undefined,
+    }),
+  )
 
 /**
  * 批量创建车辆
  */
-export const batchCreateVehicles = (data: {
-  vehicles: Array<{
-    plate_number: string
-    tanker_vehicle_code?: string
-    doc_type?: string
-    doc_no?: string
-    expire_date?: string
-    remark?: string
-  }>
-}) =>
+export const batchCreateVehicles = (
+  data: {
+    vehicles: Array<{
+      plate_number: string
+      tanker_vehicle_code?: string
+      doc_type?: string
+      doc_no?: string
+      expire_date?: string
+      remark?: string
+    }>
+  },
+  companyId?: number,
+) =>
   unwrap<{
     message: string
     success_count: number
@@ -161,7 +171,11 @@ export const batchCreateVehicles = (data: {
       plate_number: string
       reason: string
     }>
-  }>(client.post('/vehicles/batch-create', data))
+  }>(
+    client.post('/vehicles/batch-create', data, {
+      params: companyId ? { company_id: companyId } : undefined,
+    }),
+  )
 
 /**
  * 绑定车牌
