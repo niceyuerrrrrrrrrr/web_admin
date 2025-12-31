@@ -34,6 +34,7 @@ import {
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import dayjs from 'dayjs'
 import {
+  batchCreateVehicles,
   createVehicle,
   fetchPlateHistory,
   fetchVehicleDocuments,
@@ -78,6 +79,8 @@ const VehiclesPage = () => {
   const [historyUserId, setHistoryUserId] = useState<number | undefined>(undefined)
   const [createModalOpen, setCreateModalOpen] = useState(false)
   const [createForm] = Form.useForm()
+  const [batchCreateModalOpen, setBatchCreateModalOpen] = useState(false)
+  const [batchVehiclesText, setBatchVehiclesText] = useState('')
 
   // 获取车辆列表
   const vehiclesQuery = useQuery({
@@ -179,6 +182,72 @@ const VehiclesPage = () => {
       queryClient.invalidateQueries({ queryKey: ['vehicles'] })
     } catch (error) {
       message.error((error as Error).message || '创建车辆失败')
+    }
+  }
+
+  const handleBatchCreate = async () => {
+    if (!batchVehiclesText.trim()) {
+      message.error('请输入车辆信息')
+      return
+    }
+
+    try {
+      const lines = batchVehiclesText.trim().split('\n').filter(line => line.trim())
+      const vehicles = lines.map(line => {
+        const parts = line.split(/[,，\t]/).map(p => p.trim())
+        return {
+          plate_number: parts[0] || '',
+          tanker_vehicle_code: parts[1] || undefined,
+          doc_type: parts[2] || undefined,
+          doc_no: parts[3] || undefined,
+          expire_date: parts[4] || undefined,
+          remark: parts[5] || undefined,
+        }
+      }).filter(v => v.plate_number)
+
+      if (vehicles.length === 0) {
+        message.error('没有有效的车辆信息')
+        return
+      }
+
+      if (vehicles.length > 100) {
+        message.error('一次最多创建100辆车')
+        return
+      }
+
+      const result = await batchCreateVehicles({ vehicles })
+      
+      if (result.failed_count > 0) {
+        Modal.info({
+          title: '批量创建完成',
+          width: 600,
+          content: (
+            <div>
+              <p>成功创建 {result.success_count} 辆车，失败 {result.failed_count} 辆</p>
+              {result.failed_vehicles.length > 0 && (
+                <div style={{ marginTop: 16 }}>
+                  <Text strong>失败列表：</Text>
+                  <ul style={{ marginTop: 8 }}>
+                    {result.failed_vehicles.map((v, i) => (
+                      <li key={i}>
+                        {v.plate_number}: {v.reason}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+          ),
+        })
+      } else {
+        message.success(`成功创建 ${result.success_count} 辆车`)
+      }
+      
+      setBatchCreateModalOpen(false)
+      setBatchVehiclesText('')
+      queryClient.invalidateQueries({ queryKey: ['vehicles'] })
+    } catch (error) {
+      message.error((error as Error).message || '批量创建失败')
     }
   }
 
@@ -317,6 +386,12 @@ const VehiclesPage = () => {
             onClick={() => setCreateModalOpen(true)}
           >
             新增车辆
+          </Button>
+          <Button
+            icon={<PlusOutlined />}
+            onClick={() => setBatchCreateModalOpen(true)}
+          >
+            批量新增
           </Button>
           <Button
             icon={<ReloadOutlined />}
@@ -714,6 +789,57 @@ const VehiclesPage = () => {
             <Input.TextArea rows={3} placeholder="请输入备注信息" maxLength={500} />
           </Form.Item>
         </Form>
+      </Modal>
+
+      {/* 批量新增车辆Modal */}
+      <Modal
+        title="批量新增车辆"
+        open={batchCreateModalOpen}
+        onCancel={() => {
+          setBatchCreateModalOpen(false)
+          setBatchVehiclesText('')
+        }}
+        onOk={handleBatchCreate}
+        width={800}
+        okText="批量创建"
+        cancelText="取消"
+      >
+        <Space direction="vertical" size="large" style={{ width: '100%' }}>
+          <Alert
+            message="批量导入说明"
+            description={
+              <div>
+                <p>每行一辆车，字段用逗号或制表符分隔，格式如下：</p>
+                <p style={{ fontFamily: 'monospace', background: '#f5f5f5', padding: 8, borderRadius: 4 }}>
+                  车牌号,自编车号,证件类型,证件号,到期日期(YYYY-MM-DD),备注
+                </p>
+                <p style={{ marginTop: 8 }}>示例：</p>
+                <p style={{ fontFamily: 'monospace', background: '#f5f5f5', padding: 8, borderRadius: 4 }}>
+                  京A12345,001,行驶证,123456,2025-12-31,备注信息<br />
+                  京B67890,002,保险单,789012,2026-06-30<br />
+                  京C11111
+                </p>
+                <p style={{ marginTop: 8, color: '#666' }}>
+                  注意：车牌号为必填项，其他字段可选。一次最多导入100辆车。
+                </p>
+              </div>
+            }
+            type="info"
+            showIcon
+          />
+          
+          <Input.TextArea
+            value={batchVehiclesText}
+            onChange={(e) => setBatchVehiclesText(e.target.value)}
+            placeholder="请输入车辆信息，每行一辆车&#10;例如：京A12345,001,行驶证,123456,2025-12-31,备注"
+            rows={15}
+            style={{ fontFamily: 'monospace' }}
+          />
+          
+          <Text type="secondary">
+            当前输入 {batchVehiclesText.trim().split('\n').filter(line => line.trim()).length} 行
+          </Text>
+        </Space>
       </Modal>
     </Space>
   )

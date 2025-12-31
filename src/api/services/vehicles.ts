@@ -136,6 +136,34 @@ export const createVehicle = (data: {
   }>(client.post('/vehicles/create', data))
 
 /**
+ * 批量创建车辆
+ */
+export const batchCreateVehicles = (data: {
+  vehicles: Array<{
+    plate_number: string
+    tanker_vehicle_code?: string
+    doc_type?: string
+    doc_no?: string
+    expire_date?: string
+    remark?: string
+  }>
+}) =>
+  unwrap<{
+    message: string
+    success_count: number
+    failed_count: number
+    created_vehicles: Array<{
+      plate_number: string
+      tanker_vehicle_code?: string
+      doc_id: number
+    }>
+    failed_vehicles: Array<{
+      plate_number: string
+      reason: string
+    }>
+  }>(client.post('/vehicles/batch-create', data))
+
+/**
  * 绑定车牌
  */
 export const bindPlate = (data: { plate_number: string }) =>
