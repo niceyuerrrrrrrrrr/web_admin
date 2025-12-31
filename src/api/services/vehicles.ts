@@ -101,7 +101,12 @@ export const fetchVehicles = (params?: {
 /**
  * 获取车辆统计
  */
-export const fetchVehicleStatistics = () => unwrap<VehicleStatistics>(client.get('/vehicles/statistics'))
+export const fetchVehicleStatistics = (params?: { companyId?: number }) =>
+  unwrap<VehicleStatistics>(
+    client.get('/vehicles/statistics', {
+      params: params?.companyId ? { company_id: params.companyId } : undefined,
+    }),
+  )
 
 /**
  * 获取可绑定的车牌列表

@@ -101,8 +101,8 @@ const VehiclesPage = () => {
 
   // 获取车辆统计
   const statisticsQuery = useQuery({
-    queryKey: ['vehicles', 'statistics'],
-    queryFn: () => fetchVehicleStatistics(),
+    queryKey: ['vehicles', 'statistics', effectiveCompanyId],
+    queryFn: () => fetchVehicleStatistics({ companyId: effectiveCompanyId }),
   })
 
   // 获取车辆证件
