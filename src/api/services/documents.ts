@@ -46,6 +46,7 @@ export const fetchDocuments = (params: DocumentListParams) =>
         search: params.search,
         subject: params.subject,
         expire_status: params.expire_status,
+        company_id: params.company_id,
         page: params.page ?? 1,
         page_size: params.page_size ?? 20,
       },
