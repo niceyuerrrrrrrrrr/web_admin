@@ -752,7 +752,7 @@ const UsersPage = () => {
               closable
             />
           )}
-          <Form layout="inline" onFinish={handleSearch} onReset={handleReset}>
+          <Form name="searchForm" layout="inline" onFinish={handleSearch} onReset={handleReset}>
             <Form.Item name="name" label="姓名">
               <Input placeholder="请输入姓名" allowClear style={{ width: 200 }} />
             </Form.Item>
