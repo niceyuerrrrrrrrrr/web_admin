@@ -1575,26 +1575,45 @@ const ReceiptsPage = () => {
             {receipt.type === 'unloading' && (
               <>
                 <Descriptions.Item label="类型">卸货单</Descriptions.Item>
+                {(() => {
+                  const thumbUrl = receipt.thumb_url
+                  const isValidUrl = thumbUrl && 
+                    !thumbUrl.startsWith('wxfile://') && 
+                    !thumbUrl.startsWith('file://') && 
+                    !thumbUrl.includes('wxfile://') &&
+                    thumbUrl.trim()
+                  return isValidUrl ? (
+                    <Descriptions.Item label="票据图片">
+                      <Image 
+                        src={thumbUrl} 
+                        alt="卸货单图片" 
+                        style={{ maxWidth: '100%' }}
+                        fallback="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Crect fill='%23f0f0f0' width='200' height='200'/%3E%3Ctext x='50%25' y='50%25' text-anchor='middle' dy='.3em' fill='%23999'%3E图片加载失败%3C/text%3E%3C/svg%3E"
+                      />
+                    </Descriptions.Item>
+                  ) : null
+                })()}
                 <Descriptions.Item label="公司">{receipt.company || '-'}</Descriptions.Item>
                 <Descriptions.Item label="司机">{receipt.driver_name || '-'}</Descriptions.Item>
                 <Descriptions.Item label="车牌号">{receipt.vehicle_no || '-'}</Descriptions.Item>
                 <Descriptions.Item label="材料名称">{receipt.material_name || '-'}</Descriptions.Item>
                 <Descriptions.Item label="规格型号">{receipt.material_spec || '-'}</Descriptions.Item>
                 <Descriptions.Item label="毛重(t)">
-                  {(receipt as Receipt & { gross_weight?: number }).gross_weight?.toFixed(2) || '-'}
+                  {receipt.gross_weight ? Number(receipt.gross_weight).toFixed(2) : '-'}
                 </Descriptions.Item>
                 <Descriptions.Item label="净重(t)">
-                  {(receipt as Receipt & { net_weight?: number }).net_weight?.toFixed(2) || '-'}
+                  {receipt.net_weight ? Number(receipt.net_weight).toFixed(2) : '-'}
                 </Descriptions.Item>
                 <Descriptions.Item label="皮重(t)">
-                  {(receipt as Receipt & { tare_weight?: number }).tare_weight?.toFixed(2) || '-'}
+                  {receipt.tare_weight ? Number(receipt.tare_weight).toFixed(2) : '-'}
                 </Descriptions.Item>
-                <Descriptions.Item label="任务ID">
-                  {(receipt as Receipt & { task_id?: string }).task_id || '-'}
+                <Descriptions.Item label="进厂时间">
+                  {receipt.loading_time ? dayjs(receipt.loading_time).format('YYYY-MM-DD HH:mm') : '-'}
                 </Descriptions.Item>
-                <Descriptions.Item label="创建时间">
-                  {receipt.created_at ? dayjs(receipt.created_at).format('YYYY-MM-DD HH:mm') : '-'}
+                <Descriptions.Item label="出厂时间">
+                  {receipt.unloading_time ? dayjs(receipt.unloading_time).format('YYYY-MM-DD HH:mm') : '-'}
                 </Descriptions.Item>
+                <Descriptions.Item label="任务ID">{receipt.task_id || '-'}</Descriptions.Item>
               </>
             )}
 
