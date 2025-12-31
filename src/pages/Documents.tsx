@@ -315,10 +315,11 @@ const DocumentsPage = () => {
     updateMutation.mutate({
       id: editingRecord.id,
       payload: {
+        category: editingRecord.category,
         doc_type: values.doc_type,
         doc_no: values.doc_no,
-        expire_date: values.expire_date ? values.expire_date.format('YYYY-MM-DD') : undefined,
-        remark: values.remark,
+        expire_date: values.expire_date ? values.expire_date.format('YYYY-MM-DD') : null,
+        remark: values.remark || '',
       },
     })
   }
