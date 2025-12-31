@@ -814,6 +814,23 @@ export interface DocumentRecord {
   created_at?: string
   updated_at?: string
   assets: DocumentAsset[]
+  extra?: {
+    owner?: string
+    brand_model?: string
+    vin?: string
+    engine_no?: string
+    vehicle_type?: string
+    usage?: string
+    register_date?: string
+    scope?: string
+    dimensions?: string
+    capacity?: string
+    company?: string
+    product?: string
+    premium?: string
+    effective_date?: string
+    [key: string]: any
+  }
 }
 
 export interface DocumentListResponse {

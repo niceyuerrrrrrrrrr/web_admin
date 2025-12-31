@@ -457,7 +457,7 @@ const DocumentsPage = () => {
       />
 
       <Drawer
-        width={640}
+        width={800}
         title="证件详情"
         open={!!detailRecord}
         onClose={() => setDetailRecord(null)}
@@ -465,29 +465,97 @@ const DocumentsPage = () => {
       >
         {detailRecord ? (
           <Space direction="vertical" size="large" style={{ width: '100%' }}>
-            <Descriptions bordered size="small" column={2}>
-              <Descriptions.Item label="类型">{detailRecord.doc_type}</Descriptions.Item>
-              <Descriptions.Item label="证件号">{detailRecord.doc_no}</Descriptions.Item>
-              <Descriptions.Item label="所属">{detailRecord.subject_display || '-'}</Descriptions.Item>
-              <Descriptions.Item label="到期日">{detailRecord.expire_date || '-'}</Descriptions.Item>
-              <Descriptions.Item label="备注" span={2}>
-                {detailRecord.remark || '-'}
-              </Descriptions.Item>
-            </Descriptions>
-            <List
-              header="附件"
-              dataSource={detailRecord.assets || []}
-              renderItem={(item) => (
-                <List.Item>
-                  <Space>
-                    <Avatar shape="square" src={item.file_thumb || item.file_url} size={64} />
-                    <a href={item.file_url} target="_blank" rel="noreferrer">
-                      {item.file_name || '预览附件'}
-                    </a>
-                  </Space>
-                </List.Item>
-              )}
-            />
+            <Card title="基本信息" size="small">
+              <Descriptions bordered size="small" column={2}>
+                <Descriptions.Item label="类型">{detailRecord.doc_type}</Descriptions.Item>
+                <Descriptions.Item label="证件号">{detailRecord.doc_no}</Descriptions.Item>
+                <Descriptions.Item label="所属">{detailRecord.subject_display || '-'}</Descriptions.Item>
+                <Descriptions.Item label="到期日">{detailRecord.expire_date || '-'}</Descriptions.Item>
+                <Descriptions.Item label="备注" span={2}>
+                  {detailRecord.remark || '-'}
+                </Descriptions.Item>
+              </Descriptions>
+            </Card>
+
+            {/* 识别信息 */}
+            {detailRecord.extra && Object.keys(detailRecord.extra).length > 0 && (
+              <Card title="识别信息" size="small">
+                <Descriptions bordered size="small" column={2}>
+                  {detailRecord.extra.owner && (
+                    <Descriptions.Item label="所有人">{detailRecord.extra.owner}</Descriptions.Item>
+                  )}
+                  {detailRecord.extra.brand_model && (
+                    <Descriptions.Item label="品牌型号">{detailRecord.extra.brand_model}</Descriptions.Item>
+                  )}
+                  {detailRecord.extra.vin && (
+                    <Descriptions.Item label="车架号">{detailRecord.extra.vin}</Descriptions.Item>
+                  )}
+                  {detailRecord.extra.engine_no && (
+                    <Descriptions.Item label="发动机号">{detailRecord.extra.engine_no}</Descriptions.Item>
+                  )}
+                  {detailRecord.extra.vehicle_type && (
+                    <Descriptions.Item label="车辆类型">{detailRecord.extra.vehicle_type}</Descriptions.Item>
+                  )}
+                  {detailRecord.extra.usage && (
+                    <Descriptions.Item label="使用性质">{detailRecord.extra.usage}</Descriptions.Item>
+                  )}
+                  {detailRecord.extra.register_date && (
+                    <Descriptions.Item label="注册日期">{detailRecord.extra.register_date}</Descriptions.Item>
+                  )}
+                  {detailRecord.extra.scope && (
+                    <Descriptions.Item label="经营范围">{detailRecord.extra.scope}</Descriptions.Item>
+                  )}
+                  {detailRecord.extra.dimensions && (
+                    <Descriptions.Item label="外廓尺寸">{detailRecord.extra.dimensions}</Descriptions.Item>
+                  )}
+                  {detailRecord.extra.capacity && (
+                    <Descriptions.Item label="核定载质量">{detailRecord.extra.capacity}</Descriptions.Item>
+                  )}
+                  {detailRecord.extra.company && (
+                    <Descriptions.Item label="保险公司">{detailRecord.extra.company}</Descriptions.Item>
+                  )}
+                  {detailRecord.extra.product && (
+                    <Descriptions.Item label="险种">{detailRecord.extra.product}</Descriptions.Item>
+                  )}
+                  {detailRecord.extra.premium && (
+                    <Descriptions.Item label="保费">{detailRecord.extra.premium}</Descriptions.Item>
+                  )}
+                  {detailRecord.extra.effective_date && (
+                    <Descriptions.Item label="生效日期">{detailRecord.extra.effective_date}</Descriptions.Item>
+                  )}
+                </Descriptions>
+              </Card>
+            )}
+
+            {/* 证件照片 */}
+            {detailRecord.assets && detailRecord.assets.length > 0 && (
+              <Card title="证件照片" size="small">
+                <Row gutter={[16, 16]}>
+                  {detailRecord.assets.map((item, index) => (
+                    <Col span={12} key={index}>
+                      <Card
+                        hoverable
+                        cover={
+                          <img
+                            src={item.file_url}
+                            alt={item.file_name || '证件照片'}
+                            style={{ width: '100%', height: '200px', objectFit: 'cover' }}
+                          />
+                        }
+                      >
+                        <Card.Meta
+                          description={
+                            <a href={item.file_url} target="_blank" rel="noreferrer">
+                              {item.file_name || '查看原图'}
+                            </a>
+                          }
+                        />
+                      </Card>
+                    </Col>
+                  ))}
+                </Row>
+              </Card>
+            )}
           </Space>
         ) : (
           <p>暂无数据</p>
