@@ -724,6 +724,17 @@ const UsersPage = () => {
         bank_card: values.bank_card,
         bank_name: values.bank_name,
         card_holder: values.card_holder,
+        
+        // 个人信息
+        id_card: values.id_card,
+        gender: values.gender,
+        birth_date: values.birth_date ? values.birth_date.format('YYYY-MM-DD') : null,
+        address: values.address,
+        work_location: values.work_location,
+        
+        // 紧急联系人
+        emergency_contact: values.emergency_contact,
+        emergency_phone: values.emergency_phone,
       })
     })
   }
