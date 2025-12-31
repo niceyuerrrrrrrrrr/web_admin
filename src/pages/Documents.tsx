@@ -531,28 +531,35 @@ const DocumentsPage = () => {
             {detailRecord.assets && detailRecord.assets.length > 0 && (
               <Card title="证件照片" size="small">
                 <Row gutter={[16, 16]}>
-                  {detailRecord.assets.map((item, index) => (
-                    <Col span={12} key={index}>
-                      <Card
-                        hoverable
-                        cover={
-                          <img
-                            src={item.file_url}
-                            alt={item.file_name || '证件照片'}
-                            style={{ width: '100%', height: '200px', objectFit: 'cover' }}
-                          />
-                        }
-                      >
-                        <Card.Meta
-                          description={
-                            <a href={item.file_url} target="_blank" rel="noreferrer">
-                              {item.file_name || '查看原图'}
-                            </a>
+                  {detailRecord.assets.map((item, index) => {
+                    // 如果URL是相对路径，添加API域名前缀
+                    const imageUrl = item.file_url.startsWith('http') 
+                      ? item.file_url 
+                      : `https://api.hodaruner.cn${item.file_url}`
+                    
+                    return (
+                      <Col span={12} key={index}>
+                        <Card
+                          hoverable
+                          cover={
+                            <img
+                              src={imageUrl}
+                              alt={item.file_name || '证件照片'}
+                              style={{ width: '100%', height: '200px', objectFit: 'cover' }}
+                            />
                           }
-                        />
-                      </Card>
-                    </Col>
-                  ))}
+                        >
+                          <Card.Meta
+                            description={
+                              <a href={imageUrl} target="_blank" rel="noreferrer">
+                                {item.file_name || '查看原图'}
+                              </a>
+                            }
+                          />
+                        </Card>
+                      </Col>
+                    )
+                  })}
                 </Row>
               </Card>
             )}
