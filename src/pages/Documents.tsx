@@ -347,6 +347,24 @@ const DocumentsPage = () => {
             label: '证件列表',
             children: (
               <Space direction="vertical" size="large" style={{ width: '100%' }}>
+                {/* KPI统计卡片 */}
+                {statsQuery.data?.top_types && statsQuery.data.top_types.length > 0 && (
+                  <Row gutter={16}>
+                    {statsQuery.data.top_types.slice(0, 6).map((item) => (
+                      <Col span={4} key={item.doc_type}>
+                        <Card>
+                          <Statistic
+                            title={item.doc_type}
+                            value={item.count}
+                            suffix="个"
+                            valueStyle={{ color: '#1677ff', fontSize: '24px' }}
+                          />
+                        </Card>
+                      </Col>
+                    ))}
+                  </Row>
+                )}
+                
                 <Flex gap={16} wrap>
                   <Select
                     style={{ width: 220 }}
