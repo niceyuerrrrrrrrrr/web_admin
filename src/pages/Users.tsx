@@ -638,6 +638,59 @@ const UsersPage = () => {
     [currentCompanyBusinessType, openDetail, openEdit, resetPasswordMutation, deleteUserMutation, modal],
   )
 
+  const handleUpdate = async () => {
+    if (!selectedUser) return
+    const values = await editForm.validateFields()
+    updateUserMutation.mutate({
+      id: selectedUser.id,
+      data: {
+        // 基础信息
+        nickname: values.nickname,
+        username: values.username,
+        name: values.name,
+        phone: values.phone,
+        email: values.email,
+        app_lang: values.app_lang,
+        status: values.status ? 'active' : 'inactive',
+        
+        // 业务信息
+        position_type: values.positionType,
+        positionType: values.positionType,
+        role: values.role,
+        onboard_date: values.onboard_date ? values.onboard_date.format('YYYY-MM-DD') : null,
+        
+        // 车辆信息
+        plate: values.plate,
+        plateNumber: values.plate,
+        tanker_vehicle_code: values.tanker_vehicle_code,
+        
+        // 公司信息
+        company: values.company,
+        company_name: values.company_name,
+        company_business_type: values.company_business_type,
+        
+        // 部门信息
+        department_id: values.department_id,
+        
+        // 银行信息
+        bank_card: values.bank_card,
+        bank_name: values.bank_name,
+        card_holder: values.card_holder,
+        
+        // 个人信息
+        id_card: values.id_card,
+        gender: values.gender,
+        birth_date: values.birth_date ? values.birth_date.format('YYYY-MM-DD') : null,
+        address: values.address,
+        work_location: values.work_location,
+        
+        // 紧急联系人
+        emergency_contact: values.emergency_contact,
+        emergency_phone: values.emergency_phone,
+      },
+    })
+  }
+
   const handleEditSubmit = () => {
     editForm.validateFields().then((values) => {
       updateUserMutation.mutate({
@@ -1180,6 +1233,38 @@ const UsersPage = () => {
               </Form.Item>
               <Form.Item name="card_holder" label="持卡人姓名">
                 <Input placeholder="请输入持卡人姓名" />
+              </Form.Item>
+            </Card>
+
+            {/* 个人信息 */}
+            <Card title="个人信息" size="small">
+              <Form.Item name="id_card" label="身份证号">
+                <Input placeholder="请输入身份证号" />
+              </Form.Item>
+              <Form.Item name="gender" label="性别">
+                <Select placeholder="请选择性别" options={[
+                  { value: 'male', label: '男' },
+                  { value: 'female', label: '女' },
+                ]} />
+              </Form.Item>
+              <Form.Item name="birth_date" label="出生日期">
+                <DatePicker placeholder="请选择出生日期" style={{ width: '100%' }} />
+              </Form.Item>
+              <Form.Item name="address" label="住址">
+                <Input.TextArea placeholder="请输入住址" rows={3} />
+              </Form.Item>
+              <Form.Item name="work_location" label="工作地点">
+                <Input placeholder="请输入工作地点" />
+              </Form.Item>
+            </Card>
+
+            {/* 紧急联系人 */}
+            <Card title="紧急联系人" size="small">
+              <Form.Item name="emergency_contact" label="紧急联系人">
+                <Input placeholder="请输入紧急联系人姓名" />
+              </Form.Item>
+              <Form.Item name="emergency_phone" label="紧急联系人电话">
+                <Input placeholder="请输入紧急联系人电话" />
               </Form.Item>
             </Card>
           </Space>
