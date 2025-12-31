@@ -59,6 +59,40 @@ const expireOptions = [
   { value: '30days', label: '30天内到期' },
 ]
 
+// 不同证件类别对应的证件类型选项
+const docTypeOptions: Record<string, Array<{ value: string; label: string }>> = {
+  driver_personal: [
+    { value: '身份证', label: '身份证' },
+    { value: '驾驶证', label: '驾驶证' },
+    { value: '从业资格证', label: '从业资格证' },
+  ],
+  driver_vehicle: [
+    { value: '行驶证', label: '行驶证' },
+    { value: '营运证', label: '营运证' },
+    { value: '保险单', label: '保险单' },
+  ],
+  manager_personal: [
+    { value: '身份证', label: '身份证' },
+    { value: '驾驶证', label: '驾驶证' },
+  ],
+  manager_fleet_driver: [
+    { value: '身份证', label: '身份证' },
+    { value: '驾驶证', label: '驾驶证' },
+    { value: '从业资格证', label: '从业资格证' },
+  ],
+  manager_fleet_vehicle: [
+    { value: '行驶证', label: '行驶证' },
+    { value: '营运证', label: '营运证' },
+    { value: '保险单', label: '保险单' },
+    { value: '车辆登记', label: '车辆登记' },
+  ],
+  company_documents: [
+    { value: '营业执照', label: '营业执照' },
+    { value: '道路运输许可证', label: '道路运输许可证' },
+    { value: '税务登记证', label: '税务登记证' },
+  ],
+}
+
 const DocumentsPage = () => {
   const { message, modal } = AntdApp.useApp()
   const queryClient = useQueryClient()
@@ -259,8 +293,16 @@ const DocumentsPage = () => {
                   <Select
                     style={{ width: 220 }}
                     value={filters.category}
-                    onChange={(value) => setFilters((prev) => ({ ...prev, category: value, page: 1 }))}
+                    onChange={(value) => setFilters((prev) => ({ ...prev, category: value, doc_type: undefined, page: 1 }))}
                     options={categoryOptions}
+                  />
+                  <Select
+                    style={{ width: 180 }}
+                    allowClear
+                    placeholder="证件类型"
+                    options={docTypeOptions[filters.category] || []}
+                    value={filters.doc_type}
+                    onChange={(value) => setFilters((prev) => ({ ...prev, doc_type: value || undefined, page: 1 }))}
                   />
                   <Input
                     style={{ width: 200 }}
