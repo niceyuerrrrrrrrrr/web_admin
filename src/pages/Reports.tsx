@@ -72,6 +72,16 @@ const statusColors: Record<ReportStatus, string> = {
   closed: 'purple',
 }
 
+const statusLabels: Record<ReportStatus, string> = {
+  draft: '草稿',
+  submitted: '已提交',
+  reviewing: '审核中',
+  processing: '处理中',
+  resolved: '已解决',
+  rejected: '已拒绝',
+  closed: '已关闭',
+}
+
 const ReportsPage = () => {
   const { message, modal } = AntdApp.useApp()
   const queryClient = useQueryClient()
@@ -328,7 +338,7 @@ const ReportsPage = () => {
     {
       title: '状态',
       dataIndex: 'status',
-      render: (value: ReportStatus) => <Tag color={statusColors[value]}>{value}</Tag>,
+      render: (value: ReportStatus) => <Tag color={statusColors[value]}>{statusLabels[value] || value}</Tag>,
     },
     {
       title: '当前审批人',
@@ -593,16 +603,17 @@ const ReportsPage = () => {
               </Descriptions.Item>
               <Descriptions.Item label="位置">{selectedDetail.location || '-'}</Descriptions.Item>
               <Descriptions.Item label="状态">
-                <Tag color={statusColors[selectedDetail.status]}>{selectedDetail.status}</Tag>
+                <Tag color={statusColors[selectedDetail.status]}>{statusLabels[selectedDetail.status] || selectedDetail.status}</Tag>
               </Descriptions.Item>
               <Descriptions.Item label="说明" span={2}>
                 {selectedDetail.description || '-'}
               </Descriptions.Item>
             </Descriptions>
             <Flex gap={12} wrap>
-              {selectedDetail.images?.map((img) => (
-                <Avatar shape="square" key={img} src={img} size={80} />
-              ))}
+              {selectedDetail.images?.map((img) => {
+                const imgUrl = img.startsWith('http') ? img : `https://api.hodaruner.cn${img}`
+                return <Avatar shape="square" key={img} src={imgUrl} size={80} />
+              })}
             </Flex>
             <Flex gap={8} wrap>
               {selectedDetail.status === 'submitted' && (
@@ -631,6 +642,7 @@ const ReportsPage = () => {
             <Card title="审批记录" size="small">
               <List
                 dataSource={historyRecords}
+                locale={{ emptyText: '暂无审批记录' }}
                 renderItem={(item) => (
                   <List.Item>
                     <List.Item.Meta
@@ -663,9 +675,10 @@ const ReportsPage = () => {
                         <Space direction="vertical">
                           <span>{item.content}</span>
                           <Flex gap={8} wrap>
-                            {item.images?.map((img) => (
-                              <Avatar key={img} src={img} shape="square" size={48} />
-                            ))}
+                            {item.images?.map((img) => {
+                              const imgUrl = img.startsWith('http') ? img : `https://api.hodaruner.cn${img}`
+                              return <Avatar key={img} src={imgUrl} shape="square" size={48} />
+                            })}
                           </Flex>
                         </Space>
                       }
@@ -748,9 +761,10 @@ const ReportsPage = () => {
               <Button icon={<CloudUploadOutlined />}>上传图片</Button>
             </Upload>
             <Flex gap={8} wrap>
-              {(createForm.getFieldValue('images') || []).map((img: string) => (
-                <Avatar key={img} src={img} shape="square" size={64} />
-              ))}
+              {(createForm.getFieldValue('images') || []).map((img: string) => {
+                const imgUrl = img.startsWith('http') ? img : `https://api.hodaruner.cn${img}`
+                return <Avatar key={img} src={imgUrl} shape="square" size={64} />
+              })}
             </Flex>
           </Form.Item>
         </Form>
