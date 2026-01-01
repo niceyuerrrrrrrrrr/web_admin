@@ -359,3 +359,13 @@ export const fetchApprovalRanking = (params: { beginDate?: string; endDate?: str
       },
     }),
   )
+
+export interface BatchDeletePayload {
+  items: Array<{
+    approval_type: string
+    id: number
+  }>
+}
+
+export const batchDeleteApprovals = (payload: BatchDeletePayload) =>
+  unwrap(client.post('/approval/batch-delete', payload))

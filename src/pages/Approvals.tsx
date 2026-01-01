@@ -33,6 +33,7 @@ import dayjs from 'dayjs'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   APPROVAL_TYPES,
+  batchDeleteApprovals,
   fetchApprovalDetail,
   fetchApprovalHistory,
   fetchApprovalStats,
@@ -49,6 +50,7 @@ import {
   type ApprovalStats,
   type ApprovalTimelineResponse,
   type ApprovalTrendStats,
+  type BatchDeletePayload,
   type ManagerStatusStat,
   type ManagerTypeStat,
 } from '../api/services/approval'
@@ -135,8 +137,12 @@ const ApprovalsPage = () => {
   const [viewMode, setViewMode] = useState<'list' | 'dashboard'>('list')
   const { selectedCompanyId } = useCompanyStore() // 从全局状态读取
   const [pendingFilters, setPendingFilters] = useState<{ approvalType?: string }>({})
-  const [historyFilters, setHistoryFilters] = useState<HistoryFilters>({ status: 'all' })
+  const [historyFilters, setHistoryFilters] = useState<HistoryFilters>({
+    status: 'all',
+  })
   const [historyPagination, setHistoryPagination] = useState({ current: 1, pageSize: 10 })
+  const [selectedPendingKeys, setSelectedPendingKeys] = useState<React.Key[]>([])
+  const [selectedHistoryKeys, setSelectedHistoryKeys] = useState<React.Key[]>([])
   const [activeTab, setActiveTab] = useState('pending')
 
   const [detailContext, setDetailContext] = useState<{ approvalType: string; id: number } | null>(
@@ -247,6 +253,21 @@ const ApprovalsPage = () => {
     },
     onError: (error) => {
       message.error((error as Error).message || '操作失败')
+    },
+  })
+
+  const batchDeleteMutation = useMutation({
+    mutationFn: (payload: BatchDeletePayload) => batchDeleteApprovals(payload),
+    onSuccess: () => {
+      message.success('批量删除成功')
+      queryClient.invalidateQueries({ queryKey: ['approval', 'pending'] })
+      queryClient.invalidateQueries({ queryKey: ['approval', 'stats'] })
+      queryClient.invalidateQueries({ queryKey: ['approval', 'history'] })
+      setSelectedPendingKeys([])
+      setSelectedHistoryKeys([])
+    },
+    onError: (error) => {
+      message.error((error as Error).message || '批量删除失败')
     },
   })
 
@@ -724,6 +745,28 @@ const ApprovalsPage = () => {
     setSelectedTypeForDrill(null)
   }
 
+  const handleBatchDelete = (keys: React.Key[], dataSource?: ApprovalCoreFields[]) => {
+    if (!keys.length) {
+      message.warning('请先选择要删除的记录')
+      return
+    }
+
+    Modal.confirm({
+      title: '确认批量删除',
+      content: `确定要删除选中的 ${keys.length} 条审批记录吗？此操作不可恢复。`,
+      okText: '确认删除',
+      okType: 'danger',
+      cancelText: '取消',
+      onOk: () => {
+        const items = keys.map((key) => {
+          const [approvalType, id] = String(key).split('-')
+          return { approval_type: approvalType, id: Number(id) }
+        })
+        batchDeleteMutation.mutate({ items })
+      },
+    })
+  }
+
   const detailFields = detailContext ? detailFieldPresets[detailContext.approvalType] : undefined
   const detailData = detailQuery.data?.detail ?? {}
   const timelineInstance = timelineQuery.data?.instance
@@ -810,6 +853,30 @@ const ApprovalsPage = () => {
                     </Form.Item>
                   </Form>
 
+                  {selectedPendingKeys.length > 0 && (
+                    <Alert
+                      message={`已选择 ${selectedPendingKeys.length} 条记录`}
+                      type="info"
+                      showIcon
+                      action={
+                        <Space>
+                          <Button size="small" onClick={() => setSelectedPendingKeys([])}>
+                            取消选择
+                          </Button>
+                          <Button
+                            size="small"
+                            type="primary"
+                            danger
+                            loading={batchDeleteMutation.isPending}
+                            onClick={() => handleBatchDelete(selectedPendingKeys, pendingQuery.data?.records)}
+                          >
+                            批量删除
+                          </Button>
+                        </Space>
+                      }
+                    />
+                  )}
+
                   <Table
                     rowKey={(record) => `${record.approval_type}-${record.id}`}
                     columns={pendingColumns}
@@ -818,6 +885,11 @@ const ApprovalsPage = () => {
                     pagination={false}
                     scroll={{ x: 900 }}
                     locale={{ emptyText: pendingQuery.isLoading ? <Empty description="加载中" /> : <Empty description="暂无待审批" /> }}
+                    rowSelection={{
+                      selectedRowKeys: selectedPendingKeys,
+                      onChange: (keys) => setSelectedPendingKeys(keys),
+                      preserveSelectedRowKeys: true,
+                    }}
                   />
                 </Space>
               ),
@@ -862,6 +934,30 @@ const ApprovalsPage = () => {
                     </Form.Item>
                   </Form>
 
+                  {selectedHistoryKeys.length > 0 && (
+                    <Alert
+                      message={`已选择 ${selectedHistoryKeys.length} 条记录`}
+                      type="info"
+                      showIcon
+                      action={
+                        <Space>
+                          <Button size="small" onClick={() => setSelectedHistoryKeys([])}>
+                            取消选择
+                          </Button>
+                          <Button
+                            size="small"
+                            type="primary"
+                            danger
+                            loading={batchDeleteMutation.isPending}
+                            onClick={() => handleBatchDelete(selectedHistoryKeys, historyQuery.data?.records)}
+                          >
+                            批量删除
+                          </Button>
+                        </Space>
+                      }
+                    />
+                  )}
+
                   <Table
                     rowKey={(record) => `${record.approval_type}-${record.id}`}
                     columns={historyColumns}
@@ -875,6 +971,11 @@ const ApprovalsPage = () => {
                       showSizeChanger: true,
                     }}
                     scroll={{ x: 900 }}
+                    rowSelection={{
+                      selectedRowKeys: selectedHistoryKeys,
+                      onChange: (keys) => setSelectedHistoryKeys(keys),
+                      preserveSelectedRowKeys: true,
+                    }}
                   />
                 </Space>
               ),
