@@ -257,7 +257,6 @@ const ReceiptsPage = () => {
   const deleteWaterMutation = useMutation({
     mutationFn: (id: number) => deleteWaterTicket(id),
     onSuccess: () => {
-      message.success('删除成功')
       queryClient.invalidateQueries({ queryKey: ['receipts'] })
       setSelectedRowKeys([])
     },
@@ -285,8 +284,8 @@ const ReceiptsPage = () => {
   const deleteLoadingMutation = useMutation({
     mutationFn: (id: number) => deleteLoadingReceipt(id),
     onSuccess: () => {
-      message.success('删除成功')
       queryClient.invalidateQueries({ queryKey: ['receipts'] })
+      setSelectedRowKeys([])
     },
     onError: (error) => {
       message.error((error as Error).message || '删除失败')
@@ -312,8 +311,8 @@ const ReceiptsPage = () => {
   const deleteUnloadingMutation = useMutation({
     mutationFn: (id: number) => deleteUnloadingReceipt(id),
     onSuccess: () => {
-      message.success('删除成功')
       queryClient.invalidateQueries({ queryKey: ['receipts'] })
+      setSelectedRowKeys([])
     },
     onError: (error) => {
       message.error((error as Error).message || '删除失败')
@@ -324,8 +323,8 @@ const ReceiptsPage = () => {
   const deleteChargingMutation = useMutation({
     mutationFn: (id: number) => deleteChargingReceipt(id),
     onSuccess: () => {
-      message.success('删除成功')
       queryClient.invalidateQueries({ queryKey: ['receipts'] })
+      setSelectedRowKeys([])
     },
     onError: (error) => {
       message.error((error as Error).message || '删除失败')
@@ -351,8 +350,8 @@ const ReceiptsPage = () => {
   const deleteDepartureMutation = useMutation({
     mutationFn: (id: number) => deleteDepartureReceipt(id),
     onSuccess: () => {
-      message.success('删除成功')
       queryClient.invalidateQueries({ queryKey: ['receipts'] })
+      setSelectedRowKeys([])
     },
     onError: (error) => {
       message.error((error as Error).message || '删除失败')
@@ -406,14 +405,19 @@ const ReceiptsPage = () => {
         try {
           if (receipt.type === 'loading') {
             await deleteLoadingMutation.mutateAsync(receipt.id)
+            message.success('删除成功')
           } else if (receipt.type === 'unloading') {
             await deleteUnloadingMutation.mutateAsync(receipt.id)
+            message.success('删除成功')
           } else if (receipt.type === 'charging') {
             await deleteChargingMutation.mutateAsync(receipt.id)
+            message.success('删除成功')
           } else if (receipt.type === 'water') {
             await deleteWaterMutation.mutateAsync(receipt.id)
+            message.success('删除成功')
           } else if (receipt.type === 'departure') {
             await deleteDepartureMutation.mutateAsync(receipt.id)
+            message.success('删除成功')
           }
         } catch (error) {
           // Error is handled by mutation
@@ -1999,8 +2003,7 @@ const ReceiptsPage = () => {
             }
           })
           await Promise.all(deletePromises)
-          message.success('删除成功')
-          setSelectedRowKeys([])
+          message.success(`成功删除 ${selectedRowKeys.length} 条记录`)
         } catch (error) {
           message.error('删除失败：' + (error as Error).message)
         }
