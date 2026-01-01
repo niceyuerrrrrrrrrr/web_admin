@@ -8,6 +8,7 @@ import {
   DatePicker,
   Descriptions,
   Drawer,
+  Empty,
   Flex,
   Form,
   Input,
@@ -20,6 +21,7 @@ import {
   Table,
   Tabs,
   Tag,
+  Timeline,
   Upload,
 } from 'antd'
 import { Column, Pie } from '@ant-design/charts'
@@ -643,24 +645,35 @@ const ReportsPage = () => {
                 <Button onClick={() => handleRevoke(selectedDetail)}>撤销</Button>
               )}
             </Flex>
-            <Card title="审批记录" size="small">
-              <List
-                dataSource={historyRecords}
-                locale={{ emptyText: '暂无审批记录' }}
-                renderItem={(item) => (
-                  <List.Item>
-                    <List.Item.Meta
-                      title={`${item.approver_name} - ${item.action}`}
-                      description={
-                        <Space direction="vertical">
-                          <span>{item.comment}</span>
-                          <span style={{ color: '#999' }}>{item.created_at}</span>
-                        </Space>
-                      }
-                    />
-                  </List.Item>
-                )}
-              />
+            <Card title="审批流程" size="small">
+              {historyRecords.length > 0 ? (
+                <Timeline
+                  items={historyRecords.map((item) => ({
+                    color: item.action === '通过' ? 'green' : item.action === '拒绝' ? 'red' : 'blue',
+                    children: (
+                      <div>
+                        <div style={{ fontWeight: 500, marginBottom: 4 }}>
+                          {item.approver_name} · {item.action === '通过' ? '已通过' : item.action === '拒绝' ? '已拒绝' : item.action}
+                        </div>
+                        {item.comment && (
+                          <div style={{ color: '#666', marginBottom: 4 }}>{item.comment}</div>
+                        )}
+                        <div style={{ color: '#999', fontSize: 12 }}>
+                          时间：{item.created_at ? new Date(item.created_at).toLocaleString('zh-CN', { 
+                            year: 'numeric', 
+                            month: '2-digit', 
+                            day: '2-digit', 
+                            hour: '2-digit', 
+                            minute: '2-digit' 
+                          }) : '-'}
+                        </div>
+                      </div>
+                    ),
+                  }))}
+                />
+              ) : (
+                <Empty description="暂无审批记录" />
+              )}
             </Card>
             <Card title="评论" size="small">
               <List
