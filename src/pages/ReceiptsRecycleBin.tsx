@@ -118,23 +118,45 @@ export default function ReceiptsRecycleBin() {
   useEffect(() => {
     const loadDepartmentsAndDrivers = async () => {
       try {
-        // TODO: 从后端API加载部门和司机数据
-        // 临时使用测试数据以确保UI可见
-        setDepartments([
-          { id: 1, name: '销售部' },
-          { id: 2, name: '技术部' },
-          { id: 3, name: '运营部' },
-        ])
-        setDrivers([
-          { id: 1, name: '张三' },
-          { id: 2, name: '李四' },
-          { id: 3, name: '王五' },
-        ])
+        // 从API加载部门列表
+        const deptResponse = await client.get('/departments', {
+          params: { company_id: effectiveCompanyId },
+        })
+        if (deptResponse.data.success) {
+          setDepartments(
+            deptResponse.data.data.map((dept: any) => ({
+              id: dept.id,
+              name: dept.name,
+            }))
+          )
+        }
+
+        // 从API加载司机列表
+        const driverResponse = await client.get('/users', {
+          params: {
+            company_id: effectiveCompanyId,
+            position_type: '司机',
+          },
+        })
+        if (driverResponse.data.success) {
+          setDrivers(
+            driverResponse.data.data.map((user: any) => ({
+              id: user.id,
+              name: user.nickname || user.username,
+            }))
+          )
+        }
       } catch (error) {
         console.error('加载部门和司机数据失败:', error)
+        // 加载失败时使用空数组
+        setDepartments([])
+        setDrivers([])
       }
     }
-    loadDepartmentsAndDrivers()
+    
+    if (effectiveCompanyId) {
+      loadDepartmentsAndDrivers()
+    }
   }, [effectiveCompanyId])
 
   // 根据业务类型获取应显示的tabs
@@ -308,16 +330,38 @@ export default function ReceiptsRecycleBin() {
     if (type === 'loading' || type === 'unloading') {
       baseColumns.push(
         {
-          title: '车牌号',
-          dataIndex: 'vehicle_no',
-          key: 'vehicle_no',
-          width: 120,
+          title: '公司',
+          dataIndex: 'company',
+          key: 'company',
+          width: 150,
+          render: (val: string) => val || '-',
         },
         {
           title: '司机',
           dataIndex: 'driver_name',
           key: 'driver_name',
           width: 100,
+          render: (val: string) => val || '-',
+        },
+        {
+          title: '车牌号',
+          dataIndex: 'vehicle_no',
+          key: 'vehicle_no',
+          width: 120,
+        },
+        {
+          title: '材料名称',
+          dataIndex: 'material_name',
+          key: 'material_name',
+          width: 150,
+          render: (val: string) => val || '-',
+        },
+        {
+          title: '规格型号',
+          dataIndex: 'material_spec',
+          key: 'material_spec',
+          width: 150,
+          render: (val: string) => val || '-',
         },
         {
           title: '净重(t)',
@@ -330,6 +374,13 @@ export default function ReceiptsRecycleBin() {
     } else if (type === 'charging') {
       baseColumns.push(
         {
+          title: '司机',
+          dataIndex: 'driver_name',
+          key: 'driver_name',
+          width: 100,
+          render: (val: string) => val || '-',
+        },
+        {
           title: '车牌号',
           dataIndex: 'vehicle_no',
           key: 'vehicle_no',
@@ -340,6 +391,14 @@ export default function ReceiptsRecycleBin() {
           dataIndex: 'charging_station',
           key: 'charging_station',
           width: 150,
+          render: (val: string) => val || '-',
+        },
+        {
+          title: '充电桩',
+          dataIndex: 'charging_pile',
+          key: 'charging_pile',
+          width: 100,
+          render: (val: string) => val || '-',
         },
         {
           title: '电量(kWh)',
@@ -347,42 +406,80 @@ export default function ReceiptsRecycleBin() {
           key: 'energy_kwh',
           width: 100,
           render: (val: number) => val?.toFixed(2) || '-',
+        },
+        {
+          title: '金额(元)',
+          dataIndex: 'amount',
+          key: 'amount',
+          width: 100,
+          render: (val: number) => val?.toFixed(2) || '-',
         }
       )
     } else if (type === 'water') {
       baseColumns.push(
         {
+          title: '司机',
+          dataIndex: 'driver_name',
+          key: 'driver_name',
+          width: 100,
+          render: (val: string) => val || '-',
+        },
+        {
           title: '公司',
           dataIndex: 'company_name',
           key: 'company_name',
-          width: 200,
+          width: 150,
+          render: (val: string) => val || '-',
         },
         {
           title: '车牌号',
           dataIndex: 'vehicle_no',
           key: 'vehicle_no',
           width: 120,
+        },
+        {
+          title: '日期',
+          dataIndex: 'ticket_date',
+          key: 'ticket_date',
+          width: 120,
+          render: (val: string) => (val ? dayjs(val).format('YYYY-MM-DD') : '-'),
         }
       )
     } else if (type === 'departure') {
       baseColumns.push(
         {
+          title: '司机',
+          dataIndex: 'driver_name',
+          key: 'driver_name',
+          width: 100,
+          render: (val: string) => val || '-',
+        },
+        {
           title: '车牌号',
           dataIndex: 'vehicle_no',
           key: 'vehicle_no',
           width: 120,
         },
         {
-          title: '司机',
-          dataIndex: 'driver_name',
-          key: 'driver_name',
-          width: 100,
+          title: '自编车号',
+          dataIndex: 'tanker_vehicle_code',
+          key: 'tanker_vehicle_code',
+          width: 120,
+          render: (val: string) => val || '-',
+        },
+        {
+          title: '装料公司',
+          dataIndex: 'loading_company',
+          key: 'loading_company',
+          width: 150,
+          render: (val: string) => val || '-',
         },
         {
           title: '方量',
           dataIndex: 'concrete_volume',
           key: 'concrete_volume',
           width: 100,
+          render: (val: number) => val?.toFixed(2) || '-',
         }
       )
     }
