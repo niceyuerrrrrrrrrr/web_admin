@@ -227,13 +227,20 @@ const DriverSalaryPage: React.FC = () => {
   }
 
   // 合并汇总数据和配置数据
-  const summaryList = summaryData?.data || []
-  const configList = driverConfigData?.data || []
+  // 后端返回格式: { summaries: [...] } 或 { configs: [...] } 或直接数组
+  const rawSummaryData = summaryData?.data as any
+  const rawConfigData = driverConfigData?.data as any
+  const summaryList: any[] = Array.isArray(rawSummaryData) 
+    ? rawSummaryData 
+    : (rawSummaryData?.summaries || [])
+  const configList: any[] = Array.isArray(rawConfigData) 
+    ? rawConfigData 
+    : (rawConfigData?.configs || [])
   
   const allUsers = (usersData as any)?.items || []
   
-  const configMap = new Map(configList.map((c) => [c.user_id, c]))
-  const summaryMap = new Map(summaryList.map((s) => [s.user_id, s]))
+  const configMap = new Map(configList.map((c: any) => [c.user_id, c]))
+  const summaryMap = new Map(summaryList.map((s: any) => [s.user_id, s]))
 
   // 从所有用户中筛选司机，并合并工资汇总和配置信息
   const mergedData = allUsers

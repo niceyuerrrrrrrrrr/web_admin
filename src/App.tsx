@@ -453,40 +453,50 @@ const AppLayout = () => {
 
   const isSuperAdmin = user?.role === 'super_admin' || user?.positionType === '超级管理员'
 
-  const generateMenuItems = (routes: any[]): MenuProps['items'] => {
-    const items: any[] = []
-    
-    for (const item of routes) {
-      // 过滤掉公司管理菜单项（非超级管理员）
-      if (item.key === 'companies' && !isSuperAdmin) {
-        continue
-      }
+  // 判断是否是司机
+  const isDriver = user?.positionType === '司机'
+
+  const menuItems = useMemo(() => {
+    const generateMenuItems = (routes: any[]): MenuProps['items'] => {
+      const items: any[] = []
       
-      if (item.children) {
-        // 递归处理子菜单，并过滤掉公司管理
-        const filteredChildren = generateMenuItems(item.children)
-        // 如果过滤后子菜单为空，则不显示父菜单
-        if (filteredChildren && filteredChildren.length > 0) {
+      for (const item of routes) {
+        // 过滤掉公司管理菜单项（非超级管理员）
+        if (item.key === 'companies' && !isSuperAdmin) {
+          continue
+        }
+        
+        // 过滤掉工资管理菜单项（司机不可见）
+        if (item.key === 'salary' && isDriver) {
+          continue
+        }
+        
+        if (item.children) {
+          // 递归处理子菜单，并过滤掉公司管理
+          const filteredChildren = generateMenuItems(item.children)
+          // 如果过滤后子菜单为空，则不显示父菜单
+          if (filteredChildren && filteredChildren.length > 0) {
+            items.push({
+              key: item.key,
+              label: item.label,
+              icon: item.icon,
+              children: filteredChildren,
+            })
+          }
+        } else {
           items.push({
             key: item.key,
             label: item.label,
             icon: item.icon,
-            children: filteredChildren,
           })
         }
-      } else {
-        items.push({
-          key: item.key,
-          label: item.label,
-          icon: item.icon,
-        })
       }
+      
+      return items
     }
     
-    return items
-  }
-
-  const menuItems = useMemo(() => generateMenuItems(routeDefinitions), [isSuperAdmin])
+    return generateMenuItems(routeDefinitions)
+  }, [isSuperAdmin, isDriver])
 
   const handleMenuClick: MenuProps['onClick'] = ({ key }) => {
     const route = flattenRoutes(routeDefinitions).find((item: any) => item.key === key)
