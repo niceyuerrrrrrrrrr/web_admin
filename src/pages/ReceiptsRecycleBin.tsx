@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import {
   Alert,
+  App,
   Button,
   Card,
   DatePicker,
@@ -84,6 +85,7 @@ const permanentlyDeleteReceipt = async (type: ReceiptType, id: number) => {
 export default function ReceiptsRecycleBin() {
   const { user } = useAuthStore()
   const { selectedCompanyId } = useCompanyStore()
+  const { message, modal } = App.useApp()
   const queryClient = useQueryClient()
   const isSuperAdmin = user?.role === 'super_admin' || user?.positionType === '超级管理员'
   const effectiveCompanyId = isSuperAdmin ? selectedCompanyId : user?.companyId
@@ -155,15 +157,17 @@ export default function ReceiptsRecycleBin() {
   // 单个恢复
   const handleRestore = useCallback(
     (receipt: Receipt) => {
-      Modal.confirm({
+      modal.confirm({
         title: '确认恢复',
         content: `确定要恢复该${RECEIPT_TYPES.find((t) => t.value === receipt.type)?.label || '票据'}吗？`,
+        okText: '确认',
+        cancelText: '取消',
         onOk: async () => {
           await restoreMutation.mutateAsync({ type: receipt.type, id: receipt.id })
         },
       })
     },
-    [restoreMutation]
+    [modal, restoreMutation]
   )
 
   // 批量恢复
@@ -175,9 +179,11 @@ export default function ReceiptsRecycleBin() {
 
     const typeLabel = RECEIPT_TYPES.find((t) => t.value === activeTab)?.label || '票据'
 
-    Modal.confirm({
+    modal.confirm({
       title: '确认恢复',
       content: `确定要恢复选中的 ${selectedRowKeys.length} 条${typeLabel}记录吗？`,
+      okText: '确认',
+      cancelText: '取消',
       onOk: async () => {
         try {
           const restorePromises = selectedRowKeys.map((key) => {
@@ -193,12 +199,12 @@ export default function ReceiptsRecycleBin() {
         }
       },
     })
-  }, [selectedRowKeys, activeTab, restoreMutation])
+  }, [modal, selectedRowKeys, activeTab, restoreMutation])
 
   // 永久删除
   const handlePermanentDelete = useCallback(
     (receipt: Receipt) => {
-      Modal.confirm({
+      modal.confirm({
         title: '确认永久删除',
         content: (
           <div>
@@ -210,13 +216,14 @@ export default function ReceiptsRecycleBin() {
           </div>
         ),
         okText: '确认删除',
-        okType: 'danger',
+        okButtonProps: { danger: true },
+        cancelText: '取消',
         onOk: async () => {
           await permanentDeleteMutation.mutateAsync({ type: receipt.type, id: receipt.id })
         },
       })
     },
-    [permanentDeleteMutation]
+    [modal, permanentDeleteMutation]
   )
 
   // 表格列定义
