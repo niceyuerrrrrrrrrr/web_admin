@@ -746,11 +746,15 @@ const ApprovalsPage = () => {
   }
 
   const handleBatchDelete = (keys: React.Key[]) => {
+    console.log('[批量删除] 函数被调用，keys:', keys)
+    
     if (!keys.length) {
+      console.log('[批量删除] keys为空，显示警告')
       message.warning('请先选择要删除的记录')
       return
     }
 
+    console.log('[批量删除] 准备显示确认对话框')
     Modal.confirm({
       title: '确认批量删除',
       content: `确定要删除选中的 ${keys.length} 条审批记录吗？此操作不可恢复。`,
@@ -758,10 +762,12 @@ const ApprovalsPage = () => {
       okType: 'danger',
       cancelText: '取消',
       onOk: () => {
+        console.log('[批量删除] 用户确认删除')
         const items = keys.map((key) => {
           const [approvalType, id] = String(key).split('-')
           return { approval_type: approvalType, id: Number(id) }
         })
+        console.log('[批量删除] 准备调用API，items:', items)
         batchDeleteMutation.mutate({ items })
       },
     })
