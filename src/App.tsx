@@ -170,6 +170,12 @@ const routeDefinitions = [
             path: '/receipts/analytics',
             element: <ReceiptAnalytics />,
           },
+          {
+            key: 'receipts-recycle-bin',
+            label: '回收站',
+            path: '/receipts/recycle-bin',
+            element: <ReceiptsRecycleBin />,
+          },
         ],
       },
       {
