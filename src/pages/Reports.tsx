@@ -610,7 +610,7 @@ const ReportsPage = () => {
               </Descriptions.Item>
             </Descriptions>
             <Flex gap={12} wrap>
-              {selectedDetail.images?.map((img) => {
+              {selectedDetail.images?.filter(img => img).map((img) => {
                 const imgUrl = img.startsWith('http') ? img : `https://api.hodaruner.cn${img}`
                 return <Avatar shape="square" key={img} src={imgUrl} size={80} />
               })}
@@ -675,7 +675,7 @@ const ReportsPage = () => {
                         <Space direction="vertical">
                           <span>{item.content}</span>
                           <Flex gap={8} wrap>
-                            {item.images?.map((img) => {
+                            {item.images?.filter(img => img).map((img) => {
                               const imgUrl = img.startsWith('http') ? img : `https://api.hodaruner.cn${img}`
                               return <Avatar key={img} src={imgUrl} shape="square" size={48} />
                             })}
@@ -697,9 +697,10 @@ const ReportsPage = () => {
                   <Button icon={<CloudUploadOutlined />}>上传图片</Button>
                 </Upload>
                 <Flex gap={8}>
-                  {commentImages.map((img) => (
-                    <Avatar key={img} src={img} shape="square" size={48} />
-                  ))}
+                  {commentImages.filter(img => img).map((img) => {
+                    const imgUrl = img.startsWith('http') ? img : `https://api.hodaruner.cn${img}`
+                    return <Avatar key={img} src={imgUrl} shape="square" size={48} />
+                  })}
                 </Flex>
                 <Button
                   type="primary"
@@ -761,7 +762,7 @@ const ReportsPage = () => {
               <Button icon={<CloudUploadOutlined />}>上传图片</Button>
             </Upload>
             <Flex gap={8} wrap>
-              {(createForm.getFieldValue('images') || []).map((img: string) => {
+              {(createForm.getFieldValue('images') || []).filter((img: string) => img).map((img: string) => {
                 const imgUrl = img.startsWith('http') ? img : `https://api.hodaruner.cn${img}`
                 return <Avatar key={img} src={imgUrl} shape="square" size={64} />
               })}
