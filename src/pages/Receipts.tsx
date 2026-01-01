@@ -65,7 +65,7 @@ const getReceiptTypeLabel = (type: ReceiptType) =>
 
 const ReceiptsPage = () => {
   const queryClient = useQueryClient()
-  const { message } = AntdApp.useApp()
+  const { message, modal } = AntdApp.useApp()
   const { user, setAuth } = useAuthStore()
   const { selectedCompanyId } = useCompanyStore()
 
@@ -396,7 +396,6 @@ const ReceiptsPage = () => {
       message.warning('司机无权限删除票据')
       return
     }
-    const { modal } = AntdApp.useApp()
     modal.confirm({
       title: '确认删除',
       content: `确定要删除该${RECEIPT_TYPES.find(t => t.value === receipt.type)?.label || '票据'}吗？此操作不可恢复。`,
@@ -421,7 +420,7 @@ const ReceiptsPage = () => {
         }
       },
     })
-  }, [deleteLoadingMutation, deleteUnloadingMutation, deleteChargingMutation, deleteWaterMutation, deleteDepartureMutation, canEditDelete, message])
+  }, [modal, deleteLoadingMutation, deleteUnloadingMutation, deleteChargingMutation, deleteWaterMutation, deleteDepartureMutation, canEditDelete, message])
 
   // 打开编辑
   const openEdit = useCallback((receipt: Receipt) => {
@@ -1972,7 +1971,6 @@ const ReceiptsPage = () => {
     }
 
     const typeLabel = RECEIPT_TYPES.find(t => t.value === activeTab)?.label || '票据'
-    const { modal } = AntdApp.useApp()
 
     modal.confirm({
       title: '确认删除',
@@ -2008,7 +2006,7 @@ const ReceiptsPage = () => {
         }
       },
     })
-  }, [selectedRowKeys, activeTab, deleteLoadingMutation, deleteUnloadingMutation, deleteChargingMutation, deleteWaterMutation, deleteDepartureMutation, message])
+  }, [modal, selectedRowKeys, activeTab, deleteLoadingMutation, deleteUnloadingMutation, deleteChargingMutation, deleteWaterMutation, deleteDepartureMutation, message])
 
   // 提交编辑
   const handleEditSubmit = useCallback(() => {
