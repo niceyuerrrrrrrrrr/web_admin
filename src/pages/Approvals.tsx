@@ -745,7 +745,7 @@ const ApprovalsPage = () => {
     setSelectedTypeForDrill(null)
   }
 
-  const handleBatchDelete = (keys: React.Key[], dataSource?: ApprovalCoreFields[]) => {
+  const handleBatchDelete = (keys: React.Key[]) => {
     if (!keys.length) {
       message.warning('请先选择要删除的记录')
       return
@@ -868,7 +868,7 @@ const ApprovalsPage = () => {
                             type="primary"
                             danger
                             loading={batchDeleteMutation.isPending}
-                            onClick={() => handleBatchDelete(selectedPendingKeys, pendingQuery.data?.records)}
+                            onClick={() => handleBatchDelete(selectedPendingKeys)}
                           >
                             批量删除
                           </Button>
@@ -949,7 +949,7 @@ const ApprovalsPage = () => {
                             type="primary"
                             danger
                             loading={batchDeleteMutation.isPending}
-                            onClick={() => handleBatchDelete(selectedHistoryKeys, historyQuery.data?.records)}
+                            onClick={() => handleBatchDelete(selectedHistoryKeys)}
                           >
                             批量删除
                           </Button>
