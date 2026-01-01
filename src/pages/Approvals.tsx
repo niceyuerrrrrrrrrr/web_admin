@@ -128,7 +128,7 @@ const getApprovalTypeLabel = (value?: string) =>
 
 const ApprovalsPage = () => {
   const queryClient = useQueryClient()
-  const { message } = AntdApp.useApp()
+  const { message, modal } = AntdApp.useApp()
   const [pendingForm] = Form.useForm()
   const [historyForm] = Form.useForm()
   const [actionForm] = Form.useForm()
@@ -755,7 +755,7 @@ const ApprovalsPage = () => {
     }
 
     console.log('[批量删除] 准备显示确认对话框')
-    Modal.confirm({
+    modal.confirm({
       title: '确认批量删除',
       content: `确定要删除选中的 ${keys.length} 条审批记录吗？此操作不可恢复。`,
       okText: '确认删除',
