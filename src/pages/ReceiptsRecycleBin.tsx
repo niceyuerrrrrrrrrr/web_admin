@@ -118,11 +118,18 @@ export default function ReceiptsRecycleBin() {
   useEffect(() => {
     const loadDepartmentsAndDrivers = async () => {
       try {
-        // 这里应该从API获取部门和司机列表
-        // 暂时使用空数组，实际应该调用后端API
-        setDepartments([])
-        setDrivers([])
         // TODO: 从后端API加载部门和司机数据
+        // 临时使用测试数据以确保UI可见
+        setDepartments([
+          { id: 1, name: '销售部' },
+          { id: 2, name: '技术部' },
+          { id: 3, name: '运营部' },
+        ])
+        setDrivers([
+          { id: 1, name: '张三' },
+          { id: 2, name: '李四' },
+          { id: 3, name: '王五' },
+        ])
       } catch (error) {
         console.error('加载部门和司机数据失败:', error)
       }
