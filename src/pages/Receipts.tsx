@@ -396,9 +396,13 @@ const ReceiptsPage = () => {
       message.warning('司机无权限删除票据')
       return
     }
-    Modal.confirm({
+    const { modal } = AntdApp.useApp()
+    modal.confirm({
       title: '确认删除',
       content: `确定要删除该${RECEIPT_TYPES.find(t => t.value === receipt.type)?.label || '票据'}吗？此操作不可恢复。`,
+      okText: '确认',
+      cancelText: '取消',
+      okButtonProps: { danger: true },
       onOk: async () => {
         try {
           if (receipt.type === 'loading') {
@@ -1968,10 +1972,14 @@ const ReceiptsPage = () => {
     }
 
     const typeLabel = RECEIPT_TYPES.find(t => t.value === activeTab)?.label || '票据'
+    const { modal } = AntdApp.useApp()
 
-    Modal.confirm({
+    modal.confirm({
       title: '确认删除',
       content: `确定要删除选中的 ${selectedRowKeys.length} 条${typeLabel}记录吗？此操作不可恢复。`,
+      okText: '确认',
+      cancelText: '取消',
+      okButtonProps: { danger: true },
       onOk: async () => {
         try {
           const deletePromises = selectedRowKeys.map((key) => {
