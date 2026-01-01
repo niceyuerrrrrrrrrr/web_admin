@@ -40,6 +40,8 @@ const fetchDeletedReceipts = async (params: {
   startDate?: string
   endDate?: string
   companyId?: number
+  departmentId?: number
+  userId?: number
 }) => {
   const response = await client.get('/receipts/deleted', {
     params: {
@@ -47,6 +49,8 @@ const fetchDeletedReceipts = async (params: {
       start_date: params.startDate,
       end_date: params.endDate,
       company_id: params.companyId,
+      department_id: params.departmentId,
+      user_id: params.userId,
     },
   })
   if (!response.data.success) {
@@ -102,8 +106,44 @@ export default function ReceiptsRecycleBin() {
   const [filters, setFilters] = useState<{
     startDate?: string
     endDate?: string
+    departmentId?: number
+    userId?: number
   }>({})
   const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([])
+  const [departments, setDepartments] = useState<Array<{ id: number; name: string }>>([])
+  const [drivers, setDrivers] = useState<Array<{ id: number; name: string }>>([])
+  const [companyBusinessType, setCompanyBusinessType] = useState<'truck' | 'tanker' | null>(null)
+
+  // 加载部门和司机数据
+  useEffect(() => {
+    const loadDepartmentsAndDrivers = async () => {
+      try {
+        // 这里应该从API获取部门和司机列表
+        // 暂时使用空数组，实际应该调用后端API
+        setDepartments([])
+        setDrivers([])
+        // TODO: 从后端API加载部门和司机数据
+      } catch (error) {
+        console.error('加载部门和司机数据失败:', error)
+      }
+    }
+    loadDepartmentsAndDrivers()
+  }, [effectiveCompanyId])
+
+  // 根据业务类型获取应显示的tabs
+  const getVisibleTabs = () => {
+    const allTabs = RECEIPT_TYPES
+    if (!companyBusinessType) return allTabs
+    
+    if (companyBusinessType === 'truck') {
+      // 挂车：只显示装料单、卸货单、充电单
+      return allTabs.filter((t) => ['loading', 'unloading', 'charging'].includes(t.value))
+    } else if (companyBusinessType === 'tanker') {
+      // 罐车：只显示出厂单、充电单、水票
+      return allTabs.filter((t) => ['departure', 'charging', 'water'].includes(t.value))
+    }
+    return allTabs
+  }
 
   // 获取已删除的票据数据
   const receiptsQuery = useQuery<Receipt[]>({
@@ -114,6 +154,8 @@ export default function ReceiptsRecycleBin() {
         startDate: filters.startDate,
         endDate: filters.endDate,
         companyId: effectiveCompanyId,
+        departmentId: filters.departmentId,
+        userId: filters.userId,
       }),
     enabled: isSuperAdmin ? !!effectiveCompanyId : true,
   })
@@ -150,10 +192,14 @@ export default function ReceiptsRecycleBin() {
 
   const handleSearch = (values: {
     dateRange?: Dayjs[]
+    departmentId?: number
+    userId?: number
   }) => {
     setFilters({
       startDate: values.dateRange?.[0]?.format('YYYY-MM-DD'),
       endDate: values.dateRange?.[1]?.format('YYYY-MM-DD'),
+      departmentId: values.departmentId,
+      userId: values.userId,
     })
   }
 
@@ -415,7 +461,7 @@ export default function ReceiptsRecycleBin() {
         <Tabs
           activeKey={activeTab}
           onChange={(key) => setActiveTab(key as ReceiptType)}
-          items={RECEIPT_TYPES.map((type) => ({
+          items={getVisibleTabs().map((type) => ({
             key: type.value,
             label: type.label,
             children: (
@@ -423,6 +469,28 @@ export default function ReceiptsRecycleBin() {
                 <Form layout="inline" onFinish={handleSearch} onReset={handleReset}>
                   <Form.Item name="dateRange" label="删除日期">
                     <RangePicker allowClear />
+                  </Form.Item>
+                  <Form.Item name="departmentId" label="部门">
+                    <Select
+                      placeholder="选择部门"
+                      allowClear
+                      style={{ width: 150 }}
+                      options={departments.map((dept) => ({
+                        label: dept.name,
+                        value: dept.id,
+                      }))}
+                    />
+                  </Form.Item>
+                  <Form.Item name="userId" label="司机">
+                    <Select
+                      placeholder="选择司机"
+                      allowClear
+                      style={{ width: 150 }}
+                      options={drivers.map((driver) => ({
+                        label: driver.name,
+                        value: driver.id,
+                      }))}
+                    />
                   </Form.Item>
                   <Form.Item>
                     <Space>
