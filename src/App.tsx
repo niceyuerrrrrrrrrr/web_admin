@@ -12,6 +12,7 @@ import {
   ClockCircleOutlined,
   CloudDownloadOutlined,
   DatabaseOutlined,
+  DeleteOutlined,
   DollarOutlined,
   FileProtectOutlined,
   FileTextOutlined,
@@ -51,6 +52,7 @@ import ApprovalsPage from './pages/Approvals'
 import ApprovalWorkflowsPage from './pages/ApprovalWorkflows'
 import AttendancePage from './pages/Attendance'
 import ReceiptsPage from './pages/Receipts'
+import ReceiptsRecycleBin from './pages/ReceiptsRecycleBin'
 import ReceiptAnalytics from './pages/ReceiptAnalytics'
 import ReimbursementsPage from './pages/Reimbursements'
 import ChargingStationsPage from './pages/ChargingStations'
