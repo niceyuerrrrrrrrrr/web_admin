@@ -41,7 +41,14 @@ const fetchDeletedReceipts = async (params: {
   endDate?: string
   companyId?: number
 }) => {
-  const response = await client.get('/receipts/deleted', { params })
+  const response = await client.get('/receipts/deleted', {
+    params: {
+      receipt_type: params.receiptType,
+      start_date: params.startDate,
+      end_date: params.endDate,
+      company_id: params.companyId,
+    },
+  })
   if (!response.data.success) {
     throw new Error(response.data.message || '获取失败')
   }
