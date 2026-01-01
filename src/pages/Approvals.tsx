@@ -280,6 +280,20 @@ const ApprovalsPage = () => {
     actionForm.resetFields()
   }, [actionForm])
 
+  const handleSingleDelete = useCallback((record: ApprovalCoreFields) => {
+    modal.confirm({
+      title: '确认删除',
+      content: `确定要删除这条${record.type_name}审批记录吗？此操作不可恢复。`,
+      okText: '确认删除',
+      okType: 'danger',
+      cancelText: '取消',
+      onOk: () => {
+        const items = [{ approval_type: record.approval_type, id: record.id }]
+        batchDeleteMutation.mutate({ items })
+      },
+    })
+  }, [modal, batchDeleteMutation])
+
   const formatMetricValue = (record: ManagerTypeStat) => {
     if (record.metric_total == null) return '-'
     if (!record.metric_field) return record.metric_total.toFixed(2)
@@ -649,11 +663,14 @@ const ApprovalsPage = () => {
             <Button type="link" danger onClick={() => openActionModal(record, 'reject')}>
               驳回
             </Button>
+            <Button type="link" danger onClick={() => handleSingleDelete(record)}>
+              删除
+            </Button>
           </Space>
         ),
       },
     ],
-    [openActionModal, openDetail],
+    [openActionModal, openDetail, handleSingleDelete],
   )
 
   const historyColumns: ColumnsType<ApprovalCoreFields> = useMemo(
@@ -690,15 +707,20 @@ const ApprovalsPage = () => {
       },
       {
         title: '操作',
-        width: 100,
+        width: 150,
         render: (_, record) => (
-          <Button type="link" onClick={() => openDetail(record)}>
-            查看
-          </Button>
+          <Space size="small">
+            <Button type="link" onClick={() => openDetail(record)}>
+              查看
+            </Button>
+            <Button type="link" danger onClick={() => handleSingleDelete(record)}>
+              删除
+            </Button>
+          </Space>
         ),
       },
     ],
-    [openDetail],
+    [openDetail, handleSingleDelete],
   )
 
   const handlePendingFilterChange = (_: unknown, allValues: { approvalType?: string }) => {
