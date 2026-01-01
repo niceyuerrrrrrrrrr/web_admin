@@ -341,6 +341,10 @@ const ReportsPage = () => {
       render: (value: ReportStatus) => <Tag color={statusColors[value]}>{statusLabels[value] || value}</Tag>,
     },
     {
+      title: '提交人',
+      dataIndex: 'user_name',
+    },
+    {
       title: '当前审批人',
       dataIndex: 'approver_name',
     },
