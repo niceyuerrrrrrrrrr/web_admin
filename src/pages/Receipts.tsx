@@ -72,7 +72,7 @@ const ReceiptsPage = () => {
   const isSuperAdmin = user?.role === 'super_admin' || user?.positionType === '超级管理员'
   // 检查是否是司机：除了司机，其他角色都可以编辑、删除、导出
   const isDriver = user?.positionType === '司机' || user?.positionType === '挂车司机' || user?.positionType === '罐车司机'
-  const canEditDelete = !isDriver // 非司机可以编辑和删除
+  const canEditDelete = isSuperAdmin || !isDriver // 超级管理员或非司机可以编辑和删除
   
   // 如果用户信息中没有公司信息，从API获取
   const meQuery = useQuery({
