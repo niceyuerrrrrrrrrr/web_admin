@@ -22,6 +22,7 @@ import {
   Table,
   Tabs,
   Tag,
+  TimePicker,
   Typography,
 } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
@@ -42,6 +43,7 @@ import {
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import * as XLSX from 'xlsx'
 import {
+  adminUpdateShift,
   approveMakeupApplication,
   createFence,
   deleteFence,
@@ -104,6 +106,10 @@ const AttendancePage = () => {
   const [editingFence, setEditingFence] = useState<AttendanceFence | null>(null)
   const [fenceForm] = Form.useForm()
   const [makeupStatusFilter, setMakeupStatusFilter] = useState<string>('pending')
+
+  const [shiftEditOpen, setShiftEditOpen] = useState(false)
+  const [editingShift, setEditingShift] = useState<AttendanceShift | null>(null)
+  const [shiftForm] = Form.useForm()
   
   // 列配置状态
   const [historyColumnConfig, setHistoryColumnConfig] = useState<ColumnConfig[]>([])
@@ -229,6 +235,57 @@ const AttendancePage = () => {
   const alerts = alertsQuery.data?.alerts || []
   const fences = fencesQuery.data?.fences || []
   const makeupApplications = makeupQuery.data?.applications || []
+
+  const canEditShift = useMemo(() => {
+    const role = (user as any)?.role
+    const positionType = (user as any)?.positionType
+    return (
+      role === 'super_admin' ||
+      positionType === '超级管理员' ||
+      role === 'admin' ||
+      role === 'general_manager' ||
+      role === 'finance' ||
+      positionType === '财务' ||
+      positionType === '总经理' ||
+      positionType === '管理员'
+    )
+  }, [user])
+
+  const updateShiftMutation = useMutation({
+    mutationFn: (payload: {
+      shift_id: number
+      check_in_time: string
+      check_out_time?: string
+      check_in_location?: string
+      check_out_location?: string
+    }) => adminUpdateShift(payload),
+    onSuccess: () => {
+      message.success('修改成功')
+      setShiftEditOpen(false)
+      setEditingShift(null)
+      shiftForm.resetFields()
+      queryClient.invalidateQueries({ queryKey: ['attendance', 'today-shifts', resolvedUserId] })
+      queryClient.invalidateQueries({ queryKey: ['attendance', 'history', resolvedUserId] })
+      queryClient.invalidateQueries({ queryKey: ['attendance', 'all-history'] })
+    },
+    onError: (err: any) => {
+      message.error(err?.message || '修改失败')
+    },
+  })
+
+  const openShiftEdit = useCallback(
+    (shift: AttendanceShift) => {
+      setEditingShift(shift)
+      shiftForm.setFieldsValue({
+        checkInTime: shift.checkInTime ? dayjs(shift.checkInTime) : null,
+        checkOutTime: shift.checkOutTime ? dayjs(shift.checkOutTime) : null,
+        checkInLocation: shift.inLoc || '',
+        checkOutLocation: shift.outLoc || '',
+      })
+      setShiftEditOpen(true)
+    },
+    [shiftForm],
+  )
 
   // 将打卡记录按班次合并（按用户+日期分组）
   const shiftRecords = useMemo(() => {
@@ -716,8 +773,21 @@ const AttendancePage = () => {
           return <Badge status={status.color as any} text={status.label} />
         },
       },
+      {
+        title: '操作',
+        width: 120,
+        fixed: 'right',
+        render: (_, record) => {
+          if (!canEditShift) return '-'
+          return (
+            <Button type="link" icon={<EditOutlined />} onClick={() => openShiftEdit(record)}>
+              编辑
+            </Button>
+          )
+        },
+      },
     ],
-    [],
+    [canEditShift, openShiftEdit],
   )
 
   // 告警列定义
@@ -1600,6 +1670,53 @@ const AttendancePage = () => {
           </Descriptions>
         )}
       </Drawer>
+
+      <Modal
+        title="编辑班次"
+        open={shiftEditOpen}
+        onCancel={() => {
+          if (updateShiftMutation.isPending) return
+          setShiftEditOpen(false)
+          setEditingShift(null)
+          shiftForm.resetFields()
+        }}
+        onOk={async () => {
+          const values = await shiftForm.validateFields()
+          if (!editingShift) return
+          const checkIn = values.checkInTime ? dayjs(values.checkInTime).format('HH:mm:ss') : ''
+          const checkOut = values.checkOutTime ? dayjs(values.checkOutTime).format('HH:mm:ss') : undefined
+          updateShiftMutation.mutate({
+            shift_id: editingShift.id,
+            check_in_time: checkIn,
+            check_out_time: checkOut,
+            check_in_location: values.checkInLocation,
+            check_out_location: values.checkOutLocation,
+          })
+        }}
+        confirmLoading={updateShiftMutation.isPending}
+        okText="保存"
+        cancelText="取消"
+        destroyOnClose
+      >
+        <Form form={shiftForm} layout="vertical">
+          <Form.Item
+            name="checkInTime"
+            label="上班时间"
+            rules={[{ required: true, message: '请输入上班时间' }]}
+          >
+            <TimePicker format="HH:mm:ss" style={{ width: '100%' }} />
+          </Form.Item>
+          <Form.Item name="checkOutTime" label="下班时间">
+            <TimePicker format="HH:mm:ss" style={{ width: '100%' }} />
+          </Form.Item>
+          <Form.Item name="checkInLocation" label="上班地点">
+            <Input placeholder="可选" />
+          </Form.Item>
+          <Form.Item name="checkOutLocation" label="下班地点">
+            <Input placeholder="可选" />
+          </Form.Item>
+        </Form>
+      </Modal>
 
       {/* 围栏编辑Modal */}
       <Modal

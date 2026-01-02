@@ -56,6 +56,14 @@ export interface AttendanceShift {
   workDurationMinutes: number
 }
 
+export const adminUpdateShift = (data: {
+  shift_id: number
+  check_in_time: string
+  check_out_time?: string
+  check_in_location?: string
+  check_out_location?: string
+}) => unwrap<{ shift: AttendanceShift }>(client.post('/attendance/admin/update-shift', data))
+
 // 考勤统计
 export interface AttendanceStatistics {
   total_days: number
