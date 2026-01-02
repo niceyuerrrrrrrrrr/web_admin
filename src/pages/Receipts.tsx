@@ -634,13 +634,13 @@ const ReceiptsPage = () => {
         title: '进厂时间',
         dataIndex: 'loading_time',
         width: 180,
-        render: (value: string) => (value ? dayjs(value).format('YYYY-MM-DD HH:mm') : '-'),
+        render: (value: string) => (value ? dayjs(value).format('YYYY-MM-DD HH:mm:ss') : '-'),
       },
       {
         title: '出厂时间',
         dataIndex: 'unloading_time',
         width: 180,
-        render: (value: string) => (value ? dayjs(value).format('YYYY-MM-DD HH:mm') : '-'),
+        render: (value: string) => (value ? dayjs(value).format('YYYY-MM-DD HH:mm:ss') : '-'),
       },
       {
         title: '任务ID',
@@ -651,7 +651,7 @@ const ReceiptsPage = () => {
         title: '创建时间',
         dataIndex: 'created_at',
         width: 180,
-        render: (value: string) => (value ? dayjs(value).format('YYYY-MM-DD HH:mm') : '-'),
+        render: (value: string) => (value ? dayjs(value).format('YYYY-MM-DD HH:mm:ss') : '-'),
       },
       {
         title: '装料单图片',
@@ -751,13 +751,13 @@ const ReceiptsPage = () => {
         title: '进厂时间',
         dataIndex: 'loading_time',
         width: 180,
-        render: (value: string) => (value ? dayjs(value).format('YYYY-MM-DD HH:mm') : '-'),
+        render: (value: string) => (value ? dayjs(value).format('YYYY-MM-DD HH:mm:ss') : '-'),
       },
       {
         title: '出厂时间',
         dataIndex: 'unloading_time',
         width: 180,
-        render: (value: string) => (value ? dayjs(value).format('YYYY-MM-DD HH:mm') : '-'),
+        render: (value: string) => (value ? dayjs(value).format('YYYY-MM-DD HH:mm:ss') : '-'),
       },
       {
         title: '任务ID',
@@ -768,7 +768,7 @@ const ReceiptsPage = () => {
         title: '创建时间',
         dataIndex: 'created_at',
         width: 180,
-        render: (value: string) => (value ? dayjs(value).format('YYYY-MM-DD HH:mm') : '-'),
+        render: (value: string) => (value ? dayjs(value).format('YYYY-MM-DD HH:mm:ss') : '-'),
       },
       {
         title: '卸货单图片',
@@ -866,13 +866,13 @@ const ReceiptsPage = () => {
         title: '开始时间',
         dataIndex: 'start_time',
         width: 150,
-        render: (value: string) => (value ? dayjs(value).format('YYYY-MM-DD HH:mm') : '-'),
+        render: (value: string) => (value ? dayjs(value).format('YYYY-MM-DD HH:mm:ss') : '-'),
       },
       {
         title: '结束时间',
         dataIndex: 'end_time',
         width: 150,
-        render: (value: string) => (value ? dayjs(value).format('YYYY-MM-DD HH:mm') : '-'),
+        render: (value: string) => (value ? dayjs(value).format('YYYY-MM-DD HH:mm:ss') : '-'),
       },
       {
         title: '时长(分钟)',
@@ -884,7 +884,7 @@ const ReceiptsPage = () => {
         title: '创建时间',
         dataIndex: 'created_at',
         width: 150,
-        render: (value: string) => (value ? dayjs(value).format('YYYY-MM-DD HH:mm') : '-'),
+        render: (value: string) => (value ? dayjs(value).format('YYYY-MM-DD HH:mm:ss') : '-'),
       },
       {
         title: '充电单图片',
@@ -970,7 +970,7 @@ const ReceiptsPage = () => {
         title: '创建时间',
         dataIndex: 'created_at',
         width: 150,
-        render: (value: string) => (value ? dayjs(value).format('YYYY-MM-DD HH:mm') : '-'),
+        render: (value: string) => (value ? dayjs(value).format('YYYY-MM-DD HH:mm:ss') : '-'),
       },
       {
         title: '操作',
@@ -1088,31 +1088,31 @@ const ReceiptsPage = () => {
         title: '装料进厂时间',
         dataIndex: ['loadBill', 'loading_time'],
         width: 180,
-        render: (value: string) => (value ? dayjs(value).format('YYYY-MM-DD HH:mm') : '-'),
+        render: (value: string) => (value ? dayjs(value).format('YYYY-MM-DD HH:mm:ss') : '-'),
       },
       {
         title: '装料出厂时间',
         dataIndex: ['loadBill', 'unloading_time'],
         width: 180,
-        render: (value: string) => (value ? dayjs(value).format('YYYY-MM-DD HH:mm') : '-'),
+        render: (value: string) => (value ? dayjs(value).format('YYYY-MM-DD HH:mm:ss') : '-'),
       },
       {
         title: '卸货进厂时间',
         dataIndex: ['unloadBill', 'loading_time'],
         width: 180,
-        render: (value: string) => (value ? dayjs(value).format('YYYY-MM-DD HH:mm') : '-'),
+        render: (value: string) => (value ? dayjs(value).format('YYYY-MM-DD HH:mm:ss') : '-'),
       },
       {
         title: '卸货出厂时间',
         dataIndex: ['unloadBill', 'unloading_time'],
         width: 180,
-        render: (value: string) => (value ? dayjs(value).format('YYYY-MM-DD HH:mm') : '-'),
+        render: (value: string) => (value ? dayjs(value).format('YYYY-MM-DD HH:mm:ss') : '-'),
       },
       {
         title: '创建时间',
         dataIndex: 'created_at',
         width: 180,
-        render: (value: string) => (value ? dayjs(value).format('YYYY-MM-DD HH:mm') : '-'),
+        render: (value: string) => (value ? dayjs(value).format('YYYY-MM-DD HH:mm:ss') : '-'),
       },
       {
         title: '装料单图片',
@@ -1291,13 +1291,13 @@ const ReceiptsPage = () => {
         title: '进厂时间',
         dataIndex: 'loading_time',
         width: 150,
-        render: (value: string) => (value ? dayjs(value).format('YYYY-MM-DD HH:mm') : '-'),
+        render: (value: string) => (value ? dayjs(value).format('YYYY-MM-DD HH:mm:ss') : '-'),
       },
       {
         title: '出厂时间',
         dataIndex: 'exit_time',
         width: 150,
-        render: (value: string) => (value ? dayjs(value).format('YYYY-MM-DD HH:mm') : '-'),
+        render: (value: string) => (value ? dayjs(value).format('YYYY-MM-DD HH:mm:ss') : '-'),
       },
       {
         title: '生产日期',
@@ -1309,7 +1309,7 @@ const ReceiptsPage = () => {
         title: '创建时间',
         dataIndex: 'created_at',
         width: 150,
-        render: (value: string) => (value ? dayjs(value).format('YYYY-MM-DD HH:mm') : '-'),
+        render: (value: string) => (value ? dayjs(value).format('YYYY-MM-DD HH:mm:ss') : '-'),
       },
       {
         title: '操作',
@@ -1427,11 +1427,11 @@ const ReceiptsPage = () => {
                 <Descriptions.Item label="任务ID">{(receipt as any).task_id || '-'}</Descriptions.Item>
                 <Descriptions.Item label="状态">{(receipt as any).status === 'finished' ? '已完成' : '进行中'}</Descriptions.Item>
                 <Descriptions.Item label="创建时间">
-                  {(receipt as any).created_at ? dayjs((receipt as any).created_at).format('YYYY-MM-DD HH:mm') : '-'}
+                  {(receipt as any).created_at ? dayjs((receipt as any).created_at).format('YYYY-MM-DD HH:mm:ss') : '-'}
                 </Descriptions.Item>
                 {(receipt as any).finished_at && (
                   <Descriptions.Item label="完成时间">
-                    {dayjs((receipt as any).finished_at).format('YYYY-MM-DD HH:mm')}
+                    {dayjs((receipt as any).finished_at).format('YYYY-MM-DD HH:mm:ss')}
                   </Descriptions.Item>
                 )}
               </Descriptions>
@@ -1473,12 +1473,12 @@ const ReceiptsPage = () => {
                 </Descriptions.Item>
                 <Descriptions.Item label="进厂时间">
                   {(receipt as any).loadBill.loading_time
-                    ? dayjs((receipt as any).loadBill.loading_time).format('YYYY-MM-DD HH:mm')
+                    ? dayjs((receipt as any).loadBill.loading_time).format('YYYY-MM-DD HH:mm:ss')
                     : '-'}
                 </Descriptions.Item>
                 <Descriptions.Item label="创建时间">
                   {(receipt as any).loadBill.created_at
-                    ? dayjs((receipt as any).loadBill.created_at).format('YYYY-MM-DD HH:mm')
+                    ? dayjs((receipt as any).loadBill.created_at).format('YYYY-MM-DD HH:mm:ss')
                     : '-'}
                 </Descriptions.Item>
               </Descriptions>
@@ -1520,12 +1520,12 @@ const ReceiptsPage = () => {
                 </Descriptions.Item>
                 <Descriptions.Item label="卸货时间">
                   {(receipt as any).unloadBill.unloading_time
-                    ? dayjs((receipt as any).unloadBill.unloading_time).format('YYYY-MM-DD HH:mm')
+                    ? dayjs((receipt as any).unloadBill.unloading_time).format('YYYY-MM-DD HH:mm:ss')
                     : '-'}
                 </Descriptions.Item>
                 <Descriptions.Item label="创建时间">
                   {(receipt as any).unloadBill.created_at
-                    ? dayjs((receipt as any).unloadBill.created_at).format('YYYY-MM-DD HH:mm')
+                    ? dayjs((receipt as any).unloadBill.created_at).format('YYYY-MM-DD HH:mm:ss')
                     : '-'}
                 </Descriptions.Item>
               </Descriptions>
@@ -1565,16 +1565,16 @@ const ReceiptsPage = () => {
                 </Descriptions.Item>
                 <Descriptions.Item label="进厂时间">
                   {(receipt as Receipt & { loading_time?: string }).loading_time
-                    ? dayjs((receipt as Receipt & { loading_time?: string }).loading_time).format('YYYY-MM-DD HH:mm')
+                    ? dayjs((receipt as Receipt & { loading_time?: string }).loading_time).format('YYYY-MM-DD HH:mm:ss')
                     : '-'}
                 </Descriptions.Item>
                 <Descriptions.Item label="出厂时间">
                   {(receipt as Receipt & { unloading_time?: string }).unloading_time
-                    ? dayjs((receipt as Receipt & { unloading_time?: string }).unloading_time).format('YYYY-MM-DD HH:mm')
+                    ? dayjs((receipt as Receipt & { unloading_time?: string }).unloading_time).format('YYYY-MM-DD HH:mm:ss')
                     : '-'}
                 </Descriptions.Item>
                 <Descriptions.Item label="创建时间">
-                  {receipt.created_at ? dayjs(receipt.created_at).format('YYYY-MM-DD HH:mm') : '-'}
+                  {receipt.created_at ? dayjs(receipt.created_at).format('YYYY-MM-DD HH:mm:ss') : '-'}
                 </Descriptions.Item>
               </>
             )}
@@ -1615,10 +1615,10 @@ const ReceiptsPage = () => {
                   {receipt.tare_weight ? Number(receipt.tare_weight).toFixed(2) : '-'}
                 </Descriptions.Item>
                 <Descriptions.Item label="进厂时间">
-                  {receipt.loading_time ? dayjs(receipt.loading_time).format('YYYY-MM-DD HH:mm') : '-'}
+                  {receipt.loading_time ? dayjs(receipt.loading_time).format('YYYY-MM-DD HH:mm:ss') : '-'}
                 </Descriptions.Item>
                 <Descriptions.Item label="出厂时间">
-                  {receipt.unloading_time ? dayjs(receipt.unloading_time).format('YYYY-MM-DD HH:mm') : '-'}
+                  {receipt.unloading_time ? dayjs(receipt.unloading_time).format('YYYY-MM-DD HH:mm:ss') : '-'}
                 </Descriptions.Item>
                 <Descriptions.Item label="任务ID">{receipt.task_id || '-'}</Descriptions.Item>
               </>
@@ -1645,19 +1645,19 @@ const ReceiptsPage = () => {
                 </Descriptions.Item>
                 <Descriptions.Item label="开始时间">
                   {(receipt as Receipt & { start_time?: string }).start_time
-                    ? dayjs((receipt as Receipt & { start_time?: string }).start_time).format('YYYY-MM-DD HH:mm')
+                    ? dayjs((receipt as Receipt & { start_time?: string }).start_time).format('YYYY-MM-DD HH:mm:ss')
                     : '-'}
                 </Descriptions.Item>
                 <Descriptions.Item label="结束时间">
                   {(receipt as Receipt & { end_time?: string }).end_time
-                    ? dayjs((receipt as Receipt & { end_time?: string }).end_time).format('YYYY-MM-DD HH:mm')
+                    ? dayjs((receipt as Receipt & { end_time?: string }).end_time).format('YYYY-MM-DD HH:mm:ss')
                     : '-'}
                 </Descriptions.Item>
                 <Descriptions.Item label="时长(分钟)">
                   {(receipt as Receipt & { duration_min?: number }).duration_min || '-'}
                 </Descriptions.Item>
                 <Descriptions.Item label="创建时间">
-                  {receipt.created_at ? dayjs(receipt.created_at).format('YYYY-MM-DD HH:mm') : '-'}
+                  {receipt.created_at ? dayjs(receipt.created_at).format('YYYY-MM-DD HH:mm:ss') : '-'}
                 </Descriptions.Item>
               </>
             )}
@@ -1684,7 +1684,7 @@ const ReceiptsPage = () => {
                     : '-'}
                 </Descriptions.Item>
                 <Descriptions.Item label="创建时间">
-                  {receipt.created_at ? dayjs(receipt.created_at).format('YYYY-MM-DD HH:mm') : '-'}
+                  {receipt.created_at ? dayjs(receipt.created_at).format('YYYY-MM-DD HH:mm:ss') : '-'}
                 </Descriptions.Item>
               </>
             )}
@@ -1740,12 +1740,12 @@ const ReceiptsPage = () => {
                 </Descriptions.Item>
                 <Descriptions.Item label="进厂时间">
                   {(receipt as any).loading_time
-                    ? dayjs((receipt as any).loading_time).format('YYYY-MM-DD HH:mm')
+                    ? dayjs((receipt as any).loading_time).format('YYYY-MM-DD HH:mm:ss')
                     : '-'}
                 </Descriptions.Item>
                 <Descriptions.Item label="出厂时间">
                   {(receipt as any).exit_time
-                    ? dayjs((receipt as any).exit_time).format('YYYY-MM-DD HH:mm')
+                    ? dayjs((receipt as any).exit_time).format('YYYY-MM-DD HH:mm:ss')
                     : '-'}
                 </Descriptions.Item>
                 <Descriptions.Item label="生产日期">
@@ -1754,7 +1754,7 @@ const ReceiptsPage = () => {
                     : '-'}
                 </Descriptions.Item>
                 <Descriptions.Item label="创建时间">
-                  {receipt.created_at ? dayjs(receipt.created_at).format('YYYY-MM-DD HH:mm') : '-'}
+                  {receipt.created_at ? dayjs(receipt.created_at).format('YYYY-MM-DD HH:mm:ss') : '-'}
                 </Descriptions.Item>
               </>
             )}
@@ -1806,8 +1806,8 @@ const ReceiptsPage = () => {
             毛重: r.gross_weight || 0,
             净重: r.net_weight || 0,
             皮重: r.tare_weight || 0,
-            进厂时间: r.loading_time ? dayjs(r.loading_time).format('YYYY-MM-DD HH:mm') : '',
-            出厂时间: r.unloading_time ? dayjs(r.unloading_time).format('YYYY-MM-DD HH:mm') : '',
+            进厂时间: r.loading_time ? dayjs(r.loading_time).format('YYYY-MM-DD HH:mm:ss') : '',
+            出厂时间: r.unloading_time ? dayjs(r.unloading_time).format('YYYY-MM-DD HH:mm:ss') : '',
           }
         } else if (receipt.type === 'charging') {
           const r = receipt as Receipt & {
@@ -1911,8 +1911,8 @@ const ReceiptsPage = () => {
             毛重: r.gross_weight || 0,
             净重: r.net_weight || 0,
             皮重: r.tare_weight || 0,
-            进厂时间: r.loading_time ? dayjs(r.loading_time).format('YYYY-MM-DD HH:mm') : '',
-            出厂时间: r.unloading_time ? dayjs(r.unloading_time).format('YYYY-MM-DD HH:mm') : '',
+            进厂时间: r.loading_time ? dayjs(r.loading_time).format('YYYY-MM-DD HH:mm:ss') : '',
+            出厂时间: r.unloading_time ? dayjs(r.unloading_time).format('YYYY-MM-DD HH:mm:ss') : '',
           }
         } else if (receipt.type === 'charging') {
           const r = receipt as Receipt & {
