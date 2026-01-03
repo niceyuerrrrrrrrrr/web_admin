@@ -59,6 +59,44 @@ import {
 const { Title, Paragraph, Text } = Typography
 const { RangePicker } = DatePicker
 
+const parseImages = (val: unknown): string[] => {
+  if (Array.isArray(val)) return val.filter(Boolean) as string[]
+  if (typeof val === 'string') {
+    const s = val.trim()
+    if (!s) return []
+    if (s.startsWith('[') && s.endsWith(']')) {
+      try {
+        const parsed = JSON.parse(s)
+        if (Array.isArray(parsed)) return parsed.filter(Boolean)
+      } catch {
+        // 兼容 python 风格：['a','b']
+        const inner = s.slice(1, -1).trim()
+        if (!inner) return []
+        const parts = inner
+          .split(',')
+          .map((p) => p.trim())
+          .filter(Boolean)
+          .map((p) => {
+            if ((p.startsWith("'") && p.endsWith("'")) || (p.startsWith('"') && p.endsWith('"'))) {
+              return p.slice(1, -1)
+            }
+            return p
+          })
+        return parts.filter(Boolean)
+      }
+    }
+    // 兼容逗号分隔
+    if (s.includes(',') && (s.includes('http://') || s.includes('https://') || s.includes('/uploads/'))) {
+      return s
+        .split(',')
+        .map((p) => p.trim())
+        .filter(Boolean)
+    }
+    return [s]
+  }
+  return []
+}
+
 type ActionType = 'approve' | 'reject'
 
 type HistoryFilters = {
@@ -625,18 +663,26 @@ const ApprovalsPage = () => {
       {
         title: '凭证',
         dataIndex: 'images',
-        width: 120,
-        render: (value: string[] | undefined) => {
-          const imgs = Array.isArray(value) ? value.filter(Boolean) : []
+        width: 220,
+        render: (value: unknown) => {
+          const imgs = parseImages(value)
           if (!imgs.length) return '-'
+          const shown = imgs.slice(0, 3)
+          const rest = imgs.length - shown.length
           return (
             <Image.PreviewGroup>
-              <Image
-                src={imgs[0]}
-                width={48}
-                height={48}
-                style={{ objectFit: 'cover', borderRadius: 6 }}
-              />
+              <Space size={6} wrap>
+                {shown.map((img) => (
+                  <Image
+                    key={img}
+                    src={img}
+                    width={40}
+                    height={40}
+                    style={{ objectFit: 'cover', borderRadius: 6 }}
+                  />
+                ))}
+                {rest > 0 && <Text type="secondary">+{rest}</Text>}
+              </Space>
             </Image.PreviewGroup>
           )
         },
@@ -713,18 +759,26 @@ const ApprovalsPage = () => {
       {
         title: '凭证',
         dataIndex: 'images',
-        width: 120,
-        render: (value: string[] | undefined) => {
-          const imgs = Array.isArray(value) ? value.filter(Boolean) : []
+        width: 220,
+        render: (value: unknown) => {
+          const imgs = parseImages(value)
           if (!imgs.length) return '-'
+          const shown = imgs.slice(0, 3)
+          const rest = imgs.length - shown.length
           return (
             <Image.PreviewGroup>
-              <Image
-                src={imgs[0]}
-                width={48}
-                height={48}
-                style={{ objectFit: 'cover', borderRadius: 6 }}
-              />
+              <Space size={6} wrap>
+                {shown.map((img) => (
+                  <Image
+                    key={img}
+                    src={img}
+                    width={40}
+                    height={40}
+                    style={{ objectFit: 'cover', borderRadius: 6 }}
+                  />
+                ))}
+                {rest > 0 && <Text type="secondary">+{rest}</Text>}
+              </Space>
             </Image.PreviewGroup>
           )
         },
@@ -1083,11 +1137,11 @@ const ApprovalsPage = () => {
                     </Descriptions>
                   </Card>
                 )}
-                {Array.isArray((detailData as any).images) && (detailData as any).images.length > 0 && (
+                {parseImages((detailData as any).images).length > 0 && (
                   <Card size="small" title="凭证" bordered={false}>
                     <Image.PreviewGroup>
                       <Space wrap size="middle">
-                        {(detailData as any).images.map((img: string) => (
+                        {parseImages((detailData as any).images).map((img: string) => (
                           <Image
                             key={img}
                             src={img}
