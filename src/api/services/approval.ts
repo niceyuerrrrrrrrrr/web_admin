@@ -219,6 +219,29 @@ export const fetchApprovalHistory = (params: {
     }),
   )
 
+export const fetchMyApprovedApprovals = (params: {
+  approvalType?: string
+  status?: string
+  beginDate?: string
+  endDate?: string
+  companyId?: number
+  page?: number
+  pageSize?: number
+}) =>
+  unwrap<ApprovalHistoryResponse>(
+    client.get('/approval/my-approved', {
+      params: {
+        approval_type: params.approvalType,
+        status: params.status,
+        begin_date: params.beginDate,
+        end_date: params.endDate,
+        company_id: params.companyId,
+        page: params.page,
+        page_size: params.pageSize,
+      },
+    }),
+  )
+
 export const fetchApprovalDetail = (approvalType: string, id: number) =>
   unwrap<ApprovalDetailResponse>(
     client.get(`/approval/pending/${approvalType}/${id}`),

@@ -28,6 +28,7 @@ import {
 import { UnorderedListOutlined, AppstoreOutlined } from '@ant-design/icons'
 import ApprovalAnalytics from './ApprovalAnalytics'
 import useCompanyStore from '../store/company'
+import useAuthStore from '../store/auth'
 import type { ColumnsType } from 'antd/es/table'
 import type { Dayjs } from 'dayjs'
 import dayjs from 'dayjs'
@@ -37,6 +38,7 @@ import {
   batchDeleteApprovals,
   fetchApprovalDetail,
   fetchApprovalHistory,
+  fetchMyApprovedApprovals,
   fetchApprovalStats,
   fetchApprovalTimeline,
   fetchManagerStats,
@@ -168,6 +170,7 @@ const getApprovalTypeLabel = (value?: string) =>
 const ApprovalsPage = () => {
   const queryClient = useQueryClient()
   const { message, modal } = AntdApp.useApp()
+  const { user: authUser } = useAuthStore()
   const [pendingForm] = Form.useForm()
   const [historyForm] = Form.useForm()
   const [actionForm] = Form.useForm()
@@ -229,9 +232,37 @@ const ApprovalsPage = () => {
   })
 
   const historyQuery = useQuery<ApprovalHistoryResponse>({
-    queryKey: ['approval', 'history', historyFilters, historyPagination, selectedCompanyId],
-    queryFn: () =>
-      fetchApprovalHistory({
+    queryKey: [
+      'approval',
+      'history',
+      (() => {
+        const role = (authUser?.role || '').toLowerCase()
+        const pos = authUser?.positionType || ''
+        const canViewAll =
+          pos === '财务' ||
+          pos === '总经理' ||
+          role === 'super_admin' ||
+          role === 'superadmin' ||
+          role.includes('super') ||
+          authUser?.role === '超级管理员'
+        return canViewAll ? 'all' : 'my-approved'
+      })(),
+      historyFilters,
+      historyPagination,
+      selectedCompanyId,
+    ],
+    queryFn: () => {
+      const role = (authUser?.role || '').toLowerCase()
+      const pos = authUser?.positionType || ''
+      const canViewAll =
+        pos === '财务' ||
+        pos === '总经理' ||
+        role === 'super_admin' ||
+        role === 'superadmin' ||
+        role.includes('super') ||
+        authUser?.role === '超级管理员'
+      const fn = canViewAll ? fetchApprovalHistory : fetchMyApprovedApprovals
+      return fn({
         approvalType: historyFilters.approvalType,
         status: historyFilters.status,
         beginDate: historyFilters.beginDate,
@@ -239,7 +270,8 @@ const ApprovalsPage = () => {
         companyId: selectedCompanyId ?? undefined,
         page: historyPagination.current,
         pageSize: historyPagination.pageSize,
-      }),
+      })
+    },
   })
 
   const detailQuery = useQuery<ApprovalDetailResponse>({
@@ -810,14 +842,27 @@ const ApprovalsPage = () => {
             <Button type="link" onClick={() => openDetail(record)}>
               查看
             </Button>
-            <Button type="link" danger onClick={() => handleSingleDelete(record)}>
-              删除
-            </Button>
+            {(() => {
+              const role = (authUser?.role || '').toLowerCase()
+              const pos = authUser?.positionType || ''
+              const canDelete =
+                pos === '财务' ||
+                pos === '总经理' ||
+                role === 'super_admin' ||
+                role === 'superadmin' ||
+                role.includes('super') ||
+                authUser?.role === '超级管理员'
+              return canDelete
+            })() && (
+              <Button type="link" danger onClick={() => handleSingleDelete(record)}>
+                删除
+              </Button>
+            )}
           </Space>
         ),
       },
     ],
-    [openDetail, handleSingleDelete],
+    [openDetail, handleSingleDelete, authUser?.role, authUser?.positionType],
   )
 
   const handlePendingFilterChange = (_: unknown, allValues: { approvalType?: string }) => {
