@@ -12,6 +12,7 @@ import {
   Flex,
   Form,
   Input,
+  Image,
   Modal,
   Row,
   Select,
@@ -622,6 +623,25 @@ const ApprovalsPage = () => {
         width: 120,
       },
       {
+        title: '凭证',
+        dataIndex: 'images',
+        width: 120,
+        render: (value: string[] | undefined) => {
+          const imgs = Array.isArray(value) ? value.filter(Boolean) : []
+          if (!imgs.length) return '-'
+          return (
+            <Image.PreviewGroup>
+              <Image
+                src={imgs[0]}
+                width={48}
+                height={48}
+                style={{ objectFit: 'cover', borderRadius: 6 }}
+              />
+            </Image.PreviewGroup>
+          )
+        },
+      },
+      {
         title: '金额/数量',
         dataIndex: 'amount',
         width: 150,
@@ -689,6 +709,25 @@ const ApprovalsPage = () => {
         title: '申请人',
         dataIndex: 'user_name',
         width: 120,
+      },
+      {
+        title: '凭证',
+        dataIndex: 'images',
+        width: 120,
+        render: (value: string[] | undefined) => {
+          const imgs = Array.isArray(value) ? value.filter(Boolean) : []
+          if (!imgs.length) return '-'
+          return (
+            <Image.PreviewGroup>
+              <Image
+                src={imgs[0]}
+                width={48}
+                height={48}
+                style={{ objectFit: 'cover', borderRadius: 6 }}
+              />
+            </Image.PreviewGroup>
+          )
+        },
       },
       {
         title: '状态',
@@ -1042,6 +1081,23 @@ const ApprovalsPage = () => {
                         </Descriptions.Item>
                       ))}
                     </Descriptions>
+                  </Card>
+                )}
+                {Array.isArray((detailData as any).images) && (detailData as any).images.length > 0 && (
+                  <Card size="small" title="凭证" bordered={false}>
+                    <Image.PreviewGroup>
+                      <Space wrap size="middle">
+                        {(detailData as any).images.map((img: string) => (
+                          <Image
+                            key={img}
+                            src={img}
+                            width={120}
+                            height={120}
+                            style={{ objectFit: 'cover', borderRadius: 8 }}
+                          />
+                        ))}
+                      </Space>
+                    </Image.PreviewGroup>
                   </Card>
                 )}
                 <Card size="small" title="全部字段" bordered={false}>

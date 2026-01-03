@@ -26,6 +26,7 @@ export type ApprovalCoreFields = {
   amount?: number
   days?: number
   quantity?: number
+  images?: string[]
 }
 
 export type ApprovalPendingResponse = {
