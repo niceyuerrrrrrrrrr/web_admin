@@ -23,6 +23,7 @@ export type ApprovalCoreFields = {
   status: string
   created_at?: string | null
   updated_at?: string | null
+  can_approve?: boolean
   amount?: number
   days?: number
   quantity?: number

@@ -723,15 +723,19 @@ const ApprovalsPage = () => {
             <Button type="link" onClick={() => openDetail(record)}>
               查看
             </Button>
-            <Button type="link" onClick={() => openActionModal(record, 'approve')}>
-              通过
-            </Button>
-            <Button type="link" danger onClick={() => openActionModal(record, 'reject')}>
-              驳回
-            </Button>
-            <Button type="link" danger onClick={() => handleSingleDelete(record)}>
-              删除
-            </Button>
+            {record.can_approve && (
+              <>
+                <Button type="link" onClick={() => openActionModal(record, 'approve')}>
+                  通过
+                </Button>
+                <Button type="link" danger onClick={() => openActionModal(record, 'reject')}>
+                  驳回
+                </Button>
+                <Button type="link" danger onClick={() => handleSingleDelete(record)}>
+                  删除
+                </Button>
+              </>
+            )}
           </Space>
         ),
       },
