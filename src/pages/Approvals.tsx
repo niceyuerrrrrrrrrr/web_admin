@@ -1128,6 +1128,11 @@ const ApprovalsPage = () => {
           <Space direction="vertical" size="large" style={{ width: '100%' }}>
             {detailQuery.isLoading ? (
               <Empty description="加载详情..." />
+            ) : detailQuery.error ? (
+              <Alert
+                type="error"
+                message={(detailQuery.error as Error).message || '加载详情失败'}
+              />
             ) : (
               <>
                 {detailFields && detailFields.length > 0 && (
