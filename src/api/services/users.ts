@@ -169,3 +169,62 @@ export const batchOperateUsers = (params: {
     }),
   )
 
+/**
+ * 批量创建用户
+ */
+export interface BatchCreateUserItem {
+  nickname: string
+  phone: string
+  username?: string
+  password?: string
+  position_type?: string
+  company_id?: number
+  department_id?: number
+  role?: string
+  status?: string
+  plate?: string
+  id_card?: string
+  bank_card?: string
+  bank_name?: string
+  card_holder?: string
+}
+
+export const batchCreateUsers = (params: {
+  users: BatchCreateUserItem[]
+  skip_duplicates?: boolean
+}) =>
+  unwrap<{
+    message: string
+    success_count: number
+    failed_count: number
+    created_users: Array<{ id: number; nickname: string; phone: string; username: string }>
+    errors: Array<{ index: number; phone: string; error: string }>
+  }>(client.post('/users/batch-create', params))
+
+/**
+ * 批量更新用户
+ */
+export interface BatchUpdateUserItem {
+  id: number
+  nickname?: string
+  phone?: string
+  position_type?: string
+  department_id?: number
+  status?: string
+  plate?: string
+  bank_card?: string
+  bank_name?: string
+  card_holder?: string
+}
+
+export const batchUpdateUsers = (params: {
+  users: BatchUpdateUserItem[]
+}) =>
+  unwrap<{
+    message: string
+    success_count: number
+    failed_count: number
+    updated_users: Array<{ id: number; nickname: string; phone: string }>
+    errors: Array<{ index: number; user_id: number; error: string }>
+  }>(client.post('/users/batch-update', params))
+

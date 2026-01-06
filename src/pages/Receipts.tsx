@@ -46,6 +46,7 @@ import {
   deleteChargingReceipt,
   updateDepartureReceipt,
   deleteDepartureReceipt,
+  deleteTransportTask,
 } from '../api/services/receipts'
 import { fetchCompanyDetail } from '../api/services/companies'
 import { fetchDepartments } from '../api/services/departments'
@@ -72,7 +73,9 @@ const ReceiptsPage = () => {
   const isSuperAdmin = user?.role === 'super_admin' || user?.positionType === '超级管理员'
   // 检查是否是司机：除了司机，其他角色都可以编辑、删除、导出
   const isDriver = user?.positionType === '司机' || user?.positionType === '挂车司机' || user?.positionType === '罐车司机'
-  const canEditDelete = isSuperAdmin || !isDriver // 超级管理员或非司机可以编辑和删除
+  // 统计、统计员、车队长、财务、总经理等管理角色可以编辑和删除
+  const isManager = ['统计', '统计员', '车队长', '财务', '总经理'].includes(user?.positionType || '')
+  const canEditDelete = isSuperAdmin || isManager || !isDriver // 超级管理员、管理角色或非司机可以编辑和删除
   
   // 如果用户信息中没有公司信息，从API获取
   const meQuery = useQuery({
@@ -358,6 +361,18 @@ const ReceiptsPage = () => {
     },
   })
 
+  // 删除运输任务（装卸匹配）
+  const deleteTransportTaskMutation = useMutation({
+    mutationFn: (taskId: string) => deleteTransportTask(taskId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['matched-receipts'] })
+      message.success('删除成功')
+    },
+    onError: (error) => {
+      message.error((error as Error).message || '删除失败')
+    },
+  })
+
   // 统计数据移除
 
   const handleSearch = (values: {
@@ -425,6 +440,50 @@ const ReceiptsPage = () => {
       },
     })
   }, [modal, deleteLoadingMutation, deleteUnloadingMutation, deleteChargingMutation, deleteWaterMutation, deleteDepartureMutation, canEditDelete, message])
+
+  // 编辑装卸匹配
+  const handleEditMatched = useCallback((record: any) => {
+    if (!canEditDelete) {
+      message.warning('无权限编辑装卸匹配')
+      return
+    }
+    // 打开编辑抽屉，显示装料单和卸货单的信息
+    Modal.info({
+      title: '编辑装卸匹配',
+      width: 800,
+      content: (
+        <div>
+          <p>任务ID: {record.task_id}</p>
+          <p>装料单ID: {record.loadBill?.id}</p>
+          <p>卸货单ID: {record.unloadBill?.id}</p>
+          <p style={{ marginTop: 16 }}>提示：请分别编辑装料单和卸货单来修改匹配数据</p>
+        </div>
+      ),
+      okText: '知道了',
+    })
+  }, [canEditDelete, message])
+
+  // 删除装卸匹配
+  const handleDeleteMatched = useCallback((record: any) => {
+    if (!canEditDelete) {
+      message.warning('无权限删除装卸匹配')
+      return
+    }
+    modal.confirm({
+      title: '确认删除',
+      content: `确定要删除任务 ${record.task_id} 的装卸匹配吗？此操作将解除装料单和卸货单的关联，但不会删除原始票据。`,
+      okText: '确认删除',
+      cancelText: '取消',
+      okButtonProps: { danger: true },
+      onOk: async () => {
+        try {
+          await deleteTransportTaskMutation.mutateAsync(record.task_id)
+        } catch (error) {
+          // Error is handled by mutation
+        }
+      },
+    })
+  }, [modal, deleteTransportTaskMutation, canEditDelete, message])
 
   // 打开编辑
   const openEdit = useCallback((receipt: Receipt) => {
@@ -1162,20 +1221,41 @@ const ReceiptsPage = () => {
       },
       {
         title: '操作',
-        width: 150,
+        width: 80,
         fixed: 'right',
         render: (_, record) => (
-          <Space size="small">
+          <Space direction="vertical" size="small" style={{ width: '100%' }}>
             <Button
               type="link"
+              size="small"
               icon={<EyeOutlined />}
               onClick={() => {
                 // 显示完整的匹配数据（包含装料单和卸货单）
                 setSelectedReceipt(record as any)
                 setDetailDrawerOpen(true)
               }}
+              style={{ padding: 0, height: 'auto' }}
             >
               查看
+            </Button>
+            <Button
+              type="link"
+              size="small"
+              icon={<EditOutlined />}
+              onClick={() => handleEditMatched(record)}
+              style={{ padding: 0, height: 'auto' }}
+            >
+              编辑
+            </Button>
+            <Button
+              type="link"
+              size="small"
+              danger
+              icon={<DeleteOutlined />}
+              onClick={() => handleDeleteMatched(record)}
+              style={{ padding: 0, height: 'auto' }}
+            >
+              删除
             </Button>
           </Space>
         ),

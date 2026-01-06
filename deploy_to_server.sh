@@ -5,7 +5,7 @@
 SERVER_USER="admin"
 SERVER_IP="47.108.135.142"
 # 默认猜测的路径，如果部署失败，请修改此处
-REMOTE_DIR="/var/www/admin"
+REMOTE_DIR="/www/wwwroot/admin.hodaruner.cn"
 
 # 颜色
 GREEN='\033[0;32m'

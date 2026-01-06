@@ -31,6 +31,8 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import dayjs from 'dayjs'
 import {
   batchOperateUsers,
+  batchCreateUsers,
+  batchUpdateUsers,
   createUser,
   deleteUser,
   fetchUserDetail,
@@ -38,11 +40,14 @@ import {
   resetUserPassword,
   updateUser,
   type User,
+  type BatchCreateUserItem,
+  type BatchUpdateUserItem,
 } from '../api/services/users'
 import { fetchDepartments, type Department } from '../api/services/departments'
 import useAuthStore from '../store/auth'
 import useCompanyStore from '../store/company'
 import CompanySelector from '../components/CompanySelector'
+import { BatchCreateUserModal, BatchUpdateUserModal } from '../components/BatchUserModals'
 
 const { Title, Paragraph, Text } = Typography
 
@@ -79,6 +84,8 @@ const UsersPage = () => {
   const [createForm] = Form.useForm()
   const [batchDepartmentModalOpen, setBatchDepartmentModalOpen] = useState(false)
   const [selectedBatchDepartmentId, setSelectedBatchDepartmentId] = useState<number | undefined>()
+  const [batchCreateModalOpen, setBatchCreateModalOpen] = useState(false)
+  const [batchUpdateModalOpen, setBatchUpdateModalOpen] = useState(false)
 
   // 当公司选择变化时，更新查询
   useEffect(() => {
@@ -256,6 +263,88 @@ const UsersPage = () => {
     },
     onError: (error) => {
       message.error((error as Error).message || '批量操作失败')
+    },
+  })
+
+  // 批量创建用户
+  const batchCreateMutation = useMutation({
+    mutationFn: (params: { users: BatchCreateUserItem[]; skip_duplicates: boolean }) =>
+      batchCreateUsers(params),
+    onSuccess: (data) => {
+      message.success(data.message || '批量创建成功')
+      setBatchCreateModalOpen(false)
+      queryClient.invalidateQueries({ queryKey: ['users'] })
+      
+      // 显示详细结果
+      if (data.errors && data.errors.length > 0) {
+        Modal.info({
+          title: '批量创建结果',
+          width: 600,
+          content: (
+            <div>
+              <p>成功: {data.success_count} 个</p>
+              <p>失败: {data.failed_count} 个</p>
+              {data.errors.length > 0 && (
+                <div style={{ marginTop: 16 }}>
+                  <p>失败详情：</p>
+                  <ul>
+                    {data.errors.slice(0, 10).map((err, idx) => (
+                      <li key={idx}>
+                        {err.phone}: {err.error}
+                      </li>
+                    ))}
+                    {data.errors.length > 10 && <li>...还有 {data.errors.length - 10} 个错误</li>}
+                  </ul>
+                </div>
+              )}
+            </div>
+          ),
+        })
+      }
+    },
+    onError: (error) => {
+      message.error((error as Error).message || '批量创建失败')
+    },
+  })
+
+  // 批量更新用户
+  const batchUpdateMutation = useMutation({
+    mutationFn: (params: { users: BatchUpdateUserItem[] }) => batchUpdateUsers(params),
+    onSuccess: (data) => {
+      message.success(data.message || '批量更新成功')
+      setBatchUpdateModalOpen(false)
+      setSelectedRowKeys([])
+      queryClient.invalidateQueries({ queryKey: ['users'] })
+      
+      // 显示详细结果
+      if (data.errors && data.errors.length > 0) {
+        Modal.info({
+          title: '批量更新结果',
+          width: 600,
+          content: (
+            <div>
+              <p>成功: {data.success_count} 个</p>
+              <p>失败: {data.failed_count} 个</p>
+              {data.errors.length > 0 && (
+                <div style={{ marginTop: 16 }}>
+                  <p>失败详情：</p>
+                  <ul>
+                    {data.errors.slice(0, 10).map((err, idx) => (
+                      <li key={idx}>
+                        用户ID {err.user_id}: {err.error}
+                      </li>
+                    ))}
+                    {data.errors.length > 10 && <li>...还有 {data.errors.length - 10} 个错误</li>}
+                  </ul>
+                </div>
+              )}
+            </div>
+          ),
+        })
+      }
+    },
+    onError: (error) => {
+      message.error((error as Error).message || '批量更新失败')
     },
   })
 
@@ -768,12 +857,33 @@ const UsersPage = () => {
           <Button
             type="primary"
             icon={<PlusOutlined />}
-            onClick={() => setCreateDrawerOpen(true)}
+            onClick={() => {
+              // 自动填充公司信息
+              if (effectiveCompanyId) {
+                createForm.setFieldsValue({
+                  company_id: effectiveCompanyId,
+                })
+              }
+              setCreateDrawerOpen(true)
+            }}
           >
             新增用户
           </Button>
+          <Button
+            type="primary"
+            icon={<PlusOutlined />}
+            onClick={() => setBatchCreateModalOpen(true)}
+          >
+            批量新增
+          </Button>
           {selectedRowKeys.length > 0 && (
             <>
+              <Button
+                icon={<EditOutlined />}
+                onClick={() => setBatchUpdateModalOpen(true)}
+              >
+                批量修改
+              </Button>
               <Button
                 danger
                 icon={<DeleteOutlined />}
@@ -1404,6 +1514,30 @@ const UsersPage = () => {
           </Form.Item>
         </Form>
       </Drawer>
+
+      {/* 批量新增用户Modal */}
+      <BatchCreateUserModal
+        open={batchCreateModalOpen}
+        onCancel={() => setBatchCreateModalOpen(false)}
+        onSubmit={(users, skipDuplicates) => {
+          batchCreateMutation.mutate({ users, skip_duplicates: skipDuplicates })
+        }}
+        loading={batchCreateMutation.isPending}
+        companyId={effectiveCompanyId}
+        departments={departmentsQuery.data?.records || []}
+      />
+
+      {/* 批量修改用户Modal */}
+      <BatchUpdateUserModal
+        open={batchUpdateModalOpen}
+        onCancel={() => setBatchUpdateModalOpen(false)}
+        onSubmit={(users) => {
+          batchUpdateMutation.mutate({ users })
+        }}
+        loading={batchUpdateMutation.isPending}
+        selectedUsers={users.filter((u) => selectedRowKeys.includes(u.id))}
+        departments={departmentsQuery.data?.records || []}
+      />
     </Space>
   )
 }

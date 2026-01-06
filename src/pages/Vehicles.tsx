@@ -69,7 +69,8 @@ const VehiclesPage = () => {
   const { selectedCompanyId } = useCompanyStore()
 
   const isSuperAdmin = user?.role === 'super_admin' || user?.positionType === '超级管理员'
-  const effectiveCompanyId = isSuperAdmin ? selectedCompanyId : undefined
+  // 超级管理员可以切换公司查看，其他用户只能看自己公司的数据
+  const effectiveCompanyId = isSuperAdmin ? selectedCompanyId : user?.companyId
 
   const [activeTab, setActiveTab] = useState('list')
   const [filters, setFilters] = useState<{

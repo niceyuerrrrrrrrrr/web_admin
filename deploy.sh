@@ -10,7 +10,7 @@ echo "🚀 开始部署Web管理后台..."
 # 服务器配置
 SERVER="47.108.135.142"
 USER="admin"
-REMOTE_PATH="/var/www/admin"
+REMOTE_PATH="/www/wwwroot/admin.hodaruner.cn"
 
 # 1. 确保已构建
 if [ ! -d "dist" ]; then
@@ -31,9 +31,9 @@ echo "🔧 在服务器上部署..."
 ssh ${USER}@${SERVER} << 'EOF'
 cd /tmp
 tar -xzf dist.tar.gz
-sudo rm -rf /var/www/admin/*
-sudo cp -r dist/* /var/www/admin/
-sudo chown -R www:www /var/www/admin
+sudo rm -rf /www/wwwroot/admin.hodaruner.cn/*
+sudo cp -r dist/* /www/wwwroot/admin.hodaruner.cn/
+sudo chown -R www:www /www/wwwroot/admin.hodaruner.cn
 rm -rf dist dist.tar.gz
 echo "服务器端部署完成"
 EOF

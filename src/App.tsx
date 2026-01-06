@@ -80,6 +80,7 @@ import ExportCenterPage from './pages/ExportCenter'
 import useAuthStore from './store/auth'
 import useCompanyStore from './store/company'
 import CompanySelector from './components/CompanySelector'
+import AccountSwitcher from './components/AccountSwitcher'
 import LoginPage from './pages/Login'
 import WorkWechatCallback from './pages/WorkWechatCallback'
 import NotFoundPage from './pages/NotFound'
@@ -373,15 +374,22 @@ const routeDefinitions = [
  * 使用全局状态，所有页面共享
  */
 const GlobalCompanySelector = () => {
+  const { user } = useAuthStore()
   const { selectedCompanyId, setSelectedCompanyId } = useCompanyStore()
-  
-  return (
-    <CompanySelector
-      value={selectedCompanyId}
-      onChange={setSelectedCompanyId}
-      style={{ minWidth: 180 }}
-    />
-  )
+
+  const isSuperAdmin = user?.role === 'super_admin' || user?.positionType === '超级管理员'
+
+  if (isSuperAdmin) {
+    return (
+      <CompanySelector
+        value={selectedCompanyId}
+        onChange={setSelectedCompanyId}
+        style={{ minWidth: 180 }}
+      />
+    )
+  }
+
+  return <AccountSwitcher style={{ minWidth: 240 }} />
 }
 
 const flattenRoutes = (routes: any[]): any[] => {
@@ -415,23 +423,24 @@ const AppLayout = () => {
   const [openKeys, setOpenKeys] = useState<string[]>([])
   const location = useLocation()
   const navigate = useNavigate()
-  const { user, logout } = useAuthStore()
+  const { user, logout, token } = useAuthStore()
   const {
     token: { colorBgContainer },
   } = theme.useToken()
-
-  // 认证守卫：未登录立即跳转到登录页
-  if (!user) {
-    return <Navigate to="/login" replace />
-  }
 
   const configQuery = useQuery({
     queryKey: ['system-config-layout'],
     queryFn: fetchSystemConfig,
     staleTime: 5 * 60 * 1000,
     retry: false,
+    enabled: !!token,
   })
   const config = configQuery.data?.base
+
+  // 认证守卫：未登录立即跳转到登录页
+  if (!token || !user) {
+    return <Navigate to="/login" replace />
+  }
 
   const selectedKeys = useMemo(() => {
     const flat = flattenRoutes(routeDefinitions).filter((r: any) => r.path)

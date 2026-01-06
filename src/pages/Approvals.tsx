@@ -218,8 +218,8 @@ const ApprovalsPage = () => {
   }, [managerFilters, managerForm])
 
   const statsQuery = useQuery<ApprovalStats>({
-    queryKey: ['approval', 'stats'],
-    queryFn: fetchApprovalStats,
+    queryKey: ['approval', 'stats', selectedCompanyId],
+    queryFn: () => fetchApprovalStats({ companyId: selectedCompanyId ?? undefined }),
   })
 
   const pendingQuery = useQuery<ApprovalPendingResponse>({
@@ -288,23 +288,25 @@ const ApprovalsPage = () => {
   })
 
   const managerQuery = useQuery<ApprovalManagerStats>({
-    queryKey: ['approval', 'manager', managerFilters],
+    queryKey: ['approval', 'manager', managerFilters, selectedCompanyId],
     queryFn: () =>
       fetchManagerStats({
         approvalType: managerFilters.approvalType !== 'all' ? managerFilters.approvalType : undefined,
         beginDate: managerFilters.beginDate,
         endDate: managerFilters.endDate,
+        companyId: selectedCompanyId ?? undefined,
       }),
   })
 
   const trendQuery = useQuery<ApprovalTrendStats>({
-    queryKey: ['approval', 'trend', managerFilters],
+    queryKey: ['approval', 'trend', managerFilters, selectedCompanyId],
     queryFn: () =>
       fetchTrendStats({
         approvalType: managerFilters.approvalType !== 'all' ? managerFilters.approvalType : undefined,
         beginDate: managerFilters.beginDate,
         endDate: managerFilters.endDate,
         groupBy: managerFilters.groupBy,
+        companyId: selectedCompanyId ?? undefined,
       }),
   })
 
@@ -748,28 +750,33 @@ const ApprovalsPage = () => {
       {
         title: '操作',
         dataIndex: 'action',
-        width: 220,
+        width: 140,
         fixed: 'right',
-        render: (_, record) => (
-          <Space size="small">
-            <Button type="link" onClick={() => openDetail(record)}>
+        render: (_, record) => {
+          const buttons = [
+            <Button key="view" type="link" size="small" onClick={() => openDetail(record)}>
               查看
-            </Button>
-            {record.can_approve && (
-              <>
-                <Button type="link" onClick={() => openActionModal(record, 'approve')}>
-                  通过
-                </Button>
-                <Button type="link" danger onClick={() => openActionModal(record, 'reject')}>
-                  驳回
-                </Button>
-                <Button type="link" danger onClick={() => handleSingleDelete(record)}>
-                  删除
-                </Button>
-              </>
-            )}
-          </Space>
-        ),
+            </Button>,
+          ]
+          if (record.can_approve) {
+            buttons.push(
+              <Button key="approve" type="link" size="small" onClick={() => openActionModal(record, 'approve')}>
+                通过
+              </Button>,
+              <Button key="reject" type="link" size="small" danger onClick={() => openActionModal(record, 'reject')}>
+                驳回
+              </Button>,
+              <Button key="delete" type="link" size="small" danger onClick={() => handleSingleDelete(record)}>
+                删除
+              </Button>,
+            )
+          }
+          return (
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 0', justifyItems: 'start' }}>
+              {buttons}
+            </div>
+          )
+        },
       },
     ],
     [openActionModal, openDetail, handleSingleDelete],
@@ -836,30 +843,38 @@ const ApprovalsPage = () => {
       },
       {
         title: '操作',
-        width: 150,
-        render: (_, record) => (
-          <Space size="small">
-            <Button type="link" onClick={() => openDetail(record)}>
+        width: 100,
+        render: (_, record) => {
+          const buttons = [
+            <Button key="view" type="link" size="small" onClick={() => openDetail(record)}>
               查看
-            </Button>
-            {(() => {
-              const role = (authUser?.role || '').toLowerCase()
-              const pos = authUser?.positionType || ''
-              const canDelete =
-                pos === '财务' ||
-                pos === '总经理' ||
-                role === 'super_admin' ||
-                role === 'superadmin' ||
-                role.includes('super') ||
-                authUser?.role === '超级管理员'
-              return canDelete
-            })() && (
-              <Button type="link" danger onClick={() => handleSingleDelete(record)}>
+            </Button>,
+          ]
+          
+          const role = (authUser?.role || '').toLowerCase()
+          const pos = authUser?.positionType || ''
+          const canDelete =
+            pos === '财务' ||
+            pos === '总经理' ||
+            role === 'super_admin' ||
+            role === 'superadmin' ||
+            role.includes('super') ||
+            authUser?.role === '超级管理员'
+          
+          if (canDelete) {
+            buttons.push(
+              <Button key="delete" type="link" size="small" danger onClick={() => handleSingleDelete(record)}>
                 删除
-              </Button>
-            )}
-          </Space>
-        ),
+              </Button>,
+            )
+          }
+          
+          return (
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 0', justifyItems: 'start' }}>
+              {buttons}
+            </div>
+          )
+        },
       },
     ],
     [openDetail, handleSingleDelete, authUser?.role, authUser?.positionType],

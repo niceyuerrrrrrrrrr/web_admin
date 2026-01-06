@@ -302,3 +302,9 @@ export const fetchMatchedReceipts = (params: {
     }),
   )
 
+/**
+ * 删除运输任务（装卸匹配）
+ */
+export const deleteTransportTask = (taskId: string) =>
+  unwrap(client.delete(`/receipts/transport-tasks/${taskId}`))
+

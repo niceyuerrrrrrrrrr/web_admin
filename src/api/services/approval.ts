@@ -183,8 +183,14 @@ const unwrap = async <T>(promise: Promise<{ data: ApiResponse<T> }>) => {
   return response.data.data
 }
 
-export const fetchApprovalStats = () =>
-  unwrap<ApprovalStats>(client.get('/approval/stats'))
+export const fetchApprovalStats = (params?: { companyId?: number }) =>
+  unwrap<ApprovalStats>(
+    client.get('/approval/stats', {
+      params: {
+        company_id: params?.companyId,
+      },
+    })
+  )
 
 export const fetchPendingApprovals = (params?: { approvalType?: string; companyId?: number }) =>
   unwrap<ApprovalPendingResponse>(
