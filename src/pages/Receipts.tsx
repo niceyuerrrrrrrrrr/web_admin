@@ -494,16 +494,32 @@ const ReceiptsPage = () => {
 
   // 删除装卸匹配
   const handleDeleteMatched = useCallback((record: any) => {
-    if (!canEditDelete) {
-      message.warning('无权限删除装卸匹配')
+    // 检查权限：仅超级管理员和统计员可以删除
+    const canDeleteMatch = isSuperAdmin || ['统计', '统计员'].includes(user?.positionType || '')
+    
+    if (!canDeleteMatch) {
+      message.warning('仅超级管理员和统计员可以删除装卸匹配')
       return
     }
+    
     modal.confirm({
-      title: '确认删除',
-      content: `确定要删除任务 ${record.task_id} 的装卸匹配吗？此操作将解除装料单和卸货单的关联，但不会删除原始票据。`,
+      title: '确认删除装卸匹配',
+      content: (
+        <div>
+          <p>确定要删除任务 <strong>{record.task_id}</strong> 的装卸匹配吗？</p>
+          <Alert
+            message="重要提示"
+            description="此操作将同时软删除关联的装料单和卸货单，但数据可在回收站恢复。"
+            type="warning"
+            showIcon
+            style={{ marginTop: 16 }}
+          />
+        </div>
+      ),
       okText: '确认删除',
       cancelText: '取消',
       okButtonProps: { danger: true },
+      width: 500,
       onOk: async () => {
         try {
           await deleteTransportTaskMutation.mutateAsync(record.task_id)
@@ -512,7 +528,7 @@ const ReceiptsPage = () => {
         }
       },
     })
-  }, [modal, deleteTransportTaskMutation, canEditDelete, message])
+  }, [modal, deleteTransportTaskMutation, isSuperAdmin, user, message])
 
   // 打开编辑
   const openEdit = useCallback((receipt: Receipt) => {
@@ -1362,47 +1378,54 @@ const ReceiptsPage = () => {
       },
       {
         title: '操作',
-        width: 80,
+        width: 120,
         fixed: 'right',
-        render: (_, record) => (
-          <Space direction="vertical" size="small" style={{ width: '100%' }}>
-            <Button
-              type="link"
-              size="small"
-              icon={<EyeOutlined />}
-              onClick={() => {
-                // 显示完整的匹配数据（包含装料单和卸货单）
-                setSelectedReceipt(record as any)
-                setDetailDrawerOpen(true)
-              }}
-              style={{ padding: 0, height: 'auto' }}
-            >
-              查看
-            </Button>
-            <Button
-              type="link"
-              size="small"
-              icon={<EditOutlined />}
-              onClick={() => handleEditMatched(record)}
-              style={{ padding: 0, height: 'auto' }}
-            >
-              编辑
-            </Button>
-            <Button
-              type="link"
-              size="small"
-              danger
-              icon={<DeleteOutlined />}
-              onClick={() => handleDeleteMatched(record)}
-              style={{ padding: 0, height: 'auto' }}
-            >
-              删除
-            </Button>
-          </Space>
-        ),
+        render: (_, record) => {
+          // 检查权限：仅超级管理员和统计员可以删除
+          const canDeleteMatch = isSuperAdmin || ['统计', '统计员'].includes(user?.positionType || '')
+          
+          return (
+            <Space direction="vertical" size="small" style={{ width: '100%' }}>
+              <Button
+                type="link"
+                size="small"
+                icon={<EyeOutlined />}
+                onClick={() => {
+                  // 显示完整的匹配数据（包含装料单和卸货单）
+                  setSelectedReceipt(record as any)
+                  setDetailDrawerOpen(true)
+                }}
+                style={{ padding: 0, height: 'auto' }}
+              >
+                查看
+              </Button>
+              <Button
+                type="link"
+                size="small"
+                icon={<EditOutlined />}
+                onClick={() => handleEditMatched(record)}
+                style={{ padding: 0, height: 'auto' }}
+              >
+                编辑
+              </Button>
+              {canDeleteMatch && (
+                <Button
+                  type="link"
+                  size="small"
+                  danger
+                  icon={<DeleteOutlined />}
+                  onClick={() => handleDeleteMatched(record)}
+                  style={{ padding: 0, height: 'auto' }}
+                >
+                  删除
+                </Button>
+              )}
+            </Space>
+          )
+        },
       },
     ],
-    [],
+    [isSuperAdmin, user],
   )
 
   // 出厂单列定义（罐车业务）
