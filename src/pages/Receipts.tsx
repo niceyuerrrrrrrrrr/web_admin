@@ -18,6 +18,7 @@ import {
   Space,
   Table,
   Tabs,
+  Tag,
   Typography,
 } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
@@ -741,6 +742,29 @@ const ReceiptsPage = () => {
         render: (value: string) => (value ? dayjs(value).format('YYYY-MM-DD HH:mm:ss') : '-'),
       },
       {
+        title: '删除状态',
+        dataIndex: 'deleted_at',
+        width: 150,
+        render: (deleted_at: string | null, record: Receipt) => {
+          if (deleted_at) {
+            return (
+              <Tag color="red">
+                已删除
+                <br />
+                <small>{dayjs(deleted_at).format('YYYY-MM-DD HH:mm')}</small>
+                {record.deleted_by_name && (
+                  <>
+                    <br />
+                    <small>删除人：{record.deleted_by_name}</small>
+                  </>
+                )}
+              </Tag>
+            )
+          }
+          return <Tag color="green">正常</Tag>
+        },
+      },
+      {
         title: '装料单图片',
         dataIndex: 'thumb_url',
         key: 'thumb_url',
@@ -856,6 +880,29 @@ const ReceiptsPage = () => {
         dataIndex: 'created_at',
         width: 180,
         render: (value: string) => (value ? dayjs(value).format('YYYY-MM-DD HH:mm:ss') : '-'),
+      },
+      {
+        title: '删除状态',
+        dataIndex: 'deleted_at',
+        width: 150,
+        render: (deleted_at: string | null, record: Receipt) => {
+          if (deleted_at) {
+            return (
+              <Tag color="red">
+                已删除
+                <br />
+                <small>{dayjs(deleted_at).format('YYYY-MM-DD HH:mm')}</small>
+                {record.deleted_by_name && (
+                  <>
+                    <br />
+                    <small>删除人：{record.deleted_by_name}</small>
+                  </>
+                )}
+              </Tag>
+            )
+          }
+          return <Tag color="green">正常</Tag>
+        },
       },
       {
         title: '卸货单图片',
@@ -974,6 +1021,29 @@ const ReceiptsPage = () => {
         render: (value: string) => (value ? dayjs(value).format('YYYY-MM-DD HH:mm:ss') : '-'),
       },
       {
+        title: '删除状态',
+        dataIndex: 'deleted_at',
+        width: 150,
+        render: (deleted_at: string | null, record: Receipt) => {
+          if (deleted_at) {
+            return (
+              <Tag color="red">
+                已删除
+                <br />
+                <small>{dayjs(deleted_at).format('YYYY-MM-DD HH:mm')}</small>
+                {record.deleted_by_name && (
+                  <>
+                    <br />
+                    <small>删除人：{record.deleted_by_name}</small>
+                  </>
+                )}
+              </Tag>
+            )
+          }
+          return <Tag color="green">正常</Tag>
+        },
+      },
+      {
         title: '充电单图片',
         dataIndex: 'thumb_url',
         key: 'thumb_url',
@@ -1058,6 +1128,49 @@ const ReceiptsPage = () => {
         dataIndex: 'created_at',
         width: 150,
         render: (value: string) => (value ? dayjs(value).format('YYYY-MM-DD HH:mm:ss') : '-'),
+      },
+      {
+        title: '删除状态',
+        dataIndex: 'deleted_at',
+        width: 150,
+        render: (deleted_at: string | null, record: Receipt) => {
+          if (deleted_at) {
+            return (
+              <Tag color="red">
+                已删除
+                <br />
+                <small>{dayjs(deleted_at).format('YYYY-MM-DD HH:mm')}</small>
+                {record.deleted_by_name && (
+                  <>
+                    <br />
+                    <small>删除人：{record.deleted_by_name}</small>
+                  </>
+                )}
+              </Tag>
+            )
+          }
+          return <Tag color="green">正常</Tag>
+        },
+      },
+      {
+        title: '水票图片',
+        dataIndex: 'thumb_url',
+        width: 100,
+        render: (value: string, record: any) => {
+          const imageUrl = value || record.image_path
+          if (!imageUrl || imageUrl.startsWith('wxfile://') || imageUrl.startsWith('file://')) {
+            return '-'
+          }
+          return (
+            <Image
+              src={imageUrl}
+              width={60}
+              height={60}
+              style={{ objectFit: 'cover', borderRadius: 4 }}
+              preview={{ mask: '查看' }}
+            />
+          )
+        },
       },
       {
         title: '操作',
@@ -1418,6 +1531,49 @@ const ReceiptsPage = () => {
         dataIndex: 'created_at',
         width: 150,
         render: (value: string) => (value ? dayjs(value).format('YYYY-MM-DD HH:mm:ss') : '-'),
+      },
+      {
+        title: '删除状态',
+        dataIndex: 'deleted_at',
+        width: 150,
+        render: (deleted_at: string | null, record: Receipt) => {
+          if (deleted_at) {
+            return (
+              <Tag color="red">
+                已删除
+                <br />
+                <small>{dayjs(deleted_at).format('YYYY-MM-DD HH:mm')}</small>
+                {record.deleted_by_name && (
+                  <>
+                    <br />
+                    <small>删除人：{record.deleted_by_name}</small>
+                  </>
+                )}
+              </Tag>
+            )
+          }
+          return <Tag color="green">正常</Tag>
+        },
+      },
+      {
+        title: '出厂单图片',
+        dataIndex: 'thumb_url',
+        width: 100,
+        render: (value: string, record: any) => {
+          const imageUrl = value || record.image_path
+          if (!imageUrl || imageUrl.startsWith('wxfile://') || imageUrl.startsWith('file://')) {
+            return '-'
+          }
+          return (
+            <Image
+              src={imageUrl}
+              width={60}
+              height={60}
+              style={{ objectFit: 'cover', borderRadius: 4 }}
+              preview={{ mask: '查看' }}
+            />
+          )
+        },
       },
       {
         title: '操作',
@@ -2361,6 +2517,18 @@ const ReceiptsPage = () => {
                     value: v.tanker_vehicle_code,
                   })) || []}
                 loading={vehiclesQuery.isLoading}
+              />
+            </Form.Item>
+            <Form.Item name="deletedStatus" label="删除状态" initialValue="normal" style={{ marginBottom: 0 }}>
+              <Select
+                placeholder="选择删除状态"
+                allowClear
+                style={{ width: 150 }}
+                options={[
+                  { label: '全部', value: 'all' },
+                  { label: '正常', value: 'normal' },
+                  { label: '已删除', value: 'deleted' },
+                ]}
               />
             </Form.Item>
             <Form.Item style={{ marginBottom: 0 }}>
