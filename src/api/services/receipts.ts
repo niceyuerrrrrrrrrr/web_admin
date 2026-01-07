@@ -39,6 +39,8 @@ export const fetchReceipts = (params: ReceiptListParams & { userId?: number; sco
         receipt_type: params.receiptType,
         start_date: params.startDate,
         end_date: params.endDate,
+        vehicle_no: params.vehicleNo,
+        tanker_vehicle_code: params.tankerVehicleCode,
         company_id: params.companyId,
         department_id: params.departmentId,
         scope: params.scope || 'all', // 默认获取全部数据

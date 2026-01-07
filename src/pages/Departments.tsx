@@ -42,7 +42,7 @@ const { Title, Text } = Typography
 
 const DepartmentsPage = () => {
   const queryClient = useQueryClient()
-  const { message: messageApi } = AntdApp.useApp()
+  const { message: messageApi, modal } = AntdApp.useApp()
   const { user } = useAuthStore()
   const { selectedCompanyId, setSelectedCompanyId } = useCompanyStore()
 
@@ -245,9 +245,17 @@ const DepartmentsPage = () => {
   }
 
   const handleDelete = (department: Department) => {
-    Modal.confirm({
+    console.log('删除部门:', department)
+    console.log('用户数量:', department.user_count)
+    
+    if (department.user_count && department.user_count > 0) {
+      messageApi.warning(`该部门下还有 ${department.user_count} 个用户，请先转移用户后再删除`)
+      return
+    }
+    
+    modal.confirm({
       title: '确认删除',
-      content: `确定要删除部门"${department.title}"吗？如果该部门下有用户，请先转移用户后再删除。`,
+      content: `确定要删除部门"${department.title}"吗？`,
       okText: '删除',
       okType: 'danger',
       cancelText: '取消',
@@ -320,7 +328,6 @@ const DepartmentsPage = () => {
             danger
             icon={<DeleteOutlined />}
             onClick={() => handleDelete(record)}
-            disabled={!!(record.user_count && record.user_count > 0)}
           >
             删除
           </Button>

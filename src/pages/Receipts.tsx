@@ -120,7 +120,7 @@ const ReceiptsPage = () => {
     startDate?: string
     endDate?: string
     vehicleNo?: string
-    driverName?: string
+    tankerVehicleCode?: string
   }>({})
   const [selectedReceipt, setSelectedReceipt] = useState<Receipt | null>(null)
   const [detailDrawerOpen, setDetailDrawerOpen] = useState(false)
@@ -129,7 +129,9 @@ const ReceiptsPage = () => {
   const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([])
   const [selectedDepartmentId, setSelectedDepartmentId] = useState<number | undefined>(undefined)
   const [selectedUserId, setSelectedUserId] = useState<number | undefined>(undefined)
+  const [pageSize, setPageSize] = useState(10)
   const [editForm] = Form.useForm()
+  const [searchForm] = Form.useForm()
   const showCompanyWarning = isSuperAdmin && !effectiveCompanyId
 
   // 获取当前公司信息以判断业务类型
@@ -143,6 +145,22 @@ const ReceiptsPage = () => {
   const businessType = isSuperAdmin 
     ? companyQuery.data?.business_type 
     : (currentUser?.companyBusinessType || user?.companyBusinessType || companyQuery.data?.business_type)
+
+  // 查询车辆数据（用于车牌号和车号下拉选择框）
+  const vehiclesQuery = useQuery({
+    queryKey: ['vehicles', effectiveCompanyId],
+    queryFn: async () => {
+      const res = await client.get('/vehicles/list', {
+        params: { 
+          company_id: effectiveCompanyId,
+          page: 1,
+          page_size: 200
+        }
+      })
+      return res.data.data?.vehicles || []
+    },
+    enabled: !!effectiveCompanyId
+  })
 
   // 根据业务类型过滤可用的票据类型标签页
   const availableTabs = useMemo(() => {
@@ -204,6 +222,8 @@ const ReceiptsPage = () => {
         receiptType: activeTab === 'matched' ? undefined : activeTab, // activeTab 不会是 'matched'，因为 enabled 已经过滤了
         startDate: filters.startDate,
         endDate: filters.endDate,
+        vehicleNo: filters.vehicleNo,
+        tankerVehicleCode: filters.tankerVehicleCode,
         companyId: effectiveCompanyId, // 超级管理员需要传，非超级管理员可以不传（后端会自动过滤）
         departmentId: selectedDepartmentId, // 部门筛选
       }),
@@ -379,19 +399,20 @@ const ReceiptsPage = () => {
     receiptType?: ReceiptType
     dateRange?: Dayjs[]
     vehicleNo?: string
-    driverName?: string
+    tankerVehicleCode?: string
   }) => {
     setFilters({
       receiptType: values.receiptType,
       startDate: values.dateRange?.[0]?.format('YYYY-MM-DD'),
       endDate: values.dateRange?.[1]?.format('YYYY-MM-DD'),
       vehicleNo: values.vehicleNo,
-      driverName: values.driverName,
+      tankerVehicleCode: values.tankerVehicleCode,
     })
   }
 
   const handleReset = () => {
     setFilters({})
+    searchForm.resetFields()
   }
 
   const openDetail = useCallback((receipt: Receipt) => {
@@ -1913,6 +1934,48 @@ const ReceiptsPage = () => {
             结束时间: r.end_time ? dayjs(r.end_time).format('YYYY-MM-DD HH:mm') : '',
             时长: r.duration_min || 0,
           }
+        } else if (receipt.type === 'departure') {
+          const r = receipt as Receipt & {
+            f_departure_receipt_id?: string
+            vehicle_no?: string
+            tanker_vehicle_code?: string
+            driver_name?: string
+            loading_company?: string
+            project_name?: string
+            construction_location?: string
+            customer_name?: string
+            construction_unit?: string
+            concrete_strength?: string
+            slump?: string
+            concrete_volume?: string
+            settlement_volume?: number
+            total_volume?: string
+            total_vehicles?: string
+            bill_no?: string
+            loading_time?: string
+            exit_time?: string
+          }
+          return {
+            ...base,
+            单据编号: r.f_departure_receipt_id || '',
+            司机: r.driver_name || '',
+            车牌号: r.vehicle_no || '',
+            自编车号: r.tanker_vehicle_code || '',
+            装料公司: r.loading_company || '',
+            工程名称: r.project_name || '',
+            施工地点: r.construction_location || '',
+            客户名称: r.customer_name || '',
+            施工单位: r.construction_unit || '',
+            强度等级: r.concrete_strength || '',
+            坑落度: r.slump || '',
+            方量: r.concrete_volume || '',
+            结算方量: r.settlement_volume || 0,
+            累计方量: r.total_volume || '',
+            累计车次: r.total_vehicles || '',
+            提单号: r.bill_no || '',
+            进厂时间: r.loading_time ? dayjs(r.loading_time).format('YYYY-MM-DD HH:mm:ss') : '',
+            出厂时间: r.exit_time ? dayjs(r.exit_time).format('YYYY-MM-DD HH:mm:ss') : '',
+          }
         } else if (receipt.type === 'water') {
           const r = receipt as Receipt & {
             company?: string
@@ -2017,6 +2080,48 @@ const ReceiptsPage = () => {
             开始时间: r.start_time ? dayjs(r.start_time).format('YYYY-MM-DD HH:mm') : '',
             结束时间: r.end_time ? dayjs(r.end_time).format('YYYY-MM-DD HH:mm') : '',
             时长: r.duration_min || 0,
+          }
+        } else if (receipt.type === 'departure') {
+          const r = receipt as Receipt & {
+            f_departure_receipt_id?: string
+            vehicle_no?: string
+            tanker_vehicle_code?: string
+            driver_name?: string
+            loading_company?: string
+            project_name?: string
+            construction_location?: string
+            customer_name?: string
+            construction_unit?: string
+            concrete_strength?: string
+            slump?: string
+            concrete_volume?: string
+            settlement_volume?: number
+            total_volume?: string
+            total_vehicles?: string
+            bill_no?: string
+            loading_time?: string
+            exit_time?: string
+          }
+          return {
+            ...base,
+            单据编号: r.f_departure_receipt_id || '',
+            司机: r.driver_name || '',
+            车牌号: r.vehicle_no || '',
+            自编车号: r.tanker_vehicle_code || '',
+            装料公司: r.loading_company || '',
+            工程名称: r.project_name || '',
+            施工地点: r.construction_location || '',
+            客户名称: r.customer_name || '',
+            施工单位: r.construction_unit || '',
+            强度等级: r.concrete_strength || '',
+            坑落度: r.slump || '',
+            方量: r.concrete_volume || '',
+            结算方量: r.settlement_volume || 0,
+            累计方量: r.total_volume || '',
+            累计车次: r.total_vehicles || '',
+            提单号: r.bill_no || '',
+            进厂时间: r.loading_time ? dayjs(r.loading_time).format('YYYY-MM-DD HH:mm:ss') : '',
+            出厂时间: r.exit_time ? dayjs(r.exit_time).format('YYYY-MM-DD HH:mm:ss') : '',
           }
         } else if (receipt.type === 'water') {
           const r = receipt as Receipt & {
@@ -2195,6 +2300,71 @@ const ReceiptsPage = () => {
             loading={usersQuery.isLoading}
             notFoundContent={usersQuery.isLoading ? '加载中...' : '暂无用户'}
           />
+          <Form form={searchForm} layout="inline" onFinish={handleSearch} onReset={handleReset} style={{ display: 'inline-flex', gap: '8px' }}>
+            <Form.Item name="dateRange" label="日期范围" style={{ marginBottom: 0 }}>
+              <RangePicker allowClear />
+            </Form.Item>
+            <Form.Item name="vehicleNo" label="车牌号" style={{ marginBottom: 0 }}>
+              <Select
+                showSearch
+                allowClear
+                placeholder="请选择车牌号"
+                style={{ width: 150 }}
+                optionFilterProp="children"
+                filterOption={(input, option) =>
+                  String(option?.label ?? '').toLowerCase().includes(input.toLowerCase())
+                }
+                onChange={(value) => {
+                  if (value) {
+                    const vehicle = vehiclesQuery.data?.find((v: any) => v.plate_number === value)
+                    if (vehicle?.tanker_vehicle_code && vehicle.tanker_vehicle_code !== vehicle.plate_number) {
+                      searchForm.setFieldValue('tankerVehicleCode', vehicle.tanker_vehicle_code)
+                    }
+                  }
+                }}
+                options={vehiclesQuery.data?.map((v: any) => ({
+                  label: v.plate_number,
+                  value: v.plate_number,
+                }))}
+                loading={vehiclesQuery.isLoading}
+              />
+            </Form.Item>
+            <Form.Item name="tankerVehicleCode" label="车号" style={{ marginBottom: 0 }}>
+              <Select
+                showSearch
+                allowClear
+                placeholder="请选择车号"
+                style={{ width: 150 }}
+                optionFilterProp="children"
+                filterOption={(input, option) =>
+                  String(option?.label ?? '').toLowerCase().includes(input.toLowerCase())
+                }
+                onChange={(value) => {
+                  if (value) {
+                    const vehicle = vehiclesQuery.data?.find((v: any) => v.tanker_vehicle_code === value)
+                    if (vehicle?.plate_number) {
+                      searchForm.setFieldValue('vehicleNo', vehicle.plate_number)
+                    }
+                  }
+                }}
+                options={vehiclesQuery.data
+                  ?.filter((v: any) => v.tanker_vehicle_code && v.tanker_vehicle_code !== v.plate_number)
+                  .map((v: any) => ({
+                    label: v.tanker_vehicle_code,
+                    value: v.tanker_vehicle_code,
+                  })) || []}
+                loading={vehiclesQuery.isLoading}
+              />
+            </Form.Item>
+            <Form.Item style={{ marginBottom: 0 }}>
+              <Button type="primary" htmlType="submit">
+                查询
+              </Button>
+            </Form.Item>
+            <Form.Item style={{ marginBottom: 0 }}>
+              <Button htmlType="reset">重置</Button>
+            </Form.Item>
+          </Form>
           <Button icon={<ReloadOutlined />} onClick={() => queryClient.invalidateQueries({ queryKey: ['receipts'] })}>
             刷新
           </Button>
@@ -2247,26 +2417,6 @@ const ReceiptsPage = () => {
             label: type.label,
             children: (
               <Space direction="vertical" size="large" style={{ width: '100%' }}>
-                <Form layout="inline" onFinish={handleSearch} onReset={handleReset}>
-                  <Form.Item name="dateRange" label="日期范围">
-                    <RangePicker allowClear />
-                  </Form.Item>
-                  <Form.Item name="vehicleNo" label="车牌号">
-                    <Input placeholder="请输入车牌号" allowClear style={{ width: 150 }} />
-                  </Form.Item>
-                  <Form.Item name="driverName" label="司机姓名">
-                    <Input placeholder="请输入司机姓名" allowClear style={{ width: 150 }} />
-                  </Form.Item>
-                  <Form.Item>
-                    <Space>
-                      <Button type="primary" htmlType="submit">
-                        查询
-                      </Button>
-                      <Button htmlType="reset">重置</Button>
-                    </Space>
-                  </Form.Item>
-                </Form>
-
                 {(activeTab === 'matched' ? matchedReceiptsQuery.error : receiptsQuery.error) && (
                   <Alert
                     type="error"
@@ -2298,11 +2448,14 @@ const ReceiptsPage = () => {
                   }
                   pagination={{
                     total: activeTab === 'matched' ? matchedReceipts.length : receipts.length,
-                    pageSize: 10,
+                    pageSize: pageSize,
                     showSizeChanger: true,
                     showTotal: (total) => `共 ${total} 条`,
+                    pageSizeOptions: ['10', '20', '50', '100'],
+                    onShowSizeChange: (_current, size) => setPageSize(size),
                   }}
-                  scroll={{ x: 1000 }}
+                  scroll={{ x: 1500, y: 600 }}
+                  sticky={{ offsetHeader: 0 }}
                 />
               </Space>
             ),

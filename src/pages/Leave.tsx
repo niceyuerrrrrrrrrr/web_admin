@@ -12,6 +12,7 @@ import {
   Drawer,
   Flex,
   Form,
+  Image,
   Input,
   InputNumber,
   List,
@@ -34,6 +35,7 @@ import {
   CheckCircleOutlined,
   ClockCircleOutlined,
   CloudUploadOutlined,
+  CloseCircleOutlined,
   DeleteOutlined,
   FileSearchOutlined,
   PlusOutlined,
@@ -61,7 +63,7 @@ import useAuthStore from '../store/auth'
 import useCompanyStore from '../store/company'
 
 const { RangePicker } = DatePicker
-const { Title, Paragraph } = Typography
+const { Title, Text, Paragraph } = Typography
 
 const statusColorMap: Record<LeaveStatus, string> = {
   submitted: 'default',
@@ -296,53 +298,135 @@ const LeavePage = () => {
       width: 90,
     },
     {
+      title: '凭证',
+      dataIndex: 'images',
+      width: 180,
+      render: (value: string[]) => {
+        if (!value || value.length === 0) return '-'
+        const shown = value.slice(0, 2)
+        const rest = value.length - shown.length
+        return (
+          <Image.PreviewGroup>
+            <Space size={6} wrap>
+              {shown.map((img, idx) => (
+                <Image
+                  key={idx}
+                  src={img}
+                  width={40}
+                  height={40}
+                  style={{ objectFit: 'cover', borderRadius: 6 }}
+                />
+              ))}
+              {rest > 0 && <Text type="secondary">+{rest}</Text>}
+            </Space>
+          </Image.PreviewGroup>
+        )
+      },
+    },
+    {
+      title: '最新评论',
+      dataIndex: 'latest_comment',
+      width: 200,
+      ellipsis: true,
+      render: (value: string, record: any) => {
+        if (!value) return '-'
+        return (
+          <div>
+            <Text ellipsis={{ tooltip: value }} style={{ display: 'block', marginBottom: 4 }}>
+              {value}
+            </Text>
+            {record.comment_user && (
+              <Text type="secondary" style={{ fontSize: 12 }}>
+                {record.comment_user}
+              </Text>
+            )}
+          </div>
+        )
+      },
+    },
+    {
+      title: '评论图片',
+      dataIndex: 'comment_images',
+      width: 150,
+      render: (value: string[]) => {
+        if (!value || value.length === 0) return '-'
+        const shown = value.slice(0, 2)
+        const rest = value.length - shown.length
+        return (
+          <Image.PreviewGroup>
+            <Space size={6} wrap>
+              {shown.map((img, idx) => (
+                <Image
+                  key={idx}
+                  src={img}
+                  width={40}
+                  height={40}
+                  style={{ objectFit: 'cover', borderRadius: 6 }}
+                />
+              ))}
+              {rest > 0 && <Text type="secondary">+{rest}</Text>}
+            </Space>
+          </Image.PreviewGroup>
+        )
+      },
+    },
+    {
+      title: '当前审批人',
+      dataIndex: 'current_approver',
+      width: 120,
+      render: (value: string) => value || '-',
+    },
+    {
       title: '状态',
       dataIndex: 'status',
       render: (value: LeaveStatus) => <Tag color={statusColorMap[value]}>{value}</Tag>,
     },
     {
-      title: '当前审批人',
-      dataIndex: 'approver_name',
-    },
-    {
       title: '操作',
-      width: 260,
-      render: (_, record) => (
-        <Space wrap>
-          <Button icon={<FileSearchOutlined />} size="small" onClick={() => setDetailId(record.id)}>
+      width: 200,
+      render: (_, record) => {
+        const buttons = [
+          <Button key="detail" icon={<FileSearchOutlined />} size="small" onClick={() => setDetailId(record.id)}>
             详情
-          </Button>
-          {record.status === 'submitted' && (
-            <Button type="primary" size="small" onClick={() => handleSubmitApproval(record)}>
+          </Button>,
+        ]
+        
+        if (record.status === 'submitted') {
+          buttons.push(
+            <Button key="submit" type="primary" size="small" onClick={() => handleSubmitApproval(record)}>
               提交审批
             </Button>
-          )}
-          {record.status === 'reviewing' && (
-            <>
-              <Button
-                size="small"
-                icon={<CheckCircleOutlined />}
-                onClick={() => handleApproveAction(record, 'approve')}
-              >
-                通过
-              </Button>
-              <Button size="small" danger icon={<StopOutlined />} onClick={() => handleApproveAction(record, 'reject')}>
-                拒绝
-              </Button>
-            </>
-          )}
-          {record.status === 'reviewing' && (
-            <Button size="small" onClick={() => handleRevoke(record)}>
-              撤销
+          )
+        }
+        
+        if (record.can_approve && record.status === 'reviewing') {
+          buttons.push(
+            <Button
+              key="approve"
+              size="small"
+              icon={<CheckCircleOutlined />}
+              onClick={() => handleApproveAction(record, 'approve')}
+            >
+              通过
+            </Button>,
+            <Button
+              key="reject"
+              size="small"
+              danger
+              icon={<CloseCircleOutlined />}
+              onClick={() => handleApproveAction(record, 'reject')}
+            >
+              拒绝
             </Button>
-          )}
-          {record.status === 'submitted' && (
-            <Button size="small" danger icon={<DeleteOutlined />} onClick={() => handleDelete(record)}>
-              删除
-            </Button>
-          )}
-        </Space>
-      ),
+          )
+        }
+        
+        return (
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 8px', justifyItems: 'start' }}>
+            {buttons}
+          </div>
+        )
+      },
     },
   ]
 

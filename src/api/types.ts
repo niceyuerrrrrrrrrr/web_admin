@@ -128,6 +128,7 @@ export interface ReceiptListParams {
   endDate?: string
   companyId?: number
   vehicleNo?: string
+  tankerVehicleCode?: string
   driverName?: string
   page?: number
   pageSize?: number
@@ -281,6 +282,11 @@ export interface ReimbursementRecord {
   id: number
   user_id: number
   applicant_name?: string
+  latest_comment?: string
+  comment_images?: string[]
+  comment_user?: string
+  current_approver?: string
+  can_approve?: boolean
   approver_name?: string
   amount: number
   category: string
@@ -352,6 +358,11 @@ export interface PurchaseRecord {
   id: number
   user_id: number
   applicant_name?: string
+  latest_comment?: string
+  comment_images?: string[]
+  comment_user?: string
+  current_approver?: string
+  can_approve?: boolean
   approver_name?: string
   amount: number
   category: string
@@ -402,6 +413,11 @@ export interface MaterialRequestRecord {
   id: number
   user_id: number
   material_name: string
+  latest_comment?: string
+  comment_images?: string[]
+  comment_user?: string
+  current_approver?: string
+  can_approve?: boolean
   material_code?: string
   quantity: number
   unit: string
@@ -612,6 +628,11 @@ export interface LeaveRecord {
   id: number
   user_id: number
   leave_type: string
+  latest_comment?: string
+  comment_images?: string[]
+  comment_user?: string
+  current_approver?: string
+  can_approve?: boolean
   start_date: string
   end_date: string
   days: number
@@ -687,6 +708,11 @@ export interface ReportRecord {
   id: number
   user_id: number
   type: string
+  latest_comment?: string
+  comment_images?: string[]
+  comment_user?: string
+  current_approver?: string
+  can_approve?: boolean
   title: string
   description?: string
   location?: string

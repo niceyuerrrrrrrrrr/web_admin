@@ -254,6 +254,85 @@ const PurchasesPage = () => {
         width: 120,
       },
       {
+        title: '凭证',
+        dataIndex: 'images',
+        width: 180,
+        render: (value: string[]) => {
+          if (!value || value.length === 0) return '-'
+          const shown = value.slice(0, 2)
+          const rest = value.length - shown.length
+          return (
+            <Image.PreviewGroup>
+              <Space size={6} wrap>
+                {shown.map((img, idx) => (
+                  <Image
+                    key={idx}
+                    src={img}
+                    width={40}
+                    height={40}
+                    style={{ objectFit: 'cover', borderRadius: 6 }}
+                  />
+                ))}
+                {rest > 0 && <Text type="secondary">+{rest}</Text>}
+              </Space>
+            </Image.PreviewGroup>
+          )
+        },
+      },
+      {
+        title: '最新评论',
+        dataIndex: 'latest_comment',
+        width: 200,
+        ellipsis: true,
+        render: (value: string, record: any) => {
+          if (!value) return '-'
+          return (
+            <div>
+              <Text ellipsis={{ tooltip: value }} style={{ display: 'block', marginBottom: 4 }}>
+                {value}
+              </Text>
+              {record.comment_user && (
+                <Text type="secondary" style={{ fontSize: 12 }}>
+                  {record.comment_user}
+                </Text>
+              )}
+            </div>
+          )
+        },
+      },
+      {
+        title: '评论图片',
+        dataIndex: 'comment_images',
+        width: 150,
+        render: (value: string[]) => {
+          if (!value || value.length === 0) return '-'
+          const shown = value.slice(0, 2)
+          const rest = value.length - shown.length
+          return (
+            <Image.PreviewGroup>
+              <Space size={6} wrap>
+                {shown.map((img, idx) => (
+                  <Image
+                    key={idx}
+                    src={img}
+                    width={40}
+                    height={40}
+                    style={{ objectFit: 'cover', borderRadius: 6 }}
+                  />
+                ))}
+                {rest > 0 && <Text type="secondary">+{rest}</Text>}
+              </Space>
+            </Image.PreviewGroup>
+          )
+        },
+      },
+      {
+        title: '当前审批人',
+        dataIndex: 'current_approver',
+        width: 120,
+        render: (value: string) => value || '-',
+      },
+      {
         title: '状态',
         dataIndex: 'status',
         width: 110,
@@ -270,47 +349,63 @@ const PurchasesPage = () => {
       },
       {
         title: '操作',
-        width: 220,
+        width: 200,
         fixed: 'right',
-        render: (_, record) => (
-          <Space>
-            <Button type="link" icon={<FileSearchOutlined />} onClick={() => openDetail(record)}>
+        render: (_, record) => {
+          const buttons = [
+            <Button key="detail" type="link" size="small" icon={<FileSearchOutlined />} onClick={() => openDetail(record)}>
               详情
-            </Button>
-            {record.status === 'submitted' && record.user_id === (user as any)?.id && (
+            </Button>,
+          ]
+          
+          if (record.status === 'submitted' && record.user_id === (user as any)?.id) {
+            buttons.push(
               <Button
+                key="submit"
                 type="link"
+                size="small"
                 icon={<CheckCircleOutlined />}
                 loading={submitMutation.isPending}
                 onClick={() => submitMutation.mutate(record.id)}
               >
                 提交审批
               </Button>
-            )}
-            {record.status === 'reviewing' && canApprove && (
-              <>
-                <Button
-                  type="link"
-                  icon={<CheckCircleOutlined />}
-                  onClick={() => setActionModal({ type: 'approve' })}
-                >
-                  通过
-                </Button>
-                <Button
-                  type="link"
-                  danger
-                  icon={<CloseCircleOutlined />}
-                  onClick={() => setActionModal({ type: 'reject' })}
-                >
-                  拒绝
-                </Button>
-              </>
-            )}
-          </Space>
-        ),
+            )
+          }
+          
+          if (record.can_approve && record.status === 'reviewing') {
+            buttons.push(
+              <Button
+                key="approve"
+                type="link"
+                size="small"
+                icon={<CheckCircleOutlined />}
+                onClick={() => setActionModal({ type: 'approve' })}
+              >
+                通过
+              </Button>,
+              <Button
+                key="reject"
+                type="link"
+                size="small"
+                danger
+                icon={<CloseCircleOutlined />}
+                onClick={() => setActionModal({ type: 'reject' })}
+              >
+                拒绝
+              </Button>
+            )
+          }
+          
+          return (
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 8px', justifyItems: 'start' }}>
+              {buttons}
+            </div>
+          )
+        },
       },
     ],
-    [canApprove, submitMutation, user],
+    [submitMutation, user],
   )
 
   const handleCreate = () => {

@@ -183,6 +183,8 @@ const ApprovalsPage = () => {
     status: 'all',
   })
   const [historyPagination, setHistoryPagination] = useState({ current: 1, pageSize: 10 })
+  const [pendingPage, setPendingPage] = useState(1)
+  const [pendingPageSize, setPendingPageSize] = useState(20)
   const [selectedPendingKeys, setSelectedPendingKeys] = useState<React.Key[]>([])
   const [selectedHistoryKeys, setSelectedHistoryKeys] = useState<React.Key[]>([])
   const [activeTab, setActiveTab] = useState('pending')
@@ -722,6 +724,54 @@ const ApprovalsPage = () => {
         },
       },
       {
+        title: '最新评论',
+        dataIndex: 'latest_comment',
+        width: 200,
+        ellipsis: true,
+        render: (value: string, record) => {
+          if (!value) return '-'
+          return (
+            <div>
+              <Text ellipsis={{ tooltip: value }} style={{ display: 'block', marginBottom: 4 }}>
+                {value}
+              </Text>
+              {record.comment_user && (
+                <Text type="secondary" style={{ fontSize: 12 }}>
+                  {record.comment_user}
+                </Text>
+              )}
+            </div>
+          )
+        },
+      },
+      {
+        title: '评论图片',
+        dataIndex: 'comment_images',
+        width: 180,
+        render: (value: unknown) => {
+          const imgs = parseImages(value)
+          if (!imgs.length) return '-'
+          const shown = imgs.slice(0, 2)
+          const rest = imgs.length - shown.length
+          return (
+            <Image.PreviewGroup>
+              <Space size={6} wrap>
+                {shown.map((img) => (
+                  <Image
+                    key={img}
+                    src={img}
+                    width={40}
+                    height={40}
+                    style={{ objectFit: 'cover', borderRadius: 6 }}
+                  />
+                ))}
+                {rest > 0 && <Text type="secondary">+{rest}</Text>}
+              </Space>
+            </Image.PreviewGroup>
+          )
+        },
+      },
+      {
         title: '金额/数量',
         dataIndex: 'amount',
         width: 150,
@@ -739,6 +789,12 @@ const ApprovalsPage = () => {
         render: (value: string | undefined) => (value ? dayjs(value).format('YYYY-MM-DD HH:mm') : '-'),
       },
       {
+        title: '当前节点审批人',
+        dataIndex: 'current_approver',
+        width: 150,
+        render: (value: string) => value || '-',
+      },
+      {
         title: '状态',
         dataIndex: 'status',
         width: 120,
@@ -750,7 +806,7 @@ const ApprovalsPage = () => {
       {
         title: '操作',
         dataIndex: 'action',
-        width: 140,
+        width: 180,
         fixed: 'right',
         render: (_, record) => {
           const buttons = [
@@ -772,7 +828,7 @@ const ApprovalsPage = () => {
             )
           }
           return (
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 0', justifyItems: 'start' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 8px', justifyItems: 'start' }}>
               {buttons}
             </div>
           )
@@ -825,6 +881,60 @@ const ApprovalsPage = () => {
             </Image.PreviewGroup>
           )
         },
+      },
+      {
+        title: '最新评论',
+        dataIndex: 'latest_comment',
+        width: 200,
+        ellipsis: true,
+        render: (value: string, record) => {
+          if (!value) return '-'
+          return (
+            <div>
+              <Text ellipsis={{ tooltip: value }} style={{ display: 'block', marginBottom: 4 }}>
+                {value}
+              </Text>
+              {record.comment_user && (
+                <Text type="secondary" style={{ fontSize: 12 }}>
+                  {record.comment_user}
+                </Text>
+              )}
+            </div>
+          )
+        },
+      },
+      {
+        title: '评论图片',
+        dataIndex: 'comment_images',
+        width: 180,
+        render: (value: unknown) => {
+          const imgs = parseImages(value)
+          if (!imgs.length) return '-'
+          const shown = imgs.slice(0, 2)
+          const rest = imgs.length - shown.length
+          return (
+            <Image.PreviewGroup>
+              <Space size={6} wrap>
+                {shown.map((img) => (
+                  <Image
+                    key={img}
+                    src={img}
+                    width={40}
+                    height={40}
+                    style={{ objectFit: 'cover', borderRadius: 6 }}
+                  />
+                ))}
+                {rest > 0 && <Text type="secondary">+{rest}</Text>}
+              </Space>
+            </Image.PreviewGroup>
+          )
+        },
+      },
+      {
+        title: '当前节点审批人',
+        dataIndex: 'current_approver',
+        width: 150,
+        render: (value: string) => value || '-',
       },
       {
         title: '状态',
@@ -1067,8 +1177,19 @@ const ApprovalsPage = () => {
                     columns={pendingColumns}
                     dataSource={pendingQuery.data?.records}
                     loading={pendingQuery.isLoading}
-                    pagination={false}
-                    scroll={{ x: 900 }}
+                    pagination={{
+                      current: pendingPage,
+                      pageSize: pendingPageSize,
+                      total: pendingQuery.data?.total || 0,
+                      showSizeChanger: true,
+                      showTotal: (total) => `共 ${total} 条`,
+                      pageSizeOptions: ['10', '20', '50', '100'],
+                      onChange: (page, pageSize) => {
+                        setPendingPage(page)
+                        setPendingPageSize(pageSize)
+                      },
+                    }}
+                    scroll={{ x: 1200 }}
                     locale={{ emptyText: pendingQuery.isLoading ? <Empty description="加载中" /> : <Empty description="暂无待审批" /> }}
                     rowSelection={{
                       selectedRowKeys: selectedPendingKeys,

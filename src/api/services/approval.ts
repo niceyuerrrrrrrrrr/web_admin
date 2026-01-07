@@ -28,6 +28,11 @@ export type ApprovalCoreFields = {
   days?: number
   quantity?: number
   images?: string[]
+  latest_comment?: string
+  comment_images?: string[]
+  comment_time?: string | null
+  comment_user?: string
+  current_approver?: string
 }
 
 export type ApprovalPendingResponse = {
