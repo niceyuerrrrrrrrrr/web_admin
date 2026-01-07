@@ -36,6 +36,9 @@ export const createWarehouse = (data: {
 export const updateWarehouse = (warehouseId: number, data: Partial<Warehouse>) =>
   unwrap<Warehouse>(client.put(`/inventory/warehouses/${warehouseId}`, data))
 
+export const deleteWarehouse = (warehouseId: number) =>
+  unwrap(client.delete(`/inventory/warehouses/${warehouseId}`))
+
 export const fetchInventoryItems = (params?: { warehouseId?: number; materialCode?: string; keyword?: string; companyId?: number }) =>
   unwrap<{ records: InventoryItem[] }>(
     client.get('/inventory/items', {

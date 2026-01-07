@@ -39,6 +39,7 @@ import {
   createInventoryItem,
   createStockOperation,
   createWarehouse,
+  deleteWarehouse,
   fetchInventoryItems,
   fetchInventoryStatistics,
   fetchStockOperations,
@@ -65,6 +66,8 @@ const InventoryPage = () => {
   const { selectedCompanyId } = useCompanyStore()
 
   const isSuperAdmin = user?.role === 'super_admin' || user?.positionType === '超级管理员'
+  const isCEO = user?.positionType === '总经理'
+  const canManageWarehouse = isSuperAdmin || isCEO
   const effectiveCompanyId = isSuperAdmin ? selectedCompanyId : undefined
   const showCompanyWarning = isSuperAdmin && !effectiveCompanyId
 
@@ -148,6 +151,15 @@ const InventoryPage = () => {
       queryClient.invalidateQueries({ queryKey: ['inventory', 'warehouses'] })
     },
     onError: (error) => message.error((error as Error).message || '更新失败'),
+  })
+
+  const deleteWarehouseMutation = useMutation({
+    mutationFn: deleteWarehouse,
+    onSuccess: () => {
+      message.success('仓库删除成功')
+      queryClient.invalidateQueries({ queryKey: ['inventory', 'warehouses'] })
+    },
+    onError: (error) => message.error((error as Error).message || '删除失败'),
   })
 
   const createInventoryMutation = useMutation({
@@ -330,14 +342,15 @@ const InventoryPage = () => {
           </Button>
           <Button
             type="link"
-            onClick={() =>
+            onClick={() => {
               operationForm.setFieldsValue({
                 warehouse_id: record.warehouse_id,
                 inventory_id: record.id,
                 unit: record.unit,
                 operation_date: dayjs(),
               })
-            }
+              setOperationModalOpen(true)
+            }}
           >
             出入库
           </Button>
@@ -358,18 +371,36 @@ const InventoryPage = () => {
     },
     {
       title: '操作',
-      width: 120,
+      width: 180,
       render: (_, record) => (
-        <Button
-          type="link"
-          onClick={() => {
-            setSelectedWarehouse(record)
-            warehouseForm.setFieldsValue(record)
-            setWarehouseDrawerOpen(true)
-          }}
-        >
-          编辑
-        </Button>
+        <Space>
+          <Button
+            type="link"
+            onClick={() => {
+              setSelectedWarehouse(record)
+              warehouseForm.setFieldsValue(record)
+              setWarehouseDrawerOpen(true)
+            }}
+            disabled={!canManageWarehouse}
+          >
+            编辑
+          </Button>
+          {canManageWarehouse && (
+            <Button
+              type="link"
+              danger
+              onClick={() => {
+                Modal.confirm({
+                  title: '确认删除',
+                  content: `确定要删除仓库"${record.name}"吗？此操作不可恢复。`,
+                  onOk: () => deleteWarehouseMutation.mutate(record.id),
+                })
+              }}
+            >
+              删除
+            </Button>
+          )}
+        </Space>
       ),
     },
   ]
@@ -430,7 +461,7 @@ const InventoryPage = () => {
           >
             新增物品
           </Button>
-          <Button icon={<HomeOutlined />} onClick={() => setWarehouseModalOpen(true)}>
+          <Button icon={<HomeOutlined />} onClick={() => setWarehouseModalOpen(true)} disabled={!canManageWarehouse}>
             新建仓库
           </Button>
           <Button icon={<InboxOutlined />} onClick={() => setOperationModalOpen(true)}>
