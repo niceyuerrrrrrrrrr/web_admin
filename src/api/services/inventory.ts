@@ -66,6 +66,9 @@ export const createInventoryItem = (data: {
 export const updateInventoryItem = (itemId: number, data: Partial<InventoryItem>) =>
   unwrap(client.put(`/inventory/items/${itemId}`, data))
 
+export const deleteInventoryItem = (itemId: number) =>
+  unwrap(client.delete(`/inventory/items/${itemId}`))
+
 export const fetchStockOperations = (params?: {
   warehouseId?: number
   inventoryId?: number

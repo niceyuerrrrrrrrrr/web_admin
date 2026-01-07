@@ -39,6 +39,7 @@ import {
   createInventoryItem,
   createStockOperation,
   createWarehouse,
+  deleteInventoryItem,
   deleteWarehouse,
   fetchInventoryItems,
   fetchInventoryStatistics,
@@ -182,6 +183,16 @@ const InventoryPage = () => {
     onError: (error) => message.error((error as Error).message || '更新失败'),
   })
 
+  const deleteInventoryMutation = useMutation({
+    mutationFn: deleteInventoryItem,
+    onSuccess: () => {
+      message.success('物品删除成功')
+      queryClient.invalidateQueries({ queryKey: ['inventory', 'items'] })
+      queryClient.invalidateQueries({ queryKey: ['inventory', 'stats'] })
+    },
+    onError: (error) => message.error((error as Error).message || '删除失败'),
+  })
+
   const operationMutation = useMutation({
     mutationFn: createStockOperation,
     onSuccess: () => {
@@ -242,16 +253,21 @@ const InventoryPage = () => {
   const handleInventorySave = () => {
     inventoryForm.validateFields().then((values) => {
       if (editingItemId) {
+        const updateData: any = {
+          material_name: values.material_name,
+          material_code: values.material_code,
+          min_stock: values.min_stock,
+          max_stock: values.max_stock,
+          location: values.location,
+          notes: values.notes,
+        }
+        // 仅超级管理员和总经理可以调整库存数量
+        if (canManageWarehouse && values.quantity !== undefined) {
+          updateData.quantity = values.quantity
+        }
         updateInventoryMutation.mutate({
           id: editingItemId,
-          data: {
-            material_name: values.material_name,
-            material_code: values.material_code,
-            min_stock: values.min_stock,
-            max_stock: values.max_stock,
-            location: values.location,
-            notes: values.notes,
-          },
+          data: updateData,
         })
       } else {
         createInventoryMutation.mutate({
@@ -319,7 +335,7 @@ const InventoryPage = () => {
     { title: '备注', dataIndex: 'notes', ellipsis: true, render: (v) => v || '-' },
     {
       title: '操作',
-      width: 150,
+      width: canManageWarehouse ? 240 : 150,
       render: (_, record) => (
         <Space>
           <Button
@@ -330,6 +346,7 @@ const InventoryPage = () => {
                 warehouse_id: record.warehouse_id,
                 material_name: record.material_name,
                 material_code: record.material_code,
+                quantity: record.quantity,
                 min_stock: record.min_stock,
                 max_stock: record.max_stock,
                 location: record.location,
@@ -354,6 +371,21 @@ const InventoryPage = () => {
           >
             出入库
           </Button>
+          {canManageWarehouse && (
+            <Button
+              type="link"
+              danger
+              onClick={() => {
+                Modal.confirm({
+                  title: '确认删除',
+                  content: `确定要删除物品"${record.material_name}"吗？此操作不可恢复。`,
+                  onOk: () => deleteInventoryMutation.mutate(record.id),
+                })
+              }}
+            >
+              删除
+            </Button>
+          )}
         </Space>
       ),
     },
@@ -798,7 +830,7 @@ const InventoryPage = () => {
           <Form.Item label="物品编码" name="material_code">
             <Input />
           </Form.Item>
-          {!editingItemId && (
+          {!editingItemId ? (
             <>
               <Form.Item label="初始数量" name="quantity">
                 <InputNumber min={0} style={{ width: '100%' }} />
@@ -807,6 +839,12 @@ const InventoryPage = () => {
                 <Input />
               </Form.Item>
             </>
+          ) : (
+            canManageWarehouse && (
+              <Form.Item label="库存数量" name="quantity" help="仅超级管理员和总经理可调整">
+                <InputNumber min={0} style={{ width: '100%' }} />
+              </Form.Item>
+            )
           )}
           <Form.Item label="最低库存" name="min_stock">
             <InputNumber min={0} style={{ width: '100%' }} />
