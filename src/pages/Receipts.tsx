@@ -2046,6 +2046,20 @@ const ReceiptsPage = () => {
               </>
             )}
             
+            {/* 删除信息显示 */}
+            {receipt.deleted_at && (
+              <>
+                <Descriptions.Item label="删除状态" span={3}>
+                  <Tag color="red">已删除</Tag>
+                </Descriptions.Item>
+                <Descriptions.Item label="删除时间" span={2}>
+                  {dayjs(receipt.deleted_at).format('YYYY-MM-DD HH:mm:ss')}
+                </Descriptions.Item>
+                <Descriptions.Item label="删除人">
+                  {receipt.deleted_by_name || '-'}
+                </Descriptions.Item>
+              </>
+            )}
           </Descriptions>
         </Card>
           </>
