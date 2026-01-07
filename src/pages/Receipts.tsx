@@ -121,7 +121,10 @@ const ReceiptsPage = () => {
     endDate?: string
     vehicleNo?: string
     tankerVehicleCode?: string
-  }>({})
+    deletedStatus?: 'all' | 'normal' | 'deleted'
+  }>({
+    deletedStatus: 'normal' // 默认只显示正常票据
+  })
   const [selectedReceipt, setSelectedReceipt] = useState<Receipt | null>(null)
   const [detailDrawerOpen, setDetailDrawerOpen] = useState(false)
   const [editDrawerOpen, setEditDrawerOpen] = useState(false)
@@ -226,6 +229,7 @@ const ReceiptsPage = () => {
         tankerVehicleCode: filters.tankerVehicleCode,
         companyId: effectiveCompanyId, // 超级管理员需要传，非超级管理员可以不传（后端会自动过滤）
         departmentId: selectedDepartmentId, // 部门筛选
+        deletedStatus: filters.deletedStatus, // 删除状态筛选
       }),
     enabled: (isSuperAdmin ? !!effectiveCompanyId : true) && activeTab !== 'matched', // 匹配数据使用单独的查询
   })
@@ -400,6 +404,7 @@ const ReceiptsPage = () => {
     dateRange?: Dayjs[]
     vehicleNo?: string
     tankerVehicleCode?: string
+    deletedStatus?: 'all' | 'normal' | 'deleted'
   }) => {
     setFilters({
       receiptType: values.receiptType,
@@ -407,12 +412,14 @@ const ReceiptsPage = () => {
       endDate: values.dateRange?.[1]?.format('YYYY-MM-DD'),
       vehicleNo: values.vehicleNo,
       tankerVehicleCode: values.tankerVehicleCode,
+      deletedStatus: values.deletedStatus || 'normal',
     })
   }
 
   const handleReset = () => {
-    setFilters({})
+    setFilters({ deletedStatus: 'normal' })
     searchForm.resetFields()
+    searchForm.setFieldValue('deletedStatus', 'normal')
   }
 
   const openDetail = useCallback((receipt: Receipt) => {

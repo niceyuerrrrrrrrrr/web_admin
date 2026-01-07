@@ -26,6 +26,9 @@ export interface LoadingReceipt {
   thumb_url?: string
   task_id?: string
   created_at?: string
+  deleted_at?: string | null
+  deleted_by?: number | null
+  deleted_by_name?: string | null
 }
 
 export interface UnloadingReceipt {
@@ -46,6 +49,9 @@ export interface UnloadingReceipt {
   task_id?: string
   thumb_url?: string
   created_at?: string
+  deleted_at?: string | null
+  deleted_by?: number | null
+  deleted_by_name?: string | null
 }
 
 export interface ChargingReceipt {
@@ -67,6 +73,9 @@ export interface ChargingReceipt {
   raw_data?: Record<string, unknown>
   created_at?: string
   updated_at?: string
+  deleted_at?: string | null
+  deleted_by?: number | null
+  deleted_by_name?: string | null
 }
 
 export interface WaterTicket {
@@ -80,8 +89,12 @@ export interface WaterTicket {
   tanker_vehicle_code?: string // 自编车号
   ticket_date?: string // 日期
   image_path?: string // 图片
+  thumb_url?: string // 图片URL（兼容字段）
   created_at?: string
   updated_at?: string
+  deleted_at?: string | null
+  deleted_by?: number | null
+  deleted_by_name?: string | null
 }
 
 export interface DepartureReceipt {
@@ -117,6 +130,10 @@ export interface DepartureReceipt {
   finished_at?: string
   created_at?: string
   updated_at?: string
+  deleted_at?: string | null
+  deleted_by?: number | null
+  deleted_by_name?: string | null
+  thumb_url?: string // 图片URL（兼容字段）
 }
 
 export type Receipt = LoadingReceipt | UnloadingReceipt | ChargingReceipt | WaterTicket | DepartureReceipt
@@ -132,6 +149,7 @@ export interface ReceiptListParams {
   driverName?: string
   page?: number
   pageSize?: number
+  deletedStatus?: 'all' | 'normal' | 'deleted'
 }
 
 export interface ReceiptListResponse {
