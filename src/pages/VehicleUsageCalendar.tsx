@@ -30,16 +30,29 @@ const VehicleUsageCalendar: React.FC = () => {
   ])
 
   // 获取车辆使用数据（按公司过滤）
-  const { data: usageData, refetch, isLoading } = useQuery({
+  const { data: usageData, refetch, isLoading, error } = useQuery({
     queryKey: ['vehicleUsage', selectedCompanyId, dateRange],
-    queryFn: () =>
-      fetchVehicleUsageCalendar({
+    queryFn: async () => {
+      console.log('查询车辆使用日历:', {
+        company_id: selectedCompanyId,
+        start_date: dateRange[0].format('YYYY-MM-DD'),
+        end_date: dateRange[1].format('YYYY-MM-DD'),
+      })
+      const result = await fetchVehicleUsageCalendar({
         company_id: selectedCompanyId!,
         start_date: dateRange[0].format('YYYY-MM-DD'),
         end_date: dateRange[1].format('YYYY-MM-DD'),
-      }),
+      })
+      console.log('车辆使用日历返回数据:', result)
+      return result
+    },
     enabled: !!selectedCompanyId,
   })
+  
+  // 打印错误信息
+  if (error) {
+    console.error('车辆使用日历查询错误:', error)
+  }
 
   // 生成日期列
   const generateDateColumns = () => {
@@ -126,6 +139,8 @@ const VehicleUsageCalendar: React.FC = () => {
   }
 
   const columns = generateDateColumns()
+  // API返回格式：{success: true, data: [...], message: "..."}
+  // usageData本身就是ApiResponse，所以usageData.data是实际的车辆数组
   const dataSource = usageData?.data || []
 
   // 计算统计数据
@@ -207,7 +222,18 @@ const VehicleUsageCalendar: React.FC = () => {
         </div>
 
         {/* 车辆使用表格 */}
-        {dataSource.length > 0 ? (
+        {error ? (
+          <Empty 
+            description={
+              <div>
+                <div>数据加载失败</div>
+                <div style={{ color: '#999', fontSize: 12, marginTop: 8 }}>
+                  {(error as Error).message || '未知错误'}
+                </div>
+              </div>
+            } 
+          />
+        ) : dataSource.length > 0 ? (
           <Table
             columns={columns}
             dataSource={dataSource}
@@ -218,7 +244,18 @@ const VehicleUsageCalendar: React.FC = () => {
             bordered
           />
         ) : (
-          <Empty description="暂无数据" />
+          <Empty 
+            description={
+              <div>
+                <div>暂无数据</div>
+                {!isLoading && selectedCompanyId && (
+                  <div style={{ color: '#999', fontSize: 12, marginTop: 8 }}>
+                    当前公司ID: {selectedCompanyId}，日期范围: {dateRange[0].format('YYYY-MM-DD')} ~ {dateRange[1].format('YYYY-MM-DD')}
+                  </div>
+                )}
+              </div>
+            } 
+          />
         )}
       </Card>
     </div>
