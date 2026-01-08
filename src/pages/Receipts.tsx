@@ -3831,7 +3831,7 @@ const ReceiptsPage = () => {
                     ]
                   } else if (activeTab === 'departure') {
                     return [
-                      { label: '装料公司', value: 'company' },
+                      { label: '装料公司', value: 'loading_company' },
                       { label: '工程名称', value: 'project_name' },
                       { label: '施工地点', value: 'pour_location' },
                       { label: '客户名称', value: 'customer_name' },
