@@ -3990,6 +3990,7 @@ const ReceiptsPage = () => {
           setConfigFieldType('')
           setBatchInputValue('')
         }}
+        zIndex={1001}
         onOk={async () => {
           if (!configFieldType) {
             message.warning('请选择字段类型')
