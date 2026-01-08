@@ -3787,8 +3787,7 @@ const ReceiptsPage = () => {
             }) as any
             
             message.success(`成功更新 ${result.affected_rows || 0} 条记录`)
-            setDataCleanModalOpen(false)
-            setCleanField('')
+            // 不关闭弹窗，只清空选择，让用户可以继续清洗
             setSelectedOldValues([])
             setNewValue('')
             queryClient.invalidateQueries({ queryKey: ['receipts'] })
@@ -3796,6 +3795,8 @@ const ReceiptsPage = () => {
             message.error(error.message || '批量修改失败')
           }
         }}
+        okText="执行替换"
+        cancelText="关闭"
         width={700}
       >
         <Space direction="vertical" size="large" style={{ width: '100%' }}>
@@ -3870,11 +3871,56 @@ const ReceiptsPage = () => {
                   />
                 </Form.Item>
 
-                <Form.Item label="输入正确的新值" required>
-                  <Input
-                    value={newValue}
-                    onChange={(e) => setNewValue(e.target.value)}
-                    placeholder="请输入正确的值"
+                <Form.Item label="输入或选择正确的新值" required>
+                  <Select
+                    showSearch
+                    value={newValue || undefined}
+                    onChange={setNewValue}
+                    placeholder="请输入或选择正确的值"
+                    options={(() => {
+                      // 根据字段类型提供预设的标准值选项
+                      const standardValues: Record<string, string[]> = {
+                        'company': ['中建西部建设第九有限公司洋京厂', '陕西砼源混凝土有限公司', '海南新陕建材有限公司'],
+                        'loading_company': ['中建西部建设第九有限公司洋京厂', '陕西砼源混凝土有限公司', '海南新陕建材有限公司'],
+                        'material_name': ['C30', 'C35', 'C40', 'C45', 'C50'],
+                        'material_spec': ['P6', 'P8', 'S6', 'S8'],
+                      }
+                      
+                      const values = standardValues[cleanField] || []
+                      // 从当前数据中提取已有的值作为补充选项
+                      const existingValues = Array.from(
+                        new Set(
+                          filteredReceipts
+                            .map((r: any) => r[cleanField])
+                            .filter(Boolean)
+                        )
+                      ).sort((a, b) => String(a).localeCompare(String(b), 'zh-CN'))
+                      
+                      // 合并标准值和已有值
+                      const allValues = Array.from(new Set([...values, ...existingValues]))
+                      
+                      return allValues.map(v => ({ label: v, value: v }))
+                    })()}
+                    filterOption={(input, option) =>
+                      (option?.label as string).toLowerCase().includes(input.toLowerCase())
+                    }
+                    dropdownRender={(menu) => (
+                      <>
+                        {menu}
+                        <div style={{ padding: '8px', borderTop: '1px solid #f0f0f0' }}>
+                          <Button
+                            type="link"
+                            size="small"
+                            icon={<ToolOutlined />}
+                            onClick={() => {
+                              message.info('标准值配置功能开发中...')
+                            }}
+                          >
+                            管理标准值
+                          </Button>
+                        </div>
+                      </>
+                    )}
                   />
                 </Form.Item>
 
