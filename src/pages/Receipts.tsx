@@ -654,6 +654,8 @@ const ReceiptsPage = () => {
       if (values.load_gross_weight !== undefined) loadUpdateData.gross_weight = values.load_gross_weight
       if (values.load_net_weight !== undefined) loadUpdateData.net_weight = values.load_net_weight
       if (values.load_tare_weight !== undefined) loadUpdateData.tare_weight = values.load_tare_weight
+      if (values.load_loading_time) loadUpdateData.loading_time = values.load_loading_time.format('YYYY-MM-DD HH:mm:ss')
+      if (values.load_unloading_time) loadUpdateData.unloading_time = values.load_unloading_time.format('YYYY-MM-DD HH:mm:ss')
       
       // 准备更新卸货单的数据
       const unloadUpdateData: any = {}
@@ -663,6 +665,8 @@ const ReceiptsPage = () => {
       if (values.unload_gross_weight !== undefined) unloadUpdateData.gross_weight = values.unload_gross_weight
       if (values.unload_net_weight !== undefined) unloadUpdateData.net_weight = values.unload_net_weight
       if (values.unload_tare_weight !== undefined) unloadUpdateData.tare_weight = values.unload_tare_weight
+      if (values.unload_loading_time) unloadUpdateData.loading_time = values.unload_loading_time.format('YYYY-MM-DD HH:mm:ss')
+      if (values.unload_unloading_time) unloadUpdateData.unloading_time = values.unload_unloading_time.format('YYYY-MM-DD HH:mm:ss')
       
       // 同时更新装料单和卸货单
       await Promise.all([
@@ -680,9 +684,17 @@ const ReceiptsPage = () => {
       matchedEditForm.resetFields()
       queryClient.invalidateQueries({ queryKey: ['receipts'] })
       queryClient.invalidateQueries({ queryKey: ['matched-receipts'] })
-    } catch (error) {
-      console.error('更新失败:', error)
-      message.error('更新失败，请重试')
+    } catch (error: any) {
+      console.error('更新失败详情:', {
+        error,
+        message: error?.message,
+        response: error?.response?.data,
+        loadUpdateData,
+        unloadUpdateData,
+        editingMatched
+      })
+      const errorMsg = error?.response?.data?.message || error?.message || '更新失败，请重试'
+      message.error(errorMsg)
     }
   }, [editingMatched, matchedEditForm, message, queryClient])
 
@@ -3829,21 +3841,33 @@ const ReceiptsPage = () => {
             </Space>
             
             {/* 磅差计算显示 */}
-            <Alert
-              message="磅差计算"
-              description={
-                <div>
-                  <div>装料净重: {matchedEditForm.getFieldValue('load_net_weight') || 0} t</div>
-                  <div>卸货净重: {matchedEditForm.getFieldValue('unload_net_weight') || 0} t</div>
-                  <div style={{ marginTop: 8, fontSize: 16, fontWeight: 'bold', color: '#1890ff' }}>
-                    磅差: {((matchedEditForm.getFieldValue('load_net_weight') || 0) - (matchedEditForm.getFieldValue('unload_net_weight') || 0)).toFixed(2)} t
-                  </div>
-                </div>
-              }
-              type="info"
-              showIcon
-              style={{ marginTop: 16 }}
-            />
+            <Form.Item noStyle shouldUpdate={(prevValues, currentValues) => 
+              prevValues.load_net_weight !== currentValues.load_net_weight || 
+              prevValues.unload_net_weight !== currentValues.unload_net_weight
+            }>
+              {({ getFieldValue }) => {
+                const loadNet = getFieldValue('load_net_weight') || 0
+                const unloadNet = getFieldValue('unload_net_weight') || 0
+                const diff = loadNet - unloadNet
+                return (
+                  <Alert
+                    message="磅差计算"
+                    description={
+                      <div>
+                        <div>装料净重: {loadNet} t</div>
+                        <div>卸货净重: {unloadNet} t</div>
+                        <div style={{ marginTop: 8, fontSize: 16, fontWeight: 'bold', color: diff >= 0 ? '#1890ff' : '#ff4d4f' }}>
+                          磅差: {diff.toFixed(2)} t
+                        </div>
+                      </div>
+                    }
+                    type="info"
+                    showIcon
+                    style={{ marginTop: 16 }}
+                  />
+                )
+              }}
+            </Form.Item>
           </Form>
         )}
       </Modal>
