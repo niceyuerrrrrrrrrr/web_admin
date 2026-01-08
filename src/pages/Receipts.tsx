@@ -201,24 +201,42 @@ const ReceiptsPage = () => {
   // 获取部门列表
   const departmentsQuery = useQuery({
     queryKey: ['departments', 'list', effectiveCompanyId],
-    queryFn: () => fetchDepartments({ company_id: effectiveCompanyId }),
+    queryFn: async () => {
+      try {
+        const data = await fetchDepartments({ company_id: effectiveCompanyId })
+        console.log('部门数据加载成功:', data)
+        return data
+      } catch (error) {
+        console.error('加载部门数据失败:', error)
+        throw error
+      }
+    },
     enabled: !isSuperAdmin || !!effectiveCompanyId,
   })
 
-  const departments = departmentsQuery.data?.records || []
+  const departments = Array.isArray(departmentsQuery.data?.records) ? departmentsQuery.data.records : []
 
   // 获取用户列表（根据选择的部门过滤）
   const usersQuery = useQuery({
     queryKey: ['users', 'list', effectiveCompanyId, selectedDepartmentId],
-    queryFn: () => fetchUsers({ 
-      size: 1000, 
-      company_id: effectiveCompanyId,
-      department_id: selectedDepartmentId,
-    }),
+    queryFn: async () => {
+      try {
+        const data = await fetchUsers({ 
+          size: 1000, 
+          company_id: effectiveCompanyId,
+          department_id: selectedDepartmentId,
+        })
+        console.log('用户数据加载成功:', data)
+        return data
+      } catch (error) {
+        console.error('加载用户数据失败:', error)
+        throw error
+      }
+    },
     enabled: !isSuperAdmin || !!effectiveCompanyId,
   })
 
-  const users = usersQuery.data?.items || []
+  const users = Array.isArray(usersQuery.data?.items) ? usersQuery.data.items : []
 
   // 当部门变化时，清空用户选择
   useEffect(() => {
