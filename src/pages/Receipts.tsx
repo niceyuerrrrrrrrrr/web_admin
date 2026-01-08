@@ -3754,7 +3754,6 @@ const ReceiptsPage = () => {
           </Form>
         )}
       </Modal>
-    </Space>
 
       {/* 数据清洗对话框 */}
       <Modal
@@ -3785,9 +3784,9 @@ const ReceiptsPage = () => {
               old_values: selectedOldValues,
               new_value: newValue,
               company_id: effectiveCompanyId,
-            })
+            }) as any
             
-            message.success(`成功更新 ${result.affected_rows} 条记录`)
+            message.success(`成功更新 ${result.affected_rows || 0} 条记录`)
             setDataCleanModalOpen(false)
             setCleanField('')
             setSelectedOldValues([])
@@ -3817,17 +3816,36 @@ const ReceiptsPage = () => {
                   setNewValue('')
                 }}
                 placeholder="请选择字段"
-                options={[
-                  { label: '装料公司', value: 'company' },
-                  { label: '司机姓名', value: 'driver_name' },
-                  { label: '车牌号', value: 'vehicle_no' },
-                  { label: '物料名称', value: 'material_name' },
-                  { label: '物料规格', value: 'material_spec' },
-                  ...(activeTab === 'departure' ? [
-                    { label: '工程名称', value: 'project_name' },
-                    { label: '浇筑部位', value: 'pour_location' },
-                  ] : []),
-                ]}
+                options={(() => {
+                  const commonFields = [
+                    { label: '司机姓名', value: 'driver_name' },
+                    { label: '车牌号', value: 'vehicle_no' },
+                  ]
+                  
+                  if (activeTab === 'loading' || activeTab === 'unloading') {
+                    return [
+                      { label: '公司', value: 'company' },
+                      ...commonFields,
+                      { label: '物料名称', value: 'material_name' },
+                      { label: '物料规格', value: 'material_spec' },
+                    ]
+                  } else if (activeTab === 'departure') {
+                    return [
+                      ...commonFields,
+                      { label: '工程名称', value: 'project_name' },
+                      { label: '浇筑部位', value: 'pour_location' },
+                      { label: '混凝土标号', value: 'concrete_grade' },
+                    ]
+                  } else if (activeTab === 'water') {
+                    return [
+                      ...commonFields,
+                      { label: '公司名称', value: 'company_name' },
+                    ]
+                  } else if (activeTab === 'charging') {
+                    return commonFields
+                  }
+                  return commonFields
+                })()}
               />
             </Form.Item>
 
