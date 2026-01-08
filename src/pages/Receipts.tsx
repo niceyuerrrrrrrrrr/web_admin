@@ -154,6 +154,15 @@ const ReceiptsPage = () => {
   const [cleanField, setCleanField] = useState<string>('')
   const [selectedOldValues, setSelectedOldValues] = useState<string[]>([])
   const [newValue, setNewValue] = useState<string>('')
+  const [cleanConfigModalOpen, setCleanConfigModalOpen] = useState(false)
+  const [configFieldType, setConfigFieldType] = useState<string>('')
+  const [standardValues, setStandardValues] = useState<Record<string, string[]>>({
+    'company': ['中建西部建设第九有限公司洋京厂', '陕西砼源混凝土有限公司', '海南新陕建材有限公司'],
+    'loading_company': ['中建西部建设第九有限公司洋京厂', '陕西砼源混凝土有限公司', '海南新陕建材有限公司'],
+    'material_name': ['C30', 'C35', 'C40', 'C45', 'C50'],
+    'material_spec': ['P6', 'P8', 'S6', 'S8'],
+  })
+  const [batchInputValue, setBatchInputValue] = useState<string>('')
   const [editForm] = Form.useForm()
   const [searchForm] = Form.useForm()
   const [matchedEditForm] = Form.useForm()
@@ -3284,6 +3293,9 @@ const ReceiptsPage = () => {
               <Button icon={<ToolOutlined />} onClick={() => setDataCleanModalOpen(true)}>
                 数据清洗
               </Button>
+              <Button icon={<ToolOutlined />} onClick={() => setCleanConfigModalOpen(true)}>
+                清洗配置
+              </Button>
             </>
           )}
         </Space>
@@ -3878,14 +3890,6 @@ const ReceiptsPage = () => {
                     onChange={setNewValue}
                     placeholder="请输入或选择正确的值"
                     options={(() => {
-                      // 根据字段类型提供预设的标准值选项
-                      const standardValues: Record<string, string[]> = {
-                        'company': ['中建西部建设第九有限公司洋京厂', '陕西砼源混凝土有限公司', '海南新陕建材有限公司'],
-                        'loading_company': ['中建西部建设第九有限公司洋京厂', '陕西砼源混凝土有限公司', '海南新陕建材有限公司'],
-                        'material_name': ['C30', 'C35', 'C40', 'C45', 'C50'],
-                        'material_spec': ['P6', 'P8', 'S6', 'S8'],
-                      }
-                      
                       const values = standardValues[cleanField] || []
                       // 从当前数据中提取已有的值作为补充选项
                       const existingValues = Array.from(
@@ -3913,7 +3917,7 @@ const ReceiptsPage = () => {
                             size="small"
                             icon={<ToolOutlined />}
                             onClick={() => {
-                              message.info('标准值配置功能开发中...')
+                              setCleanConfigModalOpen(true)
                             }}
                           >
                             管理标准值
@@ -3952,6 +3956,145 @@ const ReceiptsPage = () => {
                     type="warning"
                   />
                 )}
+              </>
+            )}
+          </Form>
+        </Space>
+      </Modal>
+
+      {/* 数据清洗配置对话框 */}
+      <Modal
+        title="数据清洗配置"
+        open={cleanConfigModalOpen}
+        onCancel={() => {
+          setCleanConfigModalOpen(false)
+          setConfigFieldType('')
+          setBatchInputValue('')
+        }}
+        onOk={() => {
+          setCleanConfigModalOpen(false)
+          message.success('配置已保存')
+        }}
+        width={800}
+      >
+        <Space direction="vertical" size="large" style={{ width: '100%' }}>
+          <Alert
+            message="配置说明"
+            description="为不同字段配置标准值列表，用于数据清洗时快速选择。支持批量添加，每行一个值。"
+            type="info"
+            showIcon
+          />
+
+          <Form layout="vertical">
+            <Form.Item label="选择字段类型" required>
+              <Select
+                value={configFieldType}
+                onChange={setConfigFieldType}
+                placeholder="请选择要配置的字段"
+                options={[
+                  { label: '公司名称', value: 'company' },
+                  { label: '装料公司', value: 'loading_company' },
+                  { label: '材料名称', value: 'material_name' },
+                  { label: '规格型号', value: 'material_spec' },
+                  { label: '工程名称', value: 'project_name' },
+                  { label: '施工地点', value: 'pour_location' },
+                  { label: '客户名称', value: 'customer_name' },
+                  { label: '施工单位', value: 'construction_unit' },
+                ]}
+              />
+            </Form.Item>
+
+            {configFieldType && (
+              <>
+                <Form.Item label="当前标准值列表">
+                  <div style={{ 
+                    border: '1px solid #d9d9d9', 
+                    borderRadius: '6px', 
+                    padding: '12px',
+                    maxHeight: '200px',
+                    overflowY: 'auto',
+                    backgroundColor: '#fafafa'
+                  }}>
+                    {standardValues[configFieldType]?.length > 0 ? (
+                      <Space direction="vertical" style={{ width: '100%' }}>
+                        {standardValues[configFieldType].map((value, index) => (
+                          <div key={index} style={{ 
+                            display: 'flex', 
+                            justifyContent: 'space-between',
+                            alignItems: 'center',
+                            padding: '4px 8px',
+                            backgroundColor: 'white',
+                            borderRadius: '4px'
+                          }}>
+                            <span>{value}</span>
+                            <Button
+                              type="link"
+                              danger
+                              size="small"
+                              onClick={() => {
+                                const newValues = [...standardValues[configFieldType]]
+                                newValues.splice(index, 1)
+                                setStandardValues({
+                                  ...standardValues,
+                                  [configFieldType]: newValues
+                                })
+                              }}
+                            >
+                              删除
+                            </Button>
+                          </div>
+                        ))}
+                      </Space>
+                    ) : (
+                      <Empty description="暂无标准值" image={Empty.PRESENTED_IMAGE_SIMPLE} />
+                    )}
+                  </div>
+                </Form.Item>
+
+                <Form.Item 
+                  label="批量添加标准值" 
+                  extra="每行一个值，支持批量粘贴"
+                >
+                  <Input.TextArea
+                    value={batchInputValue}
+                    onChange={(e) => setBatchInputValue(e.target.value)}
+                    placeholder="请输入标准值，每行一个&#10;例如：&#10;中建西部建设第九有限公司洋京厂&#10;陕西砼源混凝土有限公司&#10;海南新陕建材有限公司"
+                    rows={6}
+                  />
+                  <Button
+                    type="primary"
+                    style={{ marginTop: 8 }}
+                    onClick={() => {
+                      if (!batchInputValue.trim()) {
+                        message.warning('请输入要添加的标准值')
+                        return
+                      }
+                      
+                      const newValues = batchInputValue
+                        .split('\n')
+                        .map(v => v.trim())
+                        .filter(v => v.length > 0)
+                      
+                      if (newValues.length === 0) {
+                        message.warning('没有有效的标准值')
+                        return
+                      }
+                      
+                      const currentValues = standardValues[configFieldType] || []
+                      const mergedValues = Array.from(new Set([...currentValues, ...newValues]))
+                      
+                      setStandardValues({
+                        ...standardValues,
+                        [configFieldType]: mergedValues
+                      })
+                      
+                      setBatchInputValue('')
+                      message.success(`已添加 ${newValues.length} 个标准值`)
+                    }}
+                  >
+                    批量添加
+                  </Button>
+                </Form.Item>
               </>
             )}
           </Form>
