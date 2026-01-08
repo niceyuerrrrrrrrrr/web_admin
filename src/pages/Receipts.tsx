@@ -3909,20 +3909,9 @@ const ReceiptsPage = () => {
                     onChange={setNewValue}
                     placeholder="请输入或选择正确的值"
                     options={(() => {
+                      // 只显示配置的标准值
                       const values = standardValues[cleanField] || []
-                      // 从当前数据中提取已有的值作为补充选项
-                      const existingValues = Array.from(
-                        new Set(
-                          filteredReceipts
-                            .map((r: any) => r[cleanField])
-                            .filter(Boolean)
-                        )
-                      ).sort((a, b) => String(a).localeCompare(String(b), 'zh-CN'))
-                      
-                      // 合并标准值和已有值
-                      const allValues = Array.from(new Set([...values, ...existingValues]))
-                      
-                      return allValues.map(v => ({ label: v, value: v }))
+                      return values.map(v => ({ label: v, value: v }))
                     })()}
                     filterOption={(input, option) =>
                       (option?.label as string).toLowerCase().includes(input.toLowerCase())
