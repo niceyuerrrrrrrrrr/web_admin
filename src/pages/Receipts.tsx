@@ -922,10 +922,12 @@ const ReceiptsPage = () => {
         title: '司机',
         dataIndex: 'driver_name',
         width: 120,
-        filters: Array.from(new Set(receipts?.map(r => r.driver_name).filter(Boolean))).map(name => ({
-          text: name as string,
-          value: name as string,
-        })),
+        filters: Array.from(new Set(receipts?.map(r => r.driver_name).filter(Boolean)))
+          .sort((a, b) => (a || '').localeCompare(b || '', 'zh-CN'))
+          .map(name => ({
+            text: name as string,
+            value: name as string,
+          })),
         onFilter: (value, record) => record.driver_name === value,
       },
       {
@@ -1113,10 +1115,12 @@ const ReceiptsPage = () => {
         title: '司机',
         dataIndex: 'driver_name',
         width: 120,
-        filters: Array.from(new Set(receipts?.map(r => r.driver_name).filter(Boolean))).map(name => ({
-          text: name as string,
-          value: name as string,
-        })),
+        filters: Array.from(new Set(receipts?.map(r => r.driver_name).filter(Boolean)))
+          .sort((a, b) => (a || '').localeCompare(b || '', 'zh-CN'))
+          .map(name => ({
+            text: name as string,
+            value: name as string,
+          })),
         onFilter: (value, record) => record.driver_name === value,
       },
       {
@@ -1300,10 +1304,12 @@ const ReceiptsPage = () => {
         title: '司机',
         dataIndex: 'driver_name',
         width: 100,
-        filters: Array.from(new Set(receipts?.map(r => r.driver_name).filter(Boolean))).map(name => ({
-          text: name as string,
-          value: name as string,
-        })),
+        filters: Array.from(new Set(receipts?.map(r => r.driver_name).filter(Boolean)))
+          .sort((a, b) => (a || '').localeCompare(b || '', 'zh-CN'))
+          .map(name => ({
+            text: name as string,
+            value: name as string,
+          })),
         onFilter: (value, record) => record.driver_name === value,
         render: (value: string) => value || '-',
       },
@@ -1454,10 +1460,12 @@ const ReceiptsPage = () => {
         title: '司机',
         dataIndex: 'driver_name',
         width: 100,
-        filters: Array.from(new Set(receipts?.map(r => r.driver_name).filter(Boolean))).map(name => ({
-          text: name as string,
-          value: name as string,
-        })),
+        filters: Array.from(new Set(receipts?.map(r => r.driver_name).filter(Boolean)))
+          .sort((a, b) => (a || '').localeCompare(b || '', 'zh-CN'))
+          .map(name => ({
+            text: name as string,
+            value: name as string,
+          })),
         onFilter: (value, record) => record.driver_name === value,
         render: (value: string) => value || '-',
       },
@@ -1601,10 +1609,12 @@ const ReceiptsPage = () => {
         title: '司机',
         dataIndex: ['loadBill', 'driver_name'],
         width: 120,
-        filters: Array.from(new Set(receipts?.map(r => (r as any).loadBill?.driver_name || (r as any).unloadBill?.driver_name).filter(Boolean))).map(name => ({
-          text: name as string,
-          value: name as string,
-        })),
+        filters: Array.from(new Set(receipts?.map(r => (r as any).loadBill?.driver_name || (r as any).unloadBill?.driver_name).filter(Boolean)))
+          .sort((a, b) => (a || '').localeCompare(b || '', 'zh-CN'))
+          .map(name => ({
+            text: name as string,
+            value: name as string,
+          })),
         onFilter: (value, record) => (record.loadBill?.driver_name === value || record.unloadBill?.driver_name === value),
         render: (_, record) => record.loadBill?.driver_name || record.unloadBill?.driver_name || '-',
       },
@@ -1896,10 +1906,12 @@ const ReceiptsPage = () => {
         title: '司机',
         dataIndex: 'driver_name',
         width: 100,
-        filters: (Array.isArray(receipts) ? Array.from(new Set(receipts.map(r => r.driver_name).filter(Boolean))) : []).map(name => ({
-          text: name as string,
-          value: name as string,
-        })),
+        filters: (Array.isArray(receipts) ? Array.from(new Set(receipts.map(r => r.driver_name).filter(Boolean))) : [])
+          .sort((a, b) => (a || '').localeCompare(b || '', 'zh-CN'))
+          .map(name => ({
+            text: name as string,
+            value: name as string,
+          })),
         onFilter: (value, record) => record.driver_name === value,
         render: (value: string) => value || '-',
       },
