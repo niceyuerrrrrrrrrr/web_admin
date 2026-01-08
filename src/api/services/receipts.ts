@@ -336,6 +336,17 @@ export const restoreReceipt = (receiptType: string, receiptId: number) => {
     departure: 'departure',
   }
   const path = typeMap[receiptType] || receiptType
-  return unwrap(client.post(`/receipts/${path}/${receiptId}/restore`))
+  return unwrap(client.post(`/receipts/${typeMap[receiptType]}/${receiptId}/restore`))
 }
 
+/**
+ * 批量更新票据字段（数据清洗）
+ */
+export const batchUpdateReceiptField = (data: {
+  receipt_type: string
+  field_name: string
+  old_values: string[]
+  new_value: string
+  company_id?: number
+}) =>
+  unwrap(client.post('/receipts/batch-update-field', data))

@@ -34,6 +34,8 @@ import {
   EditOutlined,
   EyeOutlined,
   ReloadOutlined,
+  ToolOutlined,
+  SwapOutlined,
 } from '@ant-design/icons'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import * as XLSX from 'xlsx'
@@ -44,6 +46,7 @@ import {
   updateChargingReceipt, 
   updateWaterTicket, 
   deleteWaterTicket,
+  batchUpdateReceiptField,
   updateLoadingReceipt,
   deleteLoadingReceipt,
   updateUnloadingReceipt,
@@ -145,6 +148,12 @@ const ReceiptsPage = () => {
   const [selectedDepartmentId, setSelectedDepartmentId] = useState<number | undefined>(undefined)
   const [selectedUserId, setSelectedUserId] = useState<number | undefined>(undefined)
   const [pageSize, setPageSize] = useState(10)
+  
+  // 数据清洗相关状态
+  const [dataCleanModalOpen, setDataCleanModalOpen] = useState(false)
+  const [cleanField, setCleanField] = useState<string>('')
+  const [selectedOldValues, setSelectedOldValues] = useState<string[]>([])
+  const [newValue, setNewValue] = useState<string>('')
   const [editForm] = Form.useForm()
   const [searchForm] = Form.useForm()
   const [matchedEditForm] = Form.useForm()
@@ -3272,6 +3281,9 @@ const ReceiptsPage = () => {
               <Button type="primary" icon={<DownloadOutlined />} onClick={handleExport}>
                 导出全部
               </Button>
+              <Button icon={<ToolOutlined />} onClick={() => setDataCleanModalOpen(true)}>
+                数据清洗
+              </Button>
             </>
           )}
         </Space>
@@ -3741,6 +3753,151 @@ const ReceiptsPage = () => {
             </Space>
           </Form>
         )}
+      </Modal>
+    </Space>
+
+      {/* 数据清洗对话框 */}
+      <Modal
+        title={
+          <Space>
+            <ToolOutlined />
+            <span>数据清洗工具</span>
+          </Space>
+        }
+        open={dataCleanModalOpen}
+        onCancel={() => {
+          setDataCleanModalOpen(false)
+          setCleanField('')
+          setSelectedOldValues([])
+          setNewValue('')
+        }}
+        onOk={async () => {
+          if (!cleanField || selectedOldValues.length === 0 || !newValue) {
+            message.warning('请完整填写所有字段')
+            return
+          }
+          
+          try {
+            // 调用后端API进行批量更新
+            const result = await batchUpdateReceiptField({
+              receipt_type: activeTab,
+              field_name: cleanField,
+              old_values: selectedOldValues,
+              new_value: newValue,
+              company_id: effectiveCompanyId,
+            })
+            
+            message.success(`成功更新 ${result.affected_rows} 条记录`)
+            setDataCleanModalOpen(false)
+            setCleanField('')
+            setSelectedOldValues([])
+            setNewValue('')
+            queryClient.invalidateQueries({ queryKey: ['receipts'] })
+          } catch (error: any) {
+            message.error(error.message || '批量修改失败')
+          }
+        }}
+        width={700}
+      >
+        <Space direction="vertical" size="large" style={{ width: '100%' }}>
+          <Alert
+            message="数据清洗说明"
+            description="选择要清洗的字段，勾选需要修改的旧值，然后输入正确的新值。系统会批量替换所有匹配的记录。"
+            type="info"
+            showIcon
+          />
+          
+          <Form layout="vertical">
+            <Form.Item label="选择要清洗的字段" required>
+              <Select
+                value={cleanField}
+                onChange={(value) => {
+                  setCleanField(value)
+                  setSelectedOldValues([])
+                  setNewValue('')
+                }}
+                placeholder="请选择字段"
+                options={[
+                  { label: '装料公司', value: 'company' },
+                  { label: '司机姓名', value: 'driver_name' },
+                  { label: '车牌号', value: 'vehicle_no' },
+                  { label: '物料名称', value: 'material_name' },
+                  { label: '物料规格', value: 'material_spec' },
+                  ...(activeTab === 'departure' ? [
+                    { label: '工程名称', value: 'project_name' },
+                    { label: '浇筑部位', value: 'pour_location' },
+                  ] : []),
+                ]}
+              />
+            </Form.Item>
+
+            {cleanField && (
+              <>
+                <Form.Item label="选择要替换的旧值（可多选）" required>
+                  <Select
+                    mode="multiple"
+                    value={selectedOldValues}
+                    onChange={setSelectedOldValues}
+                    placeholder="请选择要替换的值"
+                    style={{ width: '100%' }}
+                    options={Array.from(
+                      new Set(
+                        filteredReceipts
+                          .map((r: any) => r[cleanField])
+                          .filter(Boolean)
+                      )
+                    )
+                      .sort((a, b) => String(a).localeCompare(String(b), 'zh-CN'))
+                      .map((value) => ({
+                        label: `${value} (${filteredReceipts.filter((r: any) => r[cleanField] === value).length} 条)`,
+                        value: String(value),
+                      }))}
+                    filterOption={(input, option) =>
+                      (option?.label as string).toLowerCase().includes(input.toLowerCase())
+                    }
+                  />
+                </Form.Item>
+
+                <Form.Item label="输入正确的新值" required>
+                  <Input
+                    value={newValue}
+                    onChange={(e) => setNewValue(e.target.value)}
+                    placeholder="请输入正确的值"
+                  />
+                </Form.Item>
+
+                {selectedOldValues.length > 0 && newValue && (
+                  <Alert
+                    message="预览"
+                    description={
+                      <div>
+                        <div style={{ marginBottom: 8 }}>
+                          将以下 <strong>{selectedOldValues.length}</strong> 个值：
+                        </div>
+                        <div style={{ marginBottom: 8, color: '#ff4d4f' }}>
+                          {selectedOldValues.map((v, i) => (
+                            <Tag key={i} color="red">{v}</Tag>
+                          ))}
+                        </div>
+                        <div style={{ marginBottom: 8 }}>
+                          <SwapOutlined style={{ margin: '0 8px' }} />
+                          替换为：
+                        </div>
+                        <div>
+                          <Tag color="green">{newValue}</Tag>
+                        </div>
+                        <div style={{ marginTop: 8, color: '#999' }}>
+                          影响记录数：{filteredReceipts.filter((r: any) => selectedOldValues.includes(String(r[cleanField]))).length} 条
+                        </div>
+                      </div>
+                    }
+                    type="warning"
+                  />
+                )}
+              </>
+            )}
+          </Form>
+        </Space>
       </Modal>
     </Space>
   )
