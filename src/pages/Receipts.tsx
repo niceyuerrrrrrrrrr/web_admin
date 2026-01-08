@@ -3080,10 +3080,16 @@ const ReceiptsPage = () => {
             allowClear
             options={[
               { value: undefined, label: '全部部门' },
-              ...departments.map((dept) => ({
-                value: dept.id,
-                label: dept.title,
-              })),
+              ...departments
+                .sort((a, b) => {
+                  const titleA = (a.title || '').toLowerCase()
+                  const titleB = (b.title || '').toLowerCase()
+                  return titleA.localeCompare(titleB, 'zh-CN')
+                })
+                .map((dept) => ({
+                  value: dept.id,
+                  label: dept.title,
+                })),
             ]}
             loading={departmentsQuery.isLoading}
             notFoundContent={departmentsQuery.isLoading ? '加载中...' : '暂无部门'}
@@ -3100,10 +3106,16 @@ const ReceiptsPage = () => {
             }
             options={[
               { value: undefined, label: '全部用户' },
-              ...users.map((user) => ({
-                value: user.id,
-                label: `${user.name || user.nickname || '用户'} (${user.phone || user.id})`,
-              })),
+              ...users
+                .sort((a, b) => {
+                  const nameA = (a.name || a.nickname || '用户').toLowerCase()
+                  const nameB = (b.name || b.nickname || '用户').toLowerCase()
+                  return nameA.localeCompare(nameB, 'zh-CN')
+                })
+                .map((user) => ({
+                  value: user.id,
+                  label: `${user.name || user.nickname || '用户'} (${user.phone || user.id})`,
+                })),
             ]}
             loading={usersQuery.isLoading}
             notFoundContent={usersQuery.isLoading ? '加载中...' : '暂无用户'}
