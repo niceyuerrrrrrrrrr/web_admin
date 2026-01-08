@@ -142,6 +142,9 @@ const ReceiptsPage = () => {
   const [pageSize, setPageSize] = useState(10)
   const [editForm] = Form.useForm()
   const [searchForm] = Form.useForm()
+  const [matchedEditForm] = Form.useForm()
+  const [editingMatched, setEditingMatched] = useState<any>(null)
+  const [matchedEditModalOpen, setMatchedEditModalOpen] = useState(false)
   const showCompanyWarning = isSuperAdmin && !effectiveCompanyId
 
   // 获取当前公司信息以判断业务类型
@@ -483,52 +486,75 @@ const ReceiptsPage = () => {
   // 编辑装卸匹配
   const handleEditMatched = useCallback((record: any) => {
     console.log('handleEditMatched 被调用', record)
-    // 打开详情对话框，显示装料单和卸货单的完整信息
-    // 注意：这里是查看详情，不是真正的编辑功能
-    modal.info({
-      title: '装卸匹配详情',
-      width: 1000,
-      content: (
-        <div>
-          <Alert
-            message="编辑说明"
-            description="装卸匹配由装料单和卸货单组成。如需修改数据，请在对应的装料单或卸货单页面进行编辑。"
-            type="info"
-            showIcon
-            style={{ marginBottom: 16 }}
-          />
-          
-          <Descriptions title="任务信息" bordered size="small" column={2}>
-            <Descriptions.Item label="任务ID">{record.task_id}</Descriptions.Item>
-            <Descriptions.Item label="车牌号">{record.loadBill?.vehicle_no || record.unloadBill?.vehicle_no || '-'}</Descriptions.Item>
-            <Descriptions.Item label="司机">{record.loadBill?.driver_name || record.unloadBill?.driver_name || '-'}</Descriptions.Item>
-            <Descriptions.Item label="创建时间">{record.created_at ? dayjs(record.created_at).format('YYYY-MM-DD HH:mm:ss') : '-'}</Descriptions.Item>
-          </Descriptions>
-
-          <Descriptions title="装料单信息" bordered size="small" column={2} style={{ marginTop: 16 }}>
-            <Descriptions.Item label="装料单ID">{record.loadBill?.id || '-'}</Descriptions.Item>
-            <Descriptions.Item label="公司">{record.loadBill?.company || '-'}</Descriptions.Item>
-            <Descriptions.Item label="材料名称">{record.loadBill?.material_name || '-'}</Descriptions.Item>
-            <Descriptions.Item label="规格型号">{record.loadBill?.material_spec || '-'}</Descriptions.Item>
-            <Descriptions.Item label="毛重(t)">{record.loadBill?.gross_weight ? record.loadBill.gross_weight.toFixed(2) : '-'}</Descriptions.Item>
-            <Descriptions.Item label="净重(t)">{record.loadBill?.net_weight ? record.loadBill.net_weight.toFixed(2) : '-'}</Descriptions.Item>
-            <Descriptions.Item label="装料时间">{record.loadBill?.loading_time ? dayjs(record.loadBill.loading_time).format('YYYY-MM-DD HH:mm:ss') : '-'}</Descriptions.Item>
-          </Descriptions>
-
-          <Descriptions title="卸货单信息" bordered size="small" column={2} style={{ marginTop: 16 }}>
-            <Descriptions.Item label="卸货单ID">{record.unloadBill?.id || '-'}</Descriptions.Item>
-            <Descriptions.Item label="公司">{record.unloadBill?.company || '-'}</Descriptions.Item>
-            <Descriptions.Item label="材料名称">{record.unloadBill?.material_name || '-'}</Descriptions.Item>
-            <Descriptions.Item label="规格型号">{record.unloadBill?.material_spec || '-'}</Descriptions.Item>
-            <Descriptions.Item label="毛重(t)">{record.unloadBill?.gross_weight ? record.unloadBill.gross_weight.toFixed(2) : '-'}</Descriptions.Item>
-            <Descriptions.Item label="净重(t)">{record.unloadBill?.net_weight ? record.unloadBill.net_weight.toFixed(2) : '-'}</Descriptions.Item>
-            <Descriptions.Item label="卸货时间">{record.unloadBill?.unloading_time ? dayjs(record.unloadBill.unloading_time).format('YYYY-MM-DD HH:mm:ss') : '-'}</Descriptions.Item>
-          </Descriptions>
-        </div>
-      ),
-      okText: '关闭',
+    
+    // 设置初始值
+    matchedEditForm.setFieldsValue({
+      // 装料单字段
+      load_company: record.loadBill?.company,
+      load_material_name: record.loadBill?.material_name,
+      load_material_spec: record.loadBill?.material_spec,
+      load_gross_weight: record.loadBill?.gross_weight,
+      load_net_weight: record.loadBill?.net_weight,
+      load_tare_weight: record.loadBill?.tare_weight,
+      // 卸货单字段
+      unload_company: record.unloadBill?.company,
+      unload_material_name: record.unloadBill?.material_name,
+      unload_material_spec: record.unloadBill?.material_spec,
+      unload_gross_weight: record.unloadBill?.gross_weight,
+      unload_net_weight: record.unloadBill?.net_weight,
+      unload_tare_weight: record.unloadBill?.tare_weight,
     })
-  }, [modal])
+    
+    setEditingMatched(record)
+    setMatchedEditModalOpen(true)
+  }, [matchedEditForm])
+  
+  // 保存装卸匹配编辑
+  const handleSaveMatchedEdit = useCallback(async () => {
+    if (!editingMatched) return
+    
+    try {
+      const values = await matchedEditForm.validateFields()
+      
+      // 准备更新装料单的数据
+      const loadUpdateData: any = {}
+      if (values.load_company !== undefined) loadUpdateData.company = values.load_company
+      if (values.load_material_name !== undefined) loadUpdateData.material_name = values.load_material_name
+      if (values.load_material_spec !== undefined) loadUpdateData.material_spec = values.load_material_spec
+      if (values.load_gross_weight !== undefined) loadUpdateData.gross_weight = values.load_gross_weight
+      if (values.load_net_weight !== undefined) loadUpdateData.net_weight = values.load_net_weight
+      if (values.load_tare_weight !== undefined) loadUpdateData.tare_weight = values.load_tare_weight
+      
+      // 准备更新卸货单的数据
+      const unloadUpdateData: any = {}
+      if (values.unload_company !== undefined) unloadUpdateData.company = values.unload_company
+      if (values.unload_material_name !== undefined) unloadUpdateData.material_name = values.unload_material_name
+      if (values.unload_material_spec !== undefined) unloadUpdateData.material_spec = values.unload_material_spec
+      if (values.unload_gross_weight !== undefined) unloadUpdateData.gross_weight = values.unload_gross_weight
+      if (values.unload_net_weight !== undefined) unloadUpdateData.net_weight = values.unload_net_weight
+      if (values.unload_tare_weight !== undefined) unloadUpdateData.tare_weight = values.unload_tare_weight
+      
+      // 同时更新装料单和卸货单
+      await Promise.all([
+        editingMatched.loadBill?.id && Object.keys(loadUpdateData).length > 0
+          ? updateLoadingReceipt(editingMatched.loadBill.id, loadUpdateData)
+          : Promise.resolve(),
+        editingMatched.unloadBill?.id && Object.keys(unloadUpdateData).length > 0
+          ? updateUnloadingReceipt(editingMatched.unloadBill.id, unloadUpdateData)
+          : Promise.resolve(),
+      ])
+      
+      message.success('装卸匹配数据已更新')
+      setMatchedEditModalOpen(false)
+      setEditingMatched(null)
+      matchedEditForm.resetFields()
+      queryClient.invalidateQueries({ queryKey: ['receipts'] })
+      queryClient.invalidateQueries({ queryKey: ['matched-receipts'] })
+    } catch (error) {
+      console.error('更新失败:', error)
+      message.error('更新失败，请重试')
+    }
+  }, [editingMatched, matchedEditForm, message, queryClient])
 
   // 删除装卸匹配
   const handleDeleteMatched = useCallback((record: any) => {
@@ -3279,6 +3305,88 @@ const ReceiptsPage = () => {
           </Form>
         )}
       </Drawer>
+
+      {/* 装卸匹配编辑Modal */}
+      <Modal
+        title="编辑装卸匹配"
+        open={matchedEditModalOpen}
+        onOk={handleSaveMatchedEdit}
+        onCancel={() => {
+          setMatchedEditModalOpen(false)
+          setEditingMatched(null)
+          matchedEditForm.resetFields()
+        }}
+        width={1000}
+        okText="保存"
+        cancelText="取消"
+      >
+        {editingMatched && (
+          <Form
+            form={matchedEditForm}
+            layout="vertical"
+            style={{ maxHeight: '60vh', overflowY: 'auto', paddingRight: 16 }}
+          >
+            <Alert
+              message="编辑说明"
+              description="修改后将同步更新对应的装料单和卸货单数据。"
+              type="info"
+              showIcon
+              style={{ marginBottom: 16 }}
+            />
+            
+            <Descriptions title="任务信息" bordered size="small" column={2} style={{ marginBottom: 16 }}>
+              <Descriptions.Item label="任务ID">{editingMatched.task_id}</Descriptions.Item>
+              <Descriptions.Item label="车牌号">{editingMatched.loadBill?.vehicle_no || editingMatched.unloadBill?.vehicle_no || '-'}</Descriptions.Item>
+              <Descriptions.Item label="司机">{editingMatched.loadBill?.driver_name || editingMatched.unloadBill?.driver_name || '-'}</Descriptions.Item>
+              <Descriptions.Item label="创建时间">{editingMatched.created_at ? dayjs(editingMatched.created_at).format('YYYY-MM-DD HH:mm:ss') : '-'}</Descriptions.Item>
+            </Descriptions>
+
+            <Typography.Title level={5} style={{ marginTop: 16 }}>装料单信息（ID: {editingMatched.loadBill?.id}）</Typography.Title>
+            <Form.Item label="公司" name="load_company">
+              <Input placeholder="请输入公司名称" />
+            </Form.Item>
+            <Form.Item label="材料名称" name="load_material_name">
+              <Input placeholder="请输入材料名称" />
+            </Form.Item>
+            <Form.Item label="规格型号" name="load_material_spec">
+              <Input placeholder="请输入规格型号" />
+            </Form.Item>
+            <Space style={{ width: '100%' }} size="large">
+              <Form.Item label="毛重(t)" name="load_gross_weight" style={{ marginBottom: 0 }}>
+                <InputNumber min={0} step={0.01} precision={2} placeholder="毛重" style={{ width: 150 }} />
+              </Form.Item>
+              <Form.Item label="净重(t)" name="load_net_weight" style={{ marginBottom: 0 }}>
+                <InputNumber min={0} step={0.01} precision={2} placeholder="净重" style={{ width: 150 }} />
+              </Form.Item>
+              <Form.Item label="皮重(t)" name="load_tare_weight" style={{ marginBottom: 0 }}>
+                <InputNumber min={0} step={0.01} precision={2} placeholder="皮重" style={{ width: 150 }} />
+              </Form.Item>
+            </Space>
+
+            <Typography.Title level={5} style={{ marginTop: 24 }}>卸货单信息（ID: {editingMatched.unloadBill?.id}）</Typography.Title>
+            <Form.Item label="公司" name="unload_company">
+              <Input placeholder="请输入公司名称" />
+            </Form.Item>
+            <Form.Item label="材料名称" name="unload_material_name">
+              <Input placeholder="请输入材料名称" />
+            </Form.Item>
+            <Form.Item label="规格型号" name="unload_material_spec">
+              <Input placeholder="请输入规格型号" />
+            </Form.Item>
+            <Space style={{ width: '100%' }} size="large">
+              <Form.Item label="毛重(t)" name="unload_gross_weight" style={{ marginBottom: 0 }}>
+                <InputNumber min={0} step={0.01} precision={2} placeholder="毛重" style={{ width: 150 }} />
+              </Form.Item>
+              <Form.Item label="净重(t)" name="unload_net_weight" style={{ marginBottom: 0 }}>
+                <InputNumber min={0} step={0.01} precision={2} placeholder="净重" style={{ width: 150 }} />
+              </Form.Item>
+              <Form.Item label="皮重(t)" name="unload_tare_weight" style={{ marginBottom: 0 }}>
+                <InputNumber min={0} step={0.01} precision={2} placeholder="皮重" style={{ width: 150 }} />
+              </Form.Item>
+            </Space>
+          </Form>
+        )}
+      </Modal>
     </Space>
   )
 }
