@@ -309,5 +309,17 @@ export const fetchMatchedReceipts = (params: {
  * 删除运输任务（装卸匹配）
  */
 export const deleteTransportTask = (taskId: string) =>
-  unwrap(client.delete(`/receipts/transport-tasks/${taskId}`))
+  unwrap(client.delete(`/transport-match/${taskId}`))
+
+/**
+ * 交票（单张）
+ */
+export const submitReceiptToFinance = (receiptType: string, receiptId: number) =>
+  unwrap(client.post(`/receipts/submit-to-finance/single?receipt_type=${receiptType}&receipt_id=${receiptId}`))
+
+/**
+ * 批量交票
+ */
+export const submitReceiptsToFinance = (receiptType: string, receiptIds: number[]) =>
+  unwrap(client.post(`/receipts/submit-to-finance?receipt_type=${receiptType}`, { receipt_ids: receiptIds }))
 

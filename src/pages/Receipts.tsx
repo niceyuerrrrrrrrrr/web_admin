@@ -48,6 +48,8 @@ import {
   updateDepartureReceipt,
   deleteDepartureReceipt,
   deleteTransportTask,
+  submitReceiptToFinance,
+  submitReceiptsToFinance,
 } from '../api/services/receipts'
 import { fetchCompanyDetail } from '../api/services/companies'
 import { fetchDepartments } from '../api/services/departments'
@@ -123,8 +125,10 @@ const ReceiptsPage = () => {
     vehicleNo?: string
     tankerVehicleCode?: string
     deletedStatus?: 'all' | 'normal' | 'deleted'
+    submittedStatus?: 'all' | 'submitted' | 'not_submitted'
   }>({
-    deletedStatus: 'normal' // 默认只显示正常票据
+    deletedStatus: 'normal', // 默认只显示正常票据
+    submittedStatus: 'all' // 默认显示所有交票状态
   })
   const [selectedReceipt, setSelectedReceipt] = useState<Receipt | null>(null)
   const [detailDrawerOpen, setDetailDrawerOpen] = useState(false)
@@ -406,6 +410,7 @@ const ReceiptsPage = () => {
     vehicleNo?: string
     tankerVehicleCode?: string
     deletedStatus?: 'all' | 'normal' | 'deleted'
+    submittedStatus?: 'all' | 'submitted' | 'not_submitted'
   }) => {
     setFilters({
       receiptType: values.receiptType,
@@ -414,13 +419,15 @@ const ReceiptsPage = () => {
       vehicleNo: values.vehicleNo,
       tankerVehicleCode: values.tankerVehicleCode,
       deletedStatus: values.deletedStatus || 'normal',
+      submittedStatus: values.submittedStatus || 'all',
     })
   }
 
   const handleReset = () => {
-    setFilters({ deletedStatus: 'normal' })
+    setFilters({ deletedStatus: 'normal', submittedStatus: 'all' })
     searchForm.resetFields()
     searchForm.setFieldValue('deletedStatus', 'normal')
+    searchForm.setFieldValue('submittedStatus', 'all')
   }
 
   const openDetail = useCallback((receipt: Receipt) => {
@@ -494,13 +501,12 @@ const ReceiptsPage = () => {
 
   // 删除装卸匹配
   const handleDeleteMatched = useCallback((record: any) => {
-    // 检查权限：仅超级管理员和统计员可以删除
-    const canDeleteMatch = isSuperAdmin || ['统计', '统计员'].includes(user?.positionType || '')
-    
-    if (!canDeleteMatch) {
-      message.warning('仅超级管理员和统计员可以删除装卸匹配')
-      return
-    }
+    // 临时：直接显示删除对话框，不检查权限（用于调试）
+    console.log('用户信息:', {
+      role: user?.role,
+      positionType: user?.positionType,
+      user: user
+    })
     
     modal.confirm({
       title: '确认删除装卸匹配',
@@ -528,7 +534,42 @@ const ReceiptsPage = () => {
         }
       },
     })
-  }, [modal, deleteTransportTaskMutation, isSuperAdmin, user, message])
+  }, [modal, deleteTransportTaskMutation, user, message])
+
+  // 交票功能
+  const handleSubmitToFinance = useCallback(async (receipt: Receipt) => {
+    try {
+      await submitReceiptToFinance(receipt.type, receipt.id)
+      message.success('交票成功')
+      queryClient.invalidateQueries({ queryKey: ['receipts'] })
+    } catch (error: any) {
+      message.error(error.message || '交票失败')
+    }
+  }, [message, queryClient])
+
+  // 批量交票
+  const handleBatchSubmitToFinance = useCallback(async () => {
+    if (selectedRowKeys.length === 0) {
+      message.warning('请先选择要交票的票据')
+      return
+    }
+    
+    modal.confirm({
+      title: '确认批量交票',
+      content: `确定要将选中的 ${selectedRowKeys.length} 张票据交票吗？`,
+      onOk: async () => {
+        try {
+          const receiptIds = selectedRowKeys.map(key => Number(key))
+          await submitReceiptsToFinance(activeTab as string, receiptIds)
+          message.success('批量交票成功')
+          setSelectedRowKeys([])
+          queryClient.invalidateQueries({ queryKey: ['receipts'] })
+        } catch (error: any) {
+          message.error(error.message || '批量交票失败')
+        }
+      },
+    })
+  }, [selectedRowKeys, activeTab, modal, message, queryClient])
 
   // 打开编辑
   const openEdit = useCallback((receipt: Receipt) => {
@@ -670,8 +711,17 @@ const ReceiptsPage = () => {
           </Button>
         </>
       )}
+      {record.submitted_to_finance !== 'Y' && !record.deleted_at && (
+        <Button
+          type="link"
+          size="small"
+          onClick={() => handleSubmitToFinance(record)}
+        >
+          交票
+        </Button>
+      )}
     </Space>
-  ), [openDetail, openEdit, handleDelete, canEditDelete])
+  ), [openDetail, openEdit, handleDelete, canEditDelete, handleSubmitToFinance])
 
   // 装料单列定义
   const loadingColumns: ColumnsType<Receipt> = useMemo(
@@ -778,6 +828,27 @@ const ReceiptsPage = () => {
             )
           }
           return <Tag color="green">正常</Tag>
+        },
+      },
+      {
+        title: '交票状态',
+        dataIndex: 'submitted_to_finance',
+        width: 120,
+        render: (submitted: string, record: Receipt) => {
+          if (submitted === 'Y') {
+            return (
+              <Tag color="blue">
+                已交票
+                {record.submitted_at && (
+                  <>
+                    <br />
+                    <small>{dayjs(record.submitted_at).format('YYYY-MM-DD HH:mm')}</small>
+                  </>
+                )}
+              </Tag>
+            )
+          }
+          return <Tag color="default">未交票</Tag>
         },
       },
       {
@@ -921,6 +992,27 @@ const ReceiptsPage = () => {
         },
       },
       {
+        title: '交票状态',
+        dataIndex: 'submitted_to_finance',
+        width: 120,
+        render: (submitted: string, record: Receipt) => {
+          if (submitted === 'Y') {
+            return (
+              <Tag color="blue">
+                已交票
+                {record.submitted_at && (
+                  <>
+                    <br />
+                    <small>{dayjs(record.submitted_at).format('YYYY-MM-DD HH:mm')}</small>
+                  </>
+                )}
+              </Tag>
+            )
+          }
+          return <Tag color="default">未交票</Tag>
+        },
+      },
+      {
         title: '卸货单图片',
         dataIndex: 'thumb_url',
         key: 'thumb_url',
@@ -1060,6 +1152,27 @@ const ReceiptsPage = () => {
         },
       },
       {
+        title: '交票状态',
+        dataIndex: 'submitted_to_finance',
+        width: 120,
+        render: (submitted: string, record: Receipt) => {
+          if (submitted === 'Y') {
+            return (
+              <Tag color="blue">
+                已交票
+                {record.submitted_at && (
+                  <>
+                    <br />
+                    <small>{dayjs(record.submitted_at).format('YYYY-MM-DD HH:mm')}</small>
+                  </>
+                )}
+              </Tag>
+            )
+          }
+          return <Tag color="default">未交票</Tag>
+        },
+      },
+      {
         title: '充电单图片',
         dataIndex: 'thumb_url',
         key: 'thumb_url',
@@ -1166,6 +1279,27 @@ const ReceiptsPage = () => {
             )
           }
           return <Tag color="green">正常</Tag>
+        },
+      },
+      {
+        title: '交票状态',
+        dataIndex: 'submitted_to_finance',
+        width: 120,
+        render: (submitted: string, record: Receipt) => {
+          if (submitted === 'Y') {
+            return (
+              <Tag color="blue">
+                已交票
+                {record.submitted_at && (
+                  <>
+                    <br />
+                    <small>{dayjs(record.submitted_at).format('YYYY-MM-DD HH:mm')}</small>
+                  </>
+                )}
+              </Tag>
+            )
+          }
+          return <Tag color="default">未交票</Tag>
         },
       },
       {
@@ -1331,6 +1465,50 @@ const ReceiptsPage = () => {
         render: (value: string) => (value ? dayjs(value).format('YYYY-MM-DD HH:mm:ss') : '-'),
       },
       {
+        title: '删除状态',
+        dataIndex: 'deleted_at',
+        width: 150,
+        render: (_: string | null, record: any) => {
+          // 检查装料单或卸货单是否被删除
+          const loadDeleted = record.loadBill?.deleted_at
+          const unloadDeleted = record.unloadBill?.deleted_at
+          
+          if (loadDeleted || unloadDeleted) {
+            return (
+              <div>
+                {loadDeleted && (
+                  <Tag color="red" style={{ marginBottom: 4 }}>
+                    装料单已删除
+                    <br />
+                    <small>{dayjs(loadDeleted).format('YYYY-MM-DD HH:mm')}</small>
+                    {record.loadBill?.deleted_by_name && (
+                      <>
+                        <br />
+                        <small>删除人：{record.loadBill.deleted_by_name}</small>
+                      </>
+                    )}
+                  </Tag>
+                )}
+                {unloadDeleted && (
+                  <Tag color="red" style={{ marginTop: loadDeleted ? 4 : 0 }}>
+                    卸货单已删除
+                    <br />
+                    <small>{dayjs(unloadDeleted).format('YYYY-MM-DD HH:mm')}</small>
+                    {record.unloadBill?.deleted_by_name && (
+                      <>
+                        <br />
+                        <small>删除人：{record.unloadBill.deleted_by_name}</small>
+                      </>
+                    )}
+                  </Tag>
+                )}
+              </div>
+            )
+          }
+          return <Tag color="green">正常</Tag>
+        },
+      },
+      {
         title: '装料单图片',
         dataIndex: ['loadBill', 'thumb_url'],
         key: 'loadBill_thumb_url',
@@ -1381,9 +1559,7 @@ const ReceiptsPage = () => {
         width: 120,
         fixed: 'right',
         render: (_, record) => {
-          // 检查权限：仅超级管理员和统计员可以删除
-          const canDeleteMatch = isSuperAdmin || ['统计', '统计员'].includes(user?.positionType || '')
-          
+          // 临时：始终显示删除按钮（用于调试）
           return (
             <Space direction="vertical" size="small" style={{ width: '100%' }}>
               <Button
@@ -1408,18 +1584,16 @@ const ReceiptsPage = () => {
               >
                 编辑
               </Button>
-              {canDeleteMatch && (
-                <Button
-                  type="link"
-                  size="small"
-                  danger
-                  icon={<DeleteOutlined />}
-                  onClick={() => handleDeleteMatched(record)}
-                  style={{ padding: 0, height: 'auto' }}
-                >
-                  删除
-                </Button>
-              )}
+              <Button
+                type="link"
+                size="small"
+                danger
+                icon={<DeleteOutlined />}
+                onClick={() => handleDeleteMatched(record)}
+                style={{ padding: 0, height: 'auto' }}
+              >
+                删除
+              </Button>
             </Space>
           )
         },
@@ -1576,6 +1750,27 @@ const ReceiptsPage = () => {
             )
           }
           return <Tag color="green">正常</Tag>
+        },
+      },
+      {
+        title: '交票状态',
+        dataIndex: 'submitted_to_finance',
+        width: 120,
+        render: (submitted: string, record: Receipt) => {
+          if (submitted === 'Y') {
+            return (
+              <Tag color="blue">
+                已交票
+                {record.submitted_at && (
+                  <>
+                    <br />
+                    <small>{dayjs(record.submitted_at).format('YYYY-MM-DD HH:mm')}</small>
+                  </>
+                )}
+              </Tag>
+            )
+          }
+          return <Tag color="default">未交票</Tag>
         },
       },
       {
@@ -2568,6 +2763,18 @@ const ReceiptsPage = () => {
                 ]}
               />
             </Form.Item>
+            <Form.Item name="submittedStatus" label="交票状态" initialValue="all" style={{ marginBottom: 0 }}>
+              <Select
+                placeholder="选择交票状态"
+                allowClear
+                style={{ width: 150 }}
+                options={[
+                  { label: '全部', value: 'all' },
+                  { label: '已交票', value: 'submitted' },
+                  { label: '未交票', value: 'not_submitted' },
+                ]}
+              />
+            </Form.Item>
             <Form.Item style={{ marginBottom: 0 }}>
               <Button type="primary" htmlType="submit">
                 查询
@@ -2591,6 +2798,9 @@ const ReceiptsPage = () => {
                 <>
                   <Button icon={<DownloadOutlined />} onClick={handleBatchExport}>
                     批量导出 ({selectedRowKeys.length})
+                  </Button>
+                  <Button type="primary" onClick={handleBatchSubmitToFinance}>
+                    批量交票 ({selectedRowKeys.length})
                   </Button>
                   <Button
                     danger

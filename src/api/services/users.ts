@@ -228,3 +228,21 @@ export const batchUpdateUsers = (params: {
     errors: Array<{ index: number; user_id: number; error: string }>
   }>(client.post('/users/batch-update', params))
 
+/**
+ * 系统角色相关接口
+ */
+export interface SysRole {
+  id: number
+  name: string
+  description?: string
+}
+
+export const getUserSysRoles = (userId: number) =>
+  unwrap<{ roles: SysRole[] }>(client.get(`/users/${userId}/sys-roles`))
+
+export const getAvailableSysRoles = () =>
+  unwrap<{ roles: SysRole[] }>(client.get('/users/available-sys-roles'))
+
+export const updateUserSysRoles = (userId: number, roleIds: number[]) =>
+  unwrap<{ message: string }>(client.put(`/users/${userId}/sys-roles`, { role_ids: roleIds }))
+

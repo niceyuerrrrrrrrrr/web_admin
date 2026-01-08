@@ -29,6 +29,9 @@ export interface LoadingReceipt {
   deleted_at?: string | null
   deleted_by?: number | null
   deleted_by_name?: string | null
+  submitted_to_finance?: string
+  submitted_at?: string | null
+  submitted_by?: number | null
 }
 
 export interface UnloadingReceipt {
@@ -52,6 +55,9 @@ export interface UnloadingReceipt {
   deleted_at?: string | null
   deleted_by?: number | null
   deleted_by_name?: string | null
+  submitted_to_finance?: string
+  submitted_at?: string | null
+  submitted_by?: number | null
 }
 
 export interface ChargingReceipt {
@@ -76,6 +82,9 @@ export interface ChargingReceipt {
   deleted_at?: string | null
   deleted_by?: number | null
   deleted_by_name?: string | null
+  submitted_to_finance?: string
+  submitted_at?: string | null
+  submitted_by?: number | null
 }
 
 export interface WaterTicket {
@@ -95,6 +104,9 @@ export interface WaterTicket {
   deleted_at?: string | null
   deleted_by?: number | null
   deleted_by_name?: string | null
+  submitted_to_finance?: string
+  submitted_at?: string | null
+  submitted_by?: number | null
 }
 
 export interface DepartureReceipt {
@@ -134,6 +146,9 @@ export interface DepartureReceipt {
   deleted_by?: number | null
   deleted_by_name?: string | null
   thumb_url?: string // 图片URL（兼容字段）
+  submitted_to_finance?: string
+  submitted_at?: string | null
+  submitted_by?: number | null
 }
 
 export type Receipt = LoadingReceipt | UnloadingReceipt | ChargingReceipt | WaterTicket | DepartureReceipt

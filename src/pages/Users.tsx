@@ -25,6 +25,7 @@ import {
   KeyOutlined,
   PlusOutlined,
   ReloadOutlined,
+  SafetyOutlined,
   UserOutlined,
 } from '@ant-design/icons'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
@@ -48,6 +49,7 @@ import useAuthStore from '../store/auth'
 import useCompanyStore from '../store/company'
 import CompanySelector from '../components/CompanySelector'
 import { BatchCreateUserModal, BatchUpdateUserModal } from '../components/BatchUserModals'
+import { UserSysRolesModal } from '../components/UserSysRolesModal'
 
 const { Title, Paragraph, Text } = Typography
 
@@ -86,6 +88,9 @@ const UsersPage = () => {
   const [selectedBatchDepartmentId, setSelectedBatchDepartmentId] = useState<number | undefined>()
   const [batchCreateModalOpen, setBatchCreateModalOpen] = useState(false)
   const [batchUpdateModalOpen, setBatchUpdateModalOpen] = useState(false)
+  const [sysRolesModalOpen, setSysRolesModalOpen] = useState(false)
+  const [sysRolesUserId, setSysRolesUserId] = useState<number | null>(null)
+  const [sysRolesUserName, setSysRolesUserName] = useState<string>('')
 
   // 当公司选择变化时，更新查询
   useEffect(() => {
@@ -674,7 +679,7 @@ const UsersPage = () => {
       },
       {
         title: '操作',
-        width: 140,
+        width: 160,
         fixed: 'right',
         render: (_, record) => (
           <Space direction="vertical" size={0} style={{ width: '100%' }}>
@@ -690,6 +695,18 @@ const UsersPage = () => {
               <Button
                 type="link"
                 size="small"
+                icon={<SafetyOutlined />}
+                onClick={() => {
+                  setSysRolesUserId(record.id)
+                  setSysRolesUserName(record.name || record.nickname || record.username || '')
+                  setSysRolesModalOpen(true)
+                }}
+              >
+                角色
+              </Button>
+              <Button
+                type="link"
+                size="small"
                 icon={<KeyOutlined />}
                 onClick={() => {
                   modal.confirm({
@@ -702,6 +719,8 @@ const UsersPage = () => {
               >
                 重置
               </Button>
+            </Space>
+            <Space size={0}>
               <Button
                 type="link"
                 size="small"
@@ -1538,6 +1557,20 @@ const UsersPage = () => {
         selectedUsers={users.filter((u) => selectedRowKeys.includes(u.id))}
         departments={departmentsQuery.data?.records || []}
       />
+
+      {/* 系统角色管理Modal */}
+      {sysRolesUserId && (
+        <UserSysRolesModal
+          open={sysRolesModalOpen}
+          onClose={() => {
+            setSysRolesModalOpen(false)
+            setSysRolesUserId(null)
+            setSysRolesUserName('')
+          }}
+          userId={sysRolesUserId}
+          userName={sysRolesUserName}
+        />
+      )}
     </Space>
   )
 }
