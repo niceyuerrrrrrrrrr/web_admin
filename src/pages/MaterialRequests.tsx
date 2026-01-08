@@ -78,8 +78,9 @@ const MaterialRequestsPage = () => {
   const canApprove = ['财务', '总经理', '仓库管理员'].includes((user as any)?.position_type || (user as any)?.role)
 
   const usersQuery = useQuery({
-    queryKey: ['users', 'material'],
-    queryFn: () => fetchUsers({ size: 200 }),
+    queryKey: ['users', 'material', effectiveCompanyId],
+    queryFn: () => fetchUsers({ size: 200, company_id: effectiveCompanyId }),
+    enabled: isSuperAdmin ? !!effectiveCompanyId : true,
   })
 
   const warehousesQuery = useQuery({
@@ -445,10 +446,16 @@ const MaterialRequestsPage = () => {
                         allowClear
                         showSearch
                         placeholder="选择申请人"
-                        options={(usersQuery.data?.items || []).map((item) => ({
-                          value: item.id,
-                          label: `${item.name || item.nickname || '用户'} (${item.phone || item.id})`,
-                        }))}
+                        options={(usersQuery.data?.items || [])
+                          .sort((a, b) => {
+                            const nameA = (a.name || a.nickname || '用户').toLowerCase()
+                            const nameB = (b.name || b.nickname || '用户').toLowerCase()
+                            return nameA.localeCompare(nameB, 'zh-CN')
+                          })
+                          .map((item) => ({
+                            value: item.id,
+                            label: `${item.name || item.nickname || '用户'} (${item.phone || item.id})`,
+                          }))}
                         style={{ width: 220 }}
                         filterOption={(input, option) => (option?.label as string).toLowerCase().includes(input.toLowerCase())}
                       />
@@ -627,10 +634,16 @@ const MaterialRequestsPage = () => {
             <Select
               showSearch
               placeholder="选择申请人"
-              options={(usersQuery.data?.items || []).map((item) => ({
-                value: item.id,
-                label: `${item.name || item.nickname || '用户'} (${item.phone || item.id})`,
-              }))}
+              options={(usersQuery.data?.items || [])
+                .sort((a, b) => {
+                  const nameA = (a.name || a.nickname || '用户').toLowerCase()
+                  const nameB = (b.name || b.nickname || '用户').toLowerCase()
+                  return nameA.localeCompare(nameB, 'zh-CN')
+                })
+                .map((item) => ({
+                  value: item.id,
+                  label: `${item.name || item.nickname || '用户'} (${item.phone || item.id})`,
+                }))}
               filterOption={(input, option) => (option?.label as string).toLowerCase().includes(input.toLowerCase())}
             />
           </Form.Item>

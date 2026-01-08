@@ -153,8 +153,9 @@ const LeavePage = () => {
   })
 
   const usersQuery = useQuery({
-    queryKey: ['leave', 'users'],
-    queryFn: () => fetchUsers({ size: 200 }),
+    queryKey: ['leave', 'users', effectiveCompanyId],
+    queryFn: () => fetchUsers({ size: 200, company_id: effectiveCompanyId }),
+    enabled: isSuperAdmin ? !!effectiveCompanyId : true,
   })
 
   const createMutation = useMutation({
@@ -464,10 +465,16 @@ const LeavePage = () => {
   }
 
   const userOptions =
-    usersQuery.data?.items.map((item) => ({
-      value: item.id,
-      label: `${item.name || item.nickname || '用户'}(${item.id})`,
-    })) || []
+    (usersQuery.data?.items || [])
+      .sort((a, b) => {
+        const nameA = (a.name || a.nickname || '用户').toLowerCase()
+        const nameB = (b.name || b.nickname || '用户').toLowerCase()
+        return nameA.localeCompare(nameB, 'zh-CN')
+      })
+      .map((item) => ({
+        value: item.id,
+        label: `${item.name || item.nickname || '用户'}(${item.id})`,
+      })) || []
 
   const selectedDetail = detailQuery.data
   const historyRecords = historyQuery.data?.records || []
