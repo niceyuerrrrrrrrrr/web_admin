@@ -315,7 +315,9 @@ const ReceiptsPage = () => {
         userId: selectedUserId,
         startDate: filters.startDate,
         endDate: filters.endDate,
+        vehicleNo: filters.vehicleNo,
         companyId: effectiveCompanyId,
+        deletedStatus: filters.deletedStatus,
       }),
     enabled: activeTab === 'matched' && (isSuperAdmin ? !!effectiveCompanyId : true),
   })
@@ -1776,7 +1778,7 @@ const ReceiptsPage = () => {
           const loadNet = record.loadBill?.net_weight || 0
           const unloadNet = record.unloadBill?.net_weight || 0
           const diff = loadNet - unloadNet
-          return diff !== 0 ? diff.toFixed(2) : '-'
+          return diff.toFixed(2)
         },
       },
       {
