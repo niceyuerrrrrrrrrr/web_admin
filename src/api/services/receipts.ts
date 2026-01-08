@@ -284,6 +284,8 @@ export const fetchMatchedReceipts = (params: {
   endDate?: string
   companyId?: number
   scope?: 'mine' | 'all'
+  deletedStatus?: string
+  vehicleNo?: string
 }) =>
   unwrap<Array<{
     id: number
@@ -302,6 +304,8 @@ export const fetchMatchedReceipts = (params: {
         end_date: params.endDate,
         company_id: params.companyId,
         scope: params.scope || 'all', // 默认获取全部数据
+        deleted_status: params.deletedStatus || 'normal',
+        vehicle_no: params.vehicleNo,
       },
     }),
   )
