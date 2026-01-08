@@ -622,6 +622,8 @@ const ReceiptsPage = () => {
       load_gross_weight: record.loadBill?.gross_weight,
       load_net_weight: record.loadBill?.net_weight,
       load_tare_weight: record.loadBill?.tare_weight,
+      load_loading_time: record.loadBill?.loading_time ? dayjs(record.loadBill.loading_time) : null,
+      load_unloading_time: record.loadBill?.unloading_time ? dayjs(record.loadBill.unloading_time) : null,
       // 卸货单字段
       unload_company: record.unloadBill?.company,
       unload_material_name: record.unloadBill?.material_name,
@@ -629,6 +631,8 @@ const ReceiptsPage = () => {
       unload_gross_weight: record.unloadBill?.gross_weight,
       unload_net_weight: record.unloadBill?.net_weight,
       unload_tare_weight: record.unloadBill?.tare_weight,
+      unload_loading_time: record.unloadBill?.loading_time ? dayjs(record.unloadBill.loading_time) : null,
+      unload_unloading_time: record.unloadBill?.unloading_time ? dayjs(record.unloadBill.unloading_time) : null,
     })
     
     setEditingMatched(record)
@@ -1750,6 +1754,11 @@ const ReceiptsPage = () => {
       {
         title: '磅差(t)',
         width: 100,
+        sorter: (a: any, b: any) => {
+          const aDiff = (a.loadBill?.net_weight || 0) - (a.unloadBill?.net_weight || 0)
+          const bDiff = (b.loadBill?.net_weight || 0) - (b.unloadBill?.net_weight || 0)
+          return aDiff - bDiff
+        },
         render: (_: any, record: any) => {
           const loadNet = record.loadBill?.net_weight || 0
           const unloadNet = record.unloadBill?.net_weight || 0
@@ -1761,24 +1770,44 @@ const ReceiptsPage = () => {
         title: '装料进厂时间',
         dataIndex: ['loadBill', 'loading_time'],
         width: 180,
+        sorter: (a: any, b: any) => {
+          const aTime = a.loadBill?.loading_time || ''
+          const bTime = b.loadBill?.loading_time || ''
+          return aTime.localeCompare(bTime)
+        },
         render: (value: string) => (value ? dayjs(value).format('YYYY-MM-DD HH:mm:ss') : '-'),
       },
       {
         title: '装料出厂时间',
         dataIndex: ['loadBill', 'unloading_time'],
         width: 180,
+        sorter: (a: any, b: any) => {
+          const aTime = a.loadBill?.unloading_time || ''
+          const bTime = b.loadBill?.unloading_time || ''
+          return aTime.localeCompare(bTime)
+        },
         render: (value: string) => (value ? dayjs(value).format('YYYY-MM-DD HH:mm:ss') : '-'),
       },
       {
         title: '卸货进厂时间',
         dataIndex: ['unloadBill', 'loading_time'],
         width: 180,
+        sorter: (a: any, b: any) => {
+          const aTime = a.unloadBill?.loading_time || ''
+          const bTime = b.unloadBill?.loading_time || ''
+          return aTime.localeCompare(bTime)
+        },
         render: (value: string) => (value ? dayjs(value).format('YYYY-MM-DD HH:mm:ss') : '-'),
       },
       {
         title: '卸货出厂时间',
         dataIndex: ['unloadBill', 'unloading_time'],
         width: 180,
+        sorter: (a: any, b: any) => {
+          const aTime = a.unloadBill?.unloading_time || ''
+          const bTime = b.unloadBill?.unloading_time || ''
+          return aTime.localeCompare(bTime)
+        },
         render: (value: string) => (value ? dayjs(value).format('YYYY-MM-DD HH:mm:ss') : '-'),
       },
       {
@@ -3738,6 +3767,14 @@ const ReceiptsPage = () => {
                 <InputNumber min={0} step={0.01} precision={2} placeholder="皮重" style={{ width: 150 }} />
               </Form.Item>
             </Space>
+            <Space style={{ width: '100%' }} size="large">
+              <Form.Item label="进厂时间" name="load_loading_time" style={{ marginBottom: 0 }}>
+                <DatePicker showTime format="YYYY-MM-DD HH:mm:ss" style={{ width: 200 }} placeholder="选择进厂时间" />
+              </Form.Item>
+              <Form.Item label="出厂时间" name="load_unloading_time" style={{ marginBottom: 0 }}>
+                <DatePicker showTime format="YYYY-MM-DD HH:mm:ss" style={{ width: 200 }} placeholder="选择出厂时间" />
+              </Form.Item>
+            </Space>
 
             <Typography.Title level={5} style={{ marginTop: 24 }}>卸货单信息（ID: {editingMatched.unloadBill?.id}）</Typography.Title>
             
@@ -3782,6 +3819,31 @@ const ReceiptsPage = () => {
                 <InputNumber min={0} step={0.01} precision={2} placeholder="皮重" style={{ width: 150 }} />
               </Form.Item>
             </Space>
+            <Space style={{ width: '100%' }} size="large">
+              <Form.Item label="进厂时间" name="unload_loading_time" style={{ marginBottom: 0 }}>
+                <DatePicker showTime format="YYYY-MM-DD HH:mm:ss" style={{ width: 200 }} placeholder="选择进厂时间" />
+              </Form.Item>
+              <Form.Item label="出厂时间" name="unload_unloading_time" style={{ marginBottom: 0 }}>
+                <DatePicker showTime format="YYYY-MM-DD HH:mm:ss" style={{ width: 200 }} placeholder="选择出厂时间" />
+              </Form.Item>
+            </Space>
+            
+            {/* 磅差计算显示 */}
+            <Alert
+              message="磅差计算"
+              description={
+                <div>
+                  <div>装料净重: {matchedEditForm.getFieldValue('load_net_weight') || 0} t</div>
+                  <div>卸货净重: {matchedEditForm.getFieldValue('unload_net_weight') || 0} t</div>
+                  <div style={{ marginTop: 8, fontSize: 16, fontWeight: 'bold', color: '#1890ff' }}>
+                    磅差: {((matchedEditForm.getFieldValue('load_net_weight') || 0) - (matchedEditForm.getFieldValue('unload_net_weight') || 0)).toFixed(2)} t
+                  </div>
+                </div>
+              }
+              type="info"
+              showIcon
+              style={{ marginTop: 16 }}
+            />
           </Form>
         )}
       </Modal>
