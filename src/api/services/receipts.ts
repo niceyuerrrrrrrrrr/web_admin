@@ -45,6 +45,7 @@ export const fetchReceipts = (params: ReceiptListParams & { userId?: number; sco
         department_id: params.departmentId,
         scope: params.scope || 'all', // 默认获取全部数据
         deleted_status: params.deletedStatus || 'normal', // 默认只显示正常票据
+        submitted_status: params.submittedStatus || 'all', // 交票状态筛选
       },
     }),
   )

@@ -165,6 +165,7 @@ export interface ReceiptListParams {
   page?: number
   pageSize?: number
   deletedStatus?: 'all' | 'normal' | 'deleted'
+  submittedStatus?: 'all' | 'submitted' | 'not_submitted'
 }
 
 export interface ReceiptListResponse {

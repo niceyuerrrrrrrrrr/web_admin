@@ -237,6 +237,7 @@ const ReceiptsPage = () => {
         companyId: effectiveCompanyId, // 超级管理员需要传，非超级管理员可以不传（后端会自动过滤）
         departmentId: selectedDepartmentId, // 部门筛选
         deletedStatus: filters.deletedStatus, // 删除状态筛选
+        submittedStatus: filters.submittedStatus, // 交票状态筛选
       }),
     enabled: (isSuperAdmin ? !!effectiveCompanyId : true) && activeTab !== 'matched', // 匹配数据使用单独的查询
   })
