@@ -486,19 +486,50 @@ const ReceiptsPage = () => {
       message.warning('无权限编辑装卸匹配')
       return
     }
-    // 打开编辑抽屉，显示装料单和卸货单的信息
+    
+    // 打开详情对话框，显示装料单和卸货单的完整信息
     Modal.info({
-      title: '编辑装卸匹配',
-      width: 800,
+      title: '装卸匹配详情',
+      width: 1000,
       content: (
         <div>
-          <p>任务ID: {record.task_id}</p>
-          <p>装料单ID: {record.loadBill?.id}</p>
-          <p>卸货单ID: {record.unloadBill?.id}</p>
-          <p style={{ marginTop: 16 }}>提示：请分别编辑装料单和卸货单来修改匹配数据</p>
+          <Alert
+            message="编辑说明"
+            description="装卸匹配由装料单和卸货单组成。如需修改数据，请在对应的装料单或卸货单页面进行编辑。"
+            type="info"
+            showIcon
+            style={{ marginBottom: 16 }}
+          />
+          
+          <Descriptions title="任务信息" bordered size="small" column={2}>
+            <Descriptions.Item label="任务ID">{record.task_id}</Descriptions.Item>
+            <Descriptions.Item label="车牌号">{record.loadBill?.vehicle_no || record.unloadBill?.vehicle_no || '-'}</Descriptions.Item>
+            <Descriptions.Item label="司机">{record.loadBill?.driver_name || record.unloadBill?.driver_name || '-'}</Descriptions.Item>
+            <Descriptions.Item label="创建时间">{record.created_at ? dayjs(record.created_at).format('YYYY-MM-DD HH:mm:ss') : '-'}</Descriptions.Item>
+          </Descriptions>
+
+          <Descriptions title="装料单信息" bordered size="small" column={2} style={{ marginTop: 16 }}>
+            <Descriptions.Item label="装料单ID">{record.loadBill?.id || '-'}</Descriptions.Item>
+            <Descriptions.Item label="公司">{record.loadBill?.company || '-'}</Descriptions.Item>
+            <Descriptions.Item label="材料名称">{record.loadBill?.material_name || '-'}</Descriptions.Item>
+            <Descriptions.Item label="规格型号">{record.loadBill?.material_spec || '-'}</Descriptions.Item>
+            <Descriptions.Item label="毛重(t)">{record.loadBill?.gross_weight ? record.loadBill.gross_weight.toFixed(2) : '-'}</Descriptions.Item>
+            <Descriptions.Item label="净重(t)">{record.loadBill?.net_weight ? record.loadBill.net_weight.toFixed(2) : '-'}</Descriptions.Item>
+            <Descriptions.Item label="装料时间">{record.loadBill?.loading_time ? dayjs(record.loadBill.loading_time).format('YYYY-MM-DD HH:mm:ss') : '-'}</Descriptions.Item>
+          </Descriptions>
+
+          <Descriptions title="卸货单信息" bordered size="small" column={2} style={{ marginTop: 16 }}>
+            <Descriptions.Item label="卸货单ID">{record.unloadBill?.id || '-'}</Descriptions.Item>
+            <Descriptions.Item label="公司">{record.unloadBill?.company || '-'}</Descriptions.Item>
+            <Descriptions.Item label="材料名称">{record.unloadBill?.material_name || '-'}</Descriptions.Item>
+            <Descriptions.Item label="规格型号">{record.unloadBill?.material_spec || '-'}</Descriptions.Item>
+            <Descriptions.Item label="毛重(t)">{record.unloadBill?.gross_weight ? record.unloadBill.gross_weight.toFixed(2) : '-'}</Descriptions.Item>
+            <Descriptions.Item label="净重(t)">{record.unloadBill?.net_weight ? record.unloadBill.net_weight.toFixed(2) : '-'}</Descriptions.Item>
+            <Descriptions.Item label="卸货时间">{record.unloadBill?.unloading_time ? dayjs(record.unloadBill.unloading_time).format('YYYY-MM-DD HH:mm:ss') : '-'}</Descriptions.Item>
+          </Descriptions>
         </div>
       ),
-      okText: '知道了',
+      okText: '关闭',
     })
   }, [canEditDelete, message])
 
