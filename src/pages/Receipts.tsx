@@ -769,6 +769,11 @@ const ReceiptsPage = () => {
         title: '公司',
         dataIndex: 'company',
         width: 150,
+        filters: Array.from(new Set(receipts?.map(r => (r as any).company).filter(Boolean))).map(company => ({
+          text: company as string,
+          value: company as string,
+        })),
+        onFilter: (value, record) => (record as any).company === value,
       },
       {
         title: '司机',
@@ -809,11 +814,21 @@ const ReceiptsPage = () => {
         title: '材料名称',
         dataIndex: 'material_name',
         width: 150,
+        filters: Array.from(new Set(receipts?.map(r => (r as any).material_name).filter(Boolean))).map(name => ({
+          text: name as string,
+          value: name as string,
+        })),
+        onFilter: (value, record) => (record as any).material_name === value,
       },
       {
         title: '规格型号',
         dataIndex: 'material_spec',
         width: 120,
+        filters: Array.from(new Set(receipts?.map(r => (r as any).material_spec).filter(Boolean))).map(spec => ({
+          text: spec as string,
+          value: spec as string,
+        })),
+        onFilter: (value, record) => (record as any).material_spec === value,
       },
       {
         title: '毛重(t)',
@@ -945,6 +960,11 @@ const ReceiptsPage = () => {
         title: '公司',
         dataIndex: 'company',
         width: 150,
+        filters: Array.from(new Set(receipts?.map(r => (r as any).company).filter(Boolean))).map(company => ({
+          text: company as string,
+          value: company as string,
+        })),
+        onFilter: (value, record) => (record as any).company === value,
       },
       {
         title: '司机',
@@ -985,11 +1005,21 @@ const ReceiptsPage = () => {
         title: '材料名称',
         dataIndex: 'material_name',
         width: 150,
+        filters: Array.from(new Set(receipts?.map(r => (r as any).material_name).filter(Boolean))).map(name => ({
+          text: name as string,
+          value: name as string,
+        })),
+        onFilter: (value, record) => (record as any).material_name === value,
       },
       {
         title: '规格型号',
         dataIndex: 'material_spec',
         width: 120,
+        filters: Array.from(new Set(receipts?.map(r => (r as any).material_spec).filter(Boolean))).map(spec => ({
+          text: spec as string,
+          value: spec as string,
+        })),
+        onFilter: (value, record) => (record as any).material_spec === value,
       },
       {
         title: '毛重(t)',
