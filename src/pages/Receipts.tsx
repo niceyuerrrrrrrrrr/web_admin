@@ -3168,6 +3168,27 @@ const ReceiptsPage = () => {
           <Form form={editForm} layout="vertical">
             {(editingReceipt.type === 'loading' || editingReceipt.type === 'unloading') && (
               <>
+                {/* 票据图片 */}
+                {editingReceipt.thumb_url && 
+                 !editingReceipt.thumb_url.startsWith('wxfile://') && 
+                 !editingReceipt.thumb_url.startsWith('file://') && (
+                  <div style={{ marginBottom: 16 }}>
+                    <Typography.Text strong>票据图片：</Typography.Text>
+                    <div style={{ marginTop: 8 }}>
+                      <Image
+                        src={editingReceipt.thumb_url}
+                        width={200}
+                        height={200}
+                        style={{ objectFit: 'cover', borderRadius: 8, border: '1px solid #d9d9d9' }}
+                        fallback="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="
+                        preview={{
+                          mask: '点击查看大图',
+                        }}
+                      />
+                    </div>
+                  </div>
+                )}
+                
                 <Form.Item name="company" label="公司">
                   <Input placeholder="请输入公司名称" />
                 </Form.Item>
@@ -3202,6 +3223,27 @@ const ReceiptsPage = () => {
             )}
             {editingReceipt.type === 'charging' && (
               <>
+                {/* 票据图片 */}
+                {editingReceipt.thumb_url && 
+                 !editingReceipt.thumb_url.startsWith('wxfile://') && 
+                 !editingReceipt.thumb_url.startsWith('file://') && (
+                  <div style={{ marginBottom: 16 }}>
+                    <Typography.Text strong>票据图片：</Typography.Text>
+                    <div style={{ marginTop: 8 }}>
+                      <Image
+                        src={editingReceipt.thumb_url}
+                        width={200}
+                        height={200}
+                        style={{ objectFit: 'cover', borderRadius: 8, border: '1px solid #d9d9d9' }}
+                        fallback="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="
+                        preview={{
+                          mask: '点击查看大图',
+                        }}
+                      />
+                    </div>
+                  </div>
+                )}
+                
                 <Form.Item name="receipt_number" label="单据编号">
                   <Input placeholder="请输入单据编号" />
                 </Form.Item>
@@ -3233,6 +3275,27 @@ const ReceiptsPage = () => {
             )}
             {editingReceipt.type === 'water' && (
               <>
+                {/* 票据图片 */}
+                {editingReceipt.image_path && 
+                 !editingReceipt.image_path.startsWith('wxfile://') && 
+                 !editingReceipt.image_path.startsWith('file://') && (
+                  <div style={{ marginBottom: 16 }}>
+                    <Typography.Text strong>票据图片：</Typography.Text>
+                    <div style={{ marginTop: 8 }}>
+                      <Image
+                        src={editingReceipt.image_path}
+                        width={200}
+                        height={200}
+                        style={{ objectFit: 'cover', borderRadius: 8, border: '1px solid #d9d9d9' }}
+                        fallback="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="
+                        preview={{
+                          mask: '点击查看大图',
+                        }}
+                      />
+                    </div>
+                  </div>
+                )}
+                
                 <Form.Item name="company_name" label="公司名称">
                   <Input placeholder="请输入公司名称" />
                 </Form.Item>
@@ -3246,6 +3309,30 @@ const ReceiptsPage = () => {
             )}
             {editingReceipt.type === 'departure' && (
               <>
+                {/* 票据图片 */}
+                {(() => {
+                  const imageUrl = (editingReceipt as any).thumb_url || (editingReceipt as any).image_path
+                  return imageUrl && 
+                    !imageUrl.startsWith('wxfile://') && 
+                    !imageUrl.startsWith('file://') && (
+                    <div style={{ marginBottom: 16 }}>
+                      <Typography.Text strong>票据图片：</Typography.Text>
+                      <div style={{ marginTop: 8 }}>
+                        <Image
+                          src={imageUrl}
+                          width={200}
+                          height={200}
+                          style={{ objectFit: 'cover', borderRadius: 8, border: '1px solid #d9d9d9' }}
+                          fallback="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="
+                          preview={{
+                            mask: '点击查看大图',
+                          }}
+                        />
+                      </div>
+                    </div>
+                  )
+                })()}
+                
                 <Form.Item name="driver_name" label="司机姓名">
                   <Input placeholder="请输入司机姓名" />
                 </Form.Item>
