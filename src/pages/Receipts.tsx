@@ -2597,6 +2597,8 @@ const ReceiptsPage = () => {
             提单号: r.bill_no || '',
             进厂时间: r.loading_time ? dayjs(r.loading_time).format('YYYY-MM-DD HH:mm:ss') : '',
             出厂时间: r.exit_time ? dayjs(r.exit_time).format('YYYY-MM-DD HH:mm:ss') : '',
+            交票状态: receipt.submitted_to_finance === 'Y' ? '已交票' : '未交票',
+            交票时间: receipt.submitted_at ? dayjs(receipt.submitted_at).format('YYYY-MM-DD HH:mm:ss') : '',
           }
         } else if (receipt.type === 'water') {
           const r = receipt as Receipt & {
@@ -2744,6 +2746,8 @@ const ReceiptsPage = () => {
             提单号: r.bill_no || '',
             进厂时间: r.loading_time ? dayjs(r.loading_time).format('YYYY-MM-DD HH:mm:ss') : '',
             出厂时间: r.exit_time ? dayjs(r.exit_time).format('YYYY-MM-DD HH:mm:ss') : '',
+            交票状态: receipt.submitted_to_finance === 'Y' ? '已交票' : '未交票',
+            交票时间: receipt.submitted_at ? dayjs(receipt.submitted_at).format('YYYY-MM-DD HH:mm:ss') : '',
           }
         } else if (receipt.type === 'water') {
           const r = receipt as Receipt & {
