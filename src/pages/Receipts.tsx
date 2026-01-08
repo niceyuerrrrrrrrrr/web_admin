@@ -643,11 +643,13 @@ const ReceiptsPage = () => {
   const handleSaveMatchedEdit = useCallback(async () => {
     if (!editingMatched) return
     
+    let loadUpdateData: any = {}
+    let unloadUpdateData: any = {}
+    
     try {
       const values = await matchedEditForm.validateFields()
       
       // 准备更新装料单的数据
-      const loadUpdateData: any = {}
       if (values.load_company !== undefined) loadUpdateData.company = values.load_company
       if (values.load_material_name !== undefined) loadUpdateData.material_name = values.load_material_name
       if (values.load_material_spec !== undefined) loadUpdateData.material_spec = values.load_material_spec
@@ -658,7 +660,6 @@ const ReceiptsPage = () => {
       if (values.load_unloading_time) loadUpdateData.unloading_time = values.load_unloading_time.format('YYYY-MM-DD HH:mm:ss')
       
       // 准备更新卸货单的数据
-      const unloadUpdateData: any = {}
       if (values.unload_company !== undefined) unloadUpdateData.company = values.unload_company
       if (values.unload_material_name !== undefined) unloadUpdateData.material_name = values.unload_material_name
       if (values.unload_material_spec !== undefined) unloadUpdateData.material_spec = values.unload_material_spec
