@@ -1447,30 +1447,55 @@ const ReceiptsPage = () => {
         title: '车牌号',
         dataIndex: ['loadBill', 'vehicle_no'],
         width: 120,
+        filters: Array.from(new Set(receipts?.map(r => (r as any).loadBill?.vehicle_no || (r as any).unloadBill?.vehicle_no).filter(Boolean))).map(no => ({
+          text: no as string,
+          value: no as string,
+        })),
+        onFilter: (value, record) => (record.loadBill?.vehicle_no === value || record.unloadBill?.vehicle_no === value),
         render: (_, record) => record.loadBill?.vehicle_no || record.unloadBill?.vehicle_no || '-',
       },
       {
         title: '司机',
         dataIndex: ['loadBill', 'driver_name'],
         width: 120,
+        filters: Array.from(new Set(receipts?.map(r => (r as any).loadBill?.driver_name || (r as any).unloadBill?.driver_name).filter(Boolean))).map(name => ({
+          text: name as string,
+          value: name as string,
+        })),
+        onFilter: (value, record) => (record.loadBill?.driver_name === value || record.unloadBill?.driver_name === value),
         render: (_, record) => record.loadBill?.driver_name || record.unloadBill?.driver_name || '-',
       },
       {
         title: '装料公司',
         dataIndex: ['loadBill', 'company'],
         width: 150,
+        filters: Array.from(new Set(receipts?.map(r => (r as any).loadBill?.company).filter(Boolean))).map(company => ({
+          text: company as string,
+          value: company as string,
+        })),
+        onFilter: (value, record) => record.loadBill?.company === value,
         render: (value: string) => value || '-',
       },
       {
         title: '卸货公司',
         dataIndex: ['unloadBill', 'company'],
         width: 150,
+        filters: Array.from(new Set(receipts?.map(r => (r as any).unloadBill?.company).filter(Boolean))).map(company => ({
+          text: company as string,
+          value: company as string,
+        })),
+        onFilter: (value, record) => record.unloadBill?.company === value,
         render: (value: string) => value || '-',
       },
       {
         title: '装料材料',
         dataIndex: ['loadBill', 'material_name'],
         width: 150,
+        filters: Array.from(new Set(receipts?.map(r => (r as any).loadBill?.material_name).filter(Boolean))).map(name => ({
+          text: name as string,
+          value: name as string,
+        })),
+        onFilter: (value, record) => record.loadBill?.material_name === value,
         render: (value: string) => value || '-',
       },
       {
@@ -1483,6 +1508,11 @@ const ReceiptsPage = () => {
         title: '卸货材料',
         dataIndex: ['unloadBill', 'material_name'],
         width: 150,
+        filters: Array.from(new Set(receipts?.map(r => (r as any).unloadBill?.material_name).filter(Boolean))).map(name => ({
+          text: name as string,
+          value: name as string,
+        })),
+        onFilter: (value, record) => record.unloadBill?.material_name === value,
         render: (value: string) => value || '-',
       },
       {
