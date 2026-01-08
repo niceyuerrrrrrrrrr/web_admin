@@ -13,7 +13,8 @@ import {
   Tag,
   Input,
   Divider,
-  Empty
+  Empty,
+  Alert
 } from 'antd'
 import { Line, Column, Bar, Pie } from '@ant-design/plots'
 import { ReloadOutlined, SearchOutlined } from '@ant-design/icons'
@@ -29,9 +30,17 @@ import { fetchVehicles } from '../api/services/vehicles'
 import type { Receipt, LoadingReceipt, UnloadingReceipt } from '../api/types'
 import useAuthStore from '../store/auth'
 import useCompanyStore from '../store/company'
+import client from '../api/client'
 
 const { Title, Paragraph } = Typography
 const { RangePicker } = DatePicker
+
+const normalizeBusinessType = (raw: any): '挂车' | '罐车' => {
+  if (!raw) return '挂车'
+  if (raw === 'truck' || raw === '挂车') return '挂车'
+  if (raw === 'tanker' || raw === '罐车') return '罐车'
+  return '挂车'
+}
 
 interface MaterialStats {
   material: string
@@ -107,10 +116,51 @@ interface DriverVehicleStats {
 }
 
 const ReceiptAnalytics = () => {
-  const { user } = useAuthStore()
+  const { user, setAuth } = useAuthStore()
   const { selectedCompanyId } = useCompanyStore()
   const isSuperAdmin = user?.role === 'super_admin' || user?.positionType === '超级管理员'
-  const effectiveCompanyId = isSuperAdmin ? selectedCompanyId : undefined
+
+  // 如果用户信息中没有公司信息，从API获取（保持与票据列表页一致）
+  const meQuery = useQuery({
+    queryKey: ['me'],
+    queryFn: async () => {
+      try {
+        const response = await client.get('/me')
+        if (response.data.success && response.data.data?.user) {
+          const userData = response.data.data.user
+          const currentToken = useAuthStore.getState().token
+          if (currentToken) {
+            setAuth({
+              token: currentToken,
+              user: {
+                ...user,
+                name: user?.name || userData.name || '',
+                role: user?.role || userData.role || '',
+                companyId: userData.companyId || user?.companyId,
+                companyBusinessType: userData.companyBusinessType || user?.companyBusinessType,
+              },
+            })
+          }
+          return userData
+        }
+      } catch (error) {
+        console.error('获取用户信息失败:', error)
+      }
+      return null
+    },
+    enabled: !isSuperAdmin && (!user?.companyId || !user?.companyBusinessType),
+  })
+
+  const currentUser = meQuery.data || user
+
+  // 只有司机账号使用 mine，其它后台管理角色使用 all（但仍然按 company_id 隔离）
+  const positionType = (currentUser as any)?.positionType || (currentUser as any)?.position_type || user?.positionType
+  const isDriver = ['司机', '挂车司机', '罐车司机'].includes(positionType || '')
+  // 公司隔离：
+  // - 超级管理员：必须选择公司
+  // - 非超级管理员：强制使用当前用户公司
+  const effectiveCompanyId = isSuperAdmin ? selectedCompanyId : currentUser?.companyId
+  const showCompanyWarning = isSuperAdmin && !effectiveCompanyId
 
   const [filters, setFilters] = useState<{
     startDate?: string
@@ -135,15 +185,24 @@ const ReceiptAnalytics = () => {
   })
   
   // 优先使用 CEO 统计数据中的业务类型，否则使用公司详情中的业务类型
-  const businessType = ceoStatsQuery.data?.transportDetails?.businessType || 
-                      companyQuery.data?.business_type || 
-                      '挂车' // 默认为挂车
+  const businessType = normalizeBusinessType(
+    ceoStatsQuery.data?.transportDetails?.businessType ||
+      companyQuery.data?.business_type ||
+      currentUser?.companyBusinessType,
+  )
+
+  // 业务类型隔离：只统计/展示当前业务类型下的票据
+  const allowedReceiptTypes = useMemo(() => {
+    return businessType === '挂车'
+      ? (['loading', 'unloading', 'charging'] as const)
+      : (['departure', 'charging', 'water'] as const)
+  }, [businessType])
 
   // 获取部门列表
   const departmentsQuery = useQuery({
     queryKey: ['departments', 'list', effectiveCompanyId],
     queryFn: () => fetchDepartments({ company_id: effectiveCompanyId }),
-    enabled: !isSuperAdmin || !!effectiveCompanyId,
+    enabled: !!effectiveCompanyId,
   })
   const departments = departmentsQuery.data?.records || []
 
@@ -155,7 +214,7 @@ const ReceiptAnalytics = () => {
       company_id: effectiveCompanyId,
       department_id: filters.departmentId,
     }),
-    enabled: !isSuperAdmin || !!effectiveCompanyId,
+    enabled: !!effectiveCompanyId,
   })
   const users = usersQuery.data?.items || []
 
@@ -163,7 +222,7 @@ const ReceiptAnalytics = () => {
   const vehiclesQuery = useQuery({
     queryKey: ['vehicles', 'list', effectiveCompanyId],
     queryFn: () => fetchVehicles({ companyId: effectiveCompanyId }),
-    enabled: !isSuperAdmin || !!effectiveCompanyId,
+    enabled: !!effectiveCompanyId,
   })
   const vehicles = vehiclesQuery.data?.vehicles || []
 
@@ -182,8 +241,9 @@ const ReceiptAnalytics = () => {
         endDate: filters.endDate,
         companyId: effectiveCompanyId,
         departmentId: filters.departmentId,
+        scope: isSuperAdmin ? 'all' : (isDriver ? 'mine' : 'all'),
       }),
-    enabled: !isSuperAdmin || !!effectiveCompanyId,
+    enabled: !!effectiveCompanyId,
   })
 
   const receipts = allReceiptsQuery.data || []
@@ -191,10 +251,11 @@ const ReceiptAnalytics = () => {
   // Filter receipts in memory by vehicle
   const filteredReceipts = useMemo(() => {
     return receipts.filter(r => {
+      if (!allowedReceiptTypes.includes(r.type as any)) return false
       if (selectedVehicleNo && r.vehicle_no !== selectedVehicleNo) return false
       return true
     })
-  }, [receipts, selectedVehicleNo])
+  }, [receipts, selectedVehicleNo, allowedReceiptTypes])
 
   // ----------------------------------------------------------------
   // Trailer (挂车) Statistics Logic
@@ -632,6 +693,36 @@ const ReceiptAnalytics = () => {
     { title: '平均重量(t)', dataIndex: 'avgWeight', render: (v: number) => v?.toFixed(2) },
   ]
 
+  if (showCompanyWarning) {
+    return (
+      <Space direction="vertical" size="large" style={{ width: '100%' }}>
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            flexWrap: 'wrap',
+            gap: 16,
+          }}
+        >
+          <div>
+            <Title level={3} style={{ marginBottom: 4 }}>
+              票据数据分析
+            </Title>
+            <Paragraph type="secondary" style={{ margin: 0 }}>
+              {businessType}业务专属分析报表
+            </Paragraph>
+          </div>
+        </div>
+
+        <Alert type="warning" showIcon message="请选择要查看的公司后再查看票据分析数据" />
+        <Card>
+          <Empty description="请先在左侧/顶部选择公司（仅超级管理员需要）" />
+        </Card>
+      </Space>
+    )
+  }
+
   return (
     <Space direction="vertical" size="large" style={{ width: '100%' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 16 }}>
@@ -676,9 +767,9 @@ const ReceiptAnalytics = () => {
             }
             options={[
               { value: undefined, label: '全部用户' },
-              ...users.map((user) => ({
-                value: user.id,
-                label: user.name || user.nickname || `用户${user.id}`,
+              ...users.map((u) => ({
+                value: u.id,
+                label: u.nickname || u.username || `用户${u.id}`,
               })),
             ]}
             loading={usersQuery.isLoading}

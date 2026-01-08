@@ -56,7 +56,15 @@ const fetchDeletedReceipts = async (params: {
   if (!response.data.success) {
     throw new Error(response.data.message || '获取失败')
   }
-  return response.data.data as Receipt[]
+  const raw = response.data.data
+  const list = Array.isArray(raw)
+    ? raw
+    : Array.isArray(raw?.records)
+      ? raw.records
+      : Array.isArray(raw?.items)
+        ? raw.items
+        : []
+  return list as Receipt[]
 }
 
 // 恢复票据
@@ -123,11 +131,13 @@ export default function ReceiptsRecycleBin() {
           params: { company_id: effectiveCompanyId },
         })
         if (deptResponse.data.success) {
+          const raw = deptResponse.data.data
+          const list = Array.isArray(raw) ? raw : Array.isArray(raw?.records) ? raw.records : []
           setDepartments(
-            deptResponse.data.data.map((dept: any) => ({
+            list.map((dept: any) => ({
               id: dept.id,
-              name: dept.name,
-            }))
+              name: dept.title || dept.name,
+            })),
           )
         }
 
@@ -139,11 +149,19 @@ export default function ReceiptsRecycleBin() {
           },
         })
         if (driverResponse.data.success) {
+          const raw = driverResponse.data.data
+          const list = Array.isArray(raw)
+            ? raw
+            : Array.isArray(raw?.items)
+              ? raw.items
+              : Array.isArray(raw?.records)
+                ? raw.records
+                : []
           setDrivers(
-            driverResponse.data.data.map((user: any) => ({
-              id: user.id,
-              name: user.nickname || user.username,
-            }))
+            list.map((u: any) => ({
+              id: u.id,
+              name: u.nickname || u.username || u.name,
+            })),
           )
         }
       } catch (error) {
@@ -368,7 +386,7 @@ export default function ReceiptsRecycleBin() {
           dataIndex: 'net_weight',
           key: 'net_weight',
           width: 100,
-          render: (val: number) => val?.toFixed(2) || '-',
+          render: (val: any) => (val != null && val !== '' ? Number(val).toFixed(2) : '-'),
         }
       )
     } else if (type === 'charging') {
@@ -405,14 +423,14 @@ export default function ReceiptsRecycleBin() {
           dataIndex: 'energy_kwh',
           key: 'energy_kwh',
           width: 100,
-          render: (val: number) => val?.toFixed(2) || '-',
+          render: (val: any) => (val != null && val !== '' ? Number(val).toFixed(2) : '-'),
         },
         {
           title: '金额(元)',
           dataIndex: 'amount',
           key: 'amount',
           width: 100,
-          render: (val: number) => val?.toFixed(2) || '-',
+          render: (val: any) => (val != null && val !== '' ? Number(val).toFixed(2) : '-'),
         }
       )
     } else if (type === 'water') {
@@ -479,7 +497,7 @@ export default function ReceiptsRecycleBin() {
           dataIndex: 'concrete_volume',
           key: 'concrete_volume',
           width: 100,
-          render: (val: number) => val?.toFixed(2) || '-',
+          render: (val: any) => (val != null && val !== '' ? Number(val).toFixed(2) : '-'),
         }
       )
     }

@@ -212,7 +212,7 @@ const ReceiptsPage = () => {
         return { records: [], total: 0 }
       }
     },
-    enabled: !isSuperAdmin || !!effectiveCompanyId,
+    enabled: isSuperAdmin ? !!effectiveCompanyId : true,
   })
 
   const departments = Array.isArray(departmentsQuery.data?.records) ? departmentsQuery.data.records : []
@@ -235,7 +235,7 @@ const ReceiptsPage = () => {
         return { items: [], total: 0, page: 1, size: 1000 }
       }
     },
-    enabled: !isSuperAdmin || !!effectiveCompanyId,
+    enabled: isSuperAdmin ? !!effectiveCompanyId : true,
   })
 
   const users = Array.isArray(usersQuery.data?.items) ? usersQuery.data.items : []
@@ -1827,48 +1827,88 @@ const ReceiptsPage = () => {
         title: '司机',
         dataIndex: 'driver_name',
         width: 100,
+        filters: (Array.isArray(receipts) ? Array.from(new Set(receipts.map(r => r.driver_name).filter(Boolean))) : []).map(name => ({
+          text: name as string,
+          value: name as string,
+        })),
+        onFilter: (value, record) => record.driver_name === value,
         render: (value: string) => value || '-',
       },
       {
         title: '车牌号',
         dataIndex: 'vehicle_no',
         width: 100,
+        filters: (Array.isArray(receipts) ? Array.from(new Set(receipts.map(r => r.vehicle_no).filter(Boolean))) : []).map(no => ({
+          text: no as string,
+          value: no as string,
+        })),
+        onFilter: (value, record) => record.vehicle_no === value,
         render: (value: string) => value || '-',
       },
       {
         title: '自编车号',
         dataIndex: 'tanker_vehicle_code',
         width: 100,
+        filters: (Array.isArray(receipts) ? Array.from(new Set(receipts.map(r => r.tanker_vehicle_code).filter(Boolean))) : []).map(code => ({
+          text: code as string,
+          value: code as string,
+        })),
+        onFilter: (value, record) => record.tanker_vehicle_code === value,
         render: (value: string) => value || '-',
       },
       {
         title: '装料公司',
         dataIndex: 'loading_company',
         width: 150,
+        filters: (Array.isArray(receipts) ? Array.from(new Set(receipts.map(r => (r as any).loading_company).filter(Boolean))) : []).map(company => ({
+          text: company as string,
+          value: company as string,
+        })),
+        onFilter: (value, record) => (record as any).loading_company === value,
         render: (value: string) => value || '-',
       },
       {
         title: '工程名称',
         dataIndex: 'project_name',
         width: 150,
+        filters: (Array.isArray(receipts) ? Array.from(new Set(receipts.map(r => (r as any).project_name).filter(Boolean))) : []).map(name => ({
+          text: name as string,
+          value: name as string,
+        })),
+        onFilter: (value, record) => (record as any).project_name === value,
         render: (value: string) => value || '-',
       },
       {
         title: '施工地点',
         dataIndex: 'construction_location',
         width: 150,
+        filters: (Array.isArray(receipts) ? Array.from(new Set(receipts.map(r => (r as any).construction_location).filter(Boolean))) : []).map(location => ({
+          text: location as string,
+          value: location as string,
+        })),
+        onFilter: (value, record) => (record as any).construction_location === value,
         render: (value: string) => value || '-',
       },
       {
         title: '客户名称',
         dataIndex: 'customer_name',
         width: 150,
+        filters: (Array.isArray(receipts) ? Array.from(new Set(receipts.map(r => (r as any).customer_name).filter(Boolean))) : []).map(name => ({
+          text: name as string,
+          value: name as string,
+        })),
+        onFilter: (value, record) => (record as any).customer_name === value,
         render: (value: string) => value || '-',
       },
       {
         title: '施工单位',
         dataIndex: 'construction_unit',
         width: 150,
+        filters: (Array.isArray(receipts) ? Array.from(new Set(receipts.map(r => (r as any).construction_unit).filter(Boolean))) : []).map(unit => ({
+          text: unit as string,
+          value: unit as string,
+        })),
+        onFilter: (value, record) => (record as any).construction_unit === value,
         render: (value: string) => value || '-',
       },
       {
@@ -2479,6 +2519,12 @@ const ReceiptsPage = () => {
 
   // 导出功能
   const handleExport = useCallback(() => {
+    const toNumber = (value: any) => {
+      if (value === null || value === undefined || value === '') return null
+      const n = Number(value)
+      return Number.isFinite(n) ? n : null
+    }
+
     if (receipts.length === 0) {
       message.warning('没有数据可导出')
       return
@@ -2513,9 +2559,9 @@ const ReceiptsPage = () => {
             车牌号: r.vehicle_no || '',
             材料名称: r.material_name || '',
             规格型号: r.material_spec || '',
-            毛重: r.gross_weight || 0,
-            净重: r.net_weight || 0,
-            皮重: r.tare_weight || 0,
+            毛重: toNumber(r.gross_weight),
+            净重: toNumber(r.net_weight),
+            皮重: toNumber(r.tare_weight),
             进厂时间: r.loading_time ? dayjs(r.loading_time).format('YYYY-MM-DD HH:mm:ss') : '',
             出厂时间: r.unloading_time ? dayjs(r.unloading_time).format('YYYY-MM-DD HH:mm:ss') : '',
           }
@@ -2537,11 +2583,11 @@ const ReceiptsPage = () => {
             车牌号: r.vehicle_no || '',
             充电站: r.charging_station || '',
             充电桩: r.charging_pile || '',
-            电量: r.energy_kwh || 0,
-            金额: r.amount || 0,
-            开始时间: r.start_time ? dayjs(r.start_time).format('YYYY-MM-DD HH:mm') : '',
-            结束时间: r.end_time ? dayjs(r.end_time).format('YYYY-MM-DD HH:mm') : '',
-            时长: r.duration_min || 0,
+            电量: toNumber(r.energy_kwh),
+            金额: toNumber(r.amount),
+            开始时间: r.start_time ? dayjs(r.start_time).format('YYYY-MM-DD HH:mm:ss') : '',
+            结束时间: r.end_time ? dayjs(r.end_time).format('YYYY-MM-DD HH:mm:ss') : '',
+            时长: toNumber(r.duration_min),
           }
         } else if (receipt.type === 'departure') {
           const r = receipt as Receipt & {
@@ -2577,15 +2623,14 @@ const ReceiptsPage = () => {
             施工单位: r.construction_unit || '',
             强度等级: r.concrete_strength || '',
             坑落度: r.slump || '',
-            方量: r.concrete_volume || '',
-            结算方量: r.settlement_volume || 0,
-            累计方量: r.total_volume || '',
-            累计车次: r.total_vehicles || '',
+            方量: toNumber(r.concrete_volume),
+            结算方量: toNumber(r.settlement_volume),
+            累计方量: toNumber(r.total_volume),
+            累计车次: toNumber(r.total_vehicles),
             提单号: r.bill_no || '',
             进厂时间: r.loading_time ? dayjs(r.loading_time).format('YYYY-MM-DD HH:mm:ss') : '',
             出厂时间: r.exit_time ? dayjs(r.exit_time).format('YYYY-MM-DD HH:mm:ss') : '',
             交票状态: receipt.submitted_to_finance === 'Y' ? '已交票' : '未交票',
-            交票时间: receipt.submitted_at ? dayjs(receipt.submitted_at).format('YYYY-MM-DD HH:mm:ss') : '',
           }
         } else if (receipt.type === 'water') {
           const r = receipt as Receipt & {
@@ -2620,6 +2665,12 @@ const ReceiptsPage = () => {
 
   // 批量导出
   const handleBatchExport = useCallback(() => {
+    const toNumber = (value: any) => {
+      if (value === null || value === undefined || value === '') return null
+      const n = Number(value)
+      return Number.isFinite(n) ? n : null
+    }
+
     if (selectedRowKeys.length === 0) {
       message.warning('请先选择要导出的数据')
       return
@@ -2662,9 +2713,9 @@ const ReceiptsPage = () => {
             车牌号: r.vehicle_no || '',
             材料名称: r.material_name || '',
             规格型号: r.material_spec || '',
-            毛重: r.gross_weight || 0,
-            净重: r.net_weight || 0,
-            皮重: r.tare_weight || 0,
+            毛重: toNumber(r.gross_weight),
+            净重: toNumber(r.net_weight),
+            皮重: toNumber(r.tare_weight),
             进厂时间: r.loading_time ? dayjs(r.loading_time).format('YYYY-MM-DD HH:mm:ss') : '',
             出厂时间: r.unloading_time ? dayjs(r.unloading_time).format('YYYY-MM-DD HH:mm:ss') : '',
           }
@@ -2686,11 +2737,11 @@ const ReceiptsPage = () => {
             车牌号: r.vehicle_no || '',
             充电站: r.charging_station || '',
             充电桩: r.charging_pile || '',
-            电量: r.energy_kwh || 0,
-            金额: r.amount || 0,
+            电量: toNumber(r.energy_kwh),
+            金额: toNumber(r.amount),
             开始时间: r.start_time ? dayjs(r.start_time).format('YYYY-MM-DD HH:mm') : '',
             结束时间: r.end_time ? dayjs(r.end_time).format('YYYY-MM-DD HH:mm') : '',
-            时长: r.duration_min || 0,
+            时长: toNumber(r.duration_min),
           }
         } else if (receipt.type === 'departure') {
           const r = receipt as Receipt & {
@@ -2726,10 +2777,10 @@ const ReceiptsPage = () => {
             施工单位: r.construction_unit || '',
             强度等级: r.concrete_strength || '',
             坑落度: r.slump || '',
-            方量: r.concrete_volume || '',
-            结算方量: r.settlement_volume || 0,
-            累计方量: r.total_volume || '',
-            累计车次: r.total_vehicles || '',
+            方量: toNumber(r.concrete_volume),
+            结算方量: toNumber(r.settlement_volume),
+            累计方量: toNumber(r.total_volume),
+            累计车次: toNumber(r.total_vehicles),
             提单号: r.bill_no || '',
             进厂时间: r.loading_time ? dayjs(r.loading_time).format('YYYY-MM-DD HH:mm:ss') : '',
             出厂时间: r.exit_time ? dayjs(r.exit_time).format('YYYY-MM-DD HH:mm:ss') : '',
