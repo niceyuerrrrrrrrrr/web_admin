@@ -4029,16 +4029,26 @@ const ReceiptsPage = () => {
                 value={configFieldType}
                 onChange={setConfigFieldType}
                 placeholder="请选择要配置的字段"
-                options={[
-                  { label: '公司名称', value: 'company' },
-                  { label: '装料公司', value: 'loading_company' },
-                  { label: '材料名称', value: 'material_name' },
-                  { label: '规格型号', value: 'material_spec' },
-                  { label: '工程名称', value: 'project_name' },
-                  { label: '施工地点', value: 'pour_location' },
-                  { label: '客户名称', value: 'customer_name' },
-                  { label: '施工单位', value: 'construction_unit' },
-                ]}
+                options={(() => {
+                  // 根据公司业务类型显示不同的配置选项
+                  if (businessType === '罐车') {
+                    // 罐车公司：只显示出厂单相关字段
+                    return [
+                      { label: '装料公司', value: 'loading_company' },
+                      { label: '工程名称', value: 'project_name' },
+                      { label: '施工地点', value: 'pour_location' },
+                      { label: '客户名称', value: 'customer_name' },
+                      { label: '施工单位', value: 'construction_unit' },
+                    ]
+                  } else {
+                    // 挂车公司：显示装料单和卸货单相关字段
+                    return [
+                      { label: '公司名称', value: 'company' },
+                      { label: '材料名称', value: 'material_name' },
+                      { label: '规格型号', value: 'material_spec' },
+                    ]
+                  }
+                })()}
               />
             </Form.Item>
 
