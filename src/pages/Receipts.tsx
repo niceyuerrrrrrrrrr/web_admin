@@ -2974,15 +2974,91 @@ const ReceiptsPage = () => {
 
   return (
     <Space direction="vertical" size="large" style={{ width: '100%' }}>
+      <div>
+        <Title level={3} style={{ marginBottom: 4 }}>
+          票据管理中心
+        </Title>
+        <Paragraph type="secondary" style={{ margin: 0 }}>
+          管理装料单、卸货单、充电单、水票等各类票据记录。
+        </Paragraph>
+      </div>
+
+      {/* KPI统计卡片 - 仅出厂单显示 */}
+      {kpiStats && activeTab === 'departure' && (
+        <Row gutter={16}>
+          <Col span={6}>
+            <Card
+              bordered
+              style={{
+                textAlign: 'center',
+                borderRadius: 8,
+                boxShadow: '0 1px 2px rgba(0,0,0,0.03)',
+                border: '1px solid #f0f0f0'
+              }}
+            >
+              <div style={{ color: '#8c8c8c', fontSize: 14, marginBottom: 8 }}>总方量</div>
+              <div style={{ fontSize: 30, fontWeight: 600, color: '#000' }}>
+                {kpiStats.totalVolume}
+                <span style={{ fontSize: 16, color: '#8c8c8c', marginLeft: 4 }}>方</span>
+              </div>
+            </Card>
+          </Col>
+          <Col span={6}>
+            <Card
+              bordered
+              style={{
+                textAlign: 'center',
+                borderRadius: 8,
+                boxShadow: '0 1px 2px rgba(0,0,0,0.03)',
+                border: '1px solid #f0f0f0'
+              }}
+            >
+              <div style={{ color: '#8c8c8c', fontSize: 14, marginBottom: 8 }}>总单据数量</div>
+              <div style={{ fontSize: 30, fontWeight: 600, color: '#000' }}>
+                {kpiStats.totalCount}
+                <span style={{ fontSize: 16, color: '#8c8c8c', marginLeft: 4 }}>单</span>
+              </div>
+            </Card>
+          </Col>
+          <Col span={6}>
+            <Card
+              bordered
+              style={{
+                textAlign: 'center',
+                borderRadius: 8,
+                boxShadow: '0 1px 2px rgba(0,0,0,0.03)',
+                border: '1px solid #f0f0f0'
+              }}
+            >
+              <div style={{ color: '#8c8c8c', fontSize: 14, marginBottom: 8 }}>小方量单据</div>
+              <div style={{ fontSize: 30, fontWeight: 600, color: '#000' }}>
+                <span style={{ fontSize: 12, color: '#8c8c8c', marginRight: 4 }}>(&lt;9.1方)</span>
+                {kpiStats.smallVolumeCount}
+                <span style={{ fontSize: 16, color: '#8c8c8c', marginLeft: 4 }}>单</span>
+              </div>
+            </Card>
+          </Col>
+          <Col span={6}>
+            <Card
+              bordered
+              style={{
+                textAlign: 'center',
+                borderRadius: 8,
+                boxShadow: '0 1px 2px rgba(0,0,0,0.03)',
+                border: '1px solid #f0f0f0'
+              }}
+            >
+              <div style={{ color: '#8c8c8c', fontSize: 14, marginBottom: 8 }}>已交票 / 未交票</div>
+              <div style={{ fontSize: 30, fontWeight: 600, color: '#000' }}>
+                {kpiStats.submittedCount}
+                <span style={{ fontSize: 16, color: '#8c8c8c', marginLeft: 4 }}>/ {kpiStats.notSubmittedCount} 单</span>
+              </div>
+            </Card>
+          </Col>
+        </Row>
+      )}
+
       <Flex justify="space-between" align="center" wrap gap={16}>
-        <div>
-          <Title level={3} style={{ marginBottom: 4 }}>
-            票据管理中心
-          </Title>
-          <Paragraph type="secondary" style={{ margin: 0 }}>
-            管理装料单、卸货单、充电单、水票等各类票据记录。
-          </Paragraph>
-        </div>
         <Space wrap>
           <Select
             style={{ width: 150 }}
@@ -3169,81 +3245,6 @@ const ReceiptsPage = () => {
 
       {showCompanyWarning && (
         <Alert type="warning" message="请选择要查看的公司后再查看票据数据" showIcon />
-      )}
-
-      {/* KPI统计卡片 - 仅出厂单显示 */}
-      {kpiStats && activeTab === 'departure' && (
-        <Row gutter={16} style={{ marginBottom: 16 }}>
-          <Col span={6}>
-            <Card
-              bordered
-              style={{
-                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                borderRadius: 8,
-                boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
-              }}
-            >
-              <Statistic
-                title={<span style={{ color: 'rgba(255,255,255,0.85)', fontSize: 14 }}>总方量</span>}
-                value={kpiStats.totalVolume}
-                suffix="方"
-                valueStyle={{ color: '#fff', fontSize: 28, fontWeight: 'bold' }}
-              />
-            </Card>
-          </Col>
-          <Col span={6}>
-            <Card
-              bordered
-              style={{
-                background: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
-                borderRadius: 8,
-                boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
-              }}
-            >
-              <Statistic
-                title={<span style={{ color: 'rgba(255,255,255,0.85)', fontSize: 14 }}>总单据数量</span>}
-                value={kpiStats.totalCount}
-                suffix="单"
-                valueStyle={{ color: '#fff', fontSize: 28, fontWeight: 'bold' }}
-              />
-            </Card>
-          </Col>
-          <Col span={6}>
-            <Card
-              bordered
-              style={{
-                background: 'linear-gradient(135deg, #ffecd2 0%, #fcb69f 100%)',
-                borderRadius: 8,
-                boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
-              }}
-            >
-              <Statistic
-                title={<span style={{ color: 'rgba(0,0,0,0.65)', fontSize: 14 }}>小方量单据</span>}
-                value={kpiStats.smallVolumeCount}
-                suffix="单"
-                valueStyle={{ color: '#d46b08', fontSize: 28, fontWeight: 'bold' }}
-                prefix={<span style={{ fontSize: 12, color: 'rgba(0,0,0,0.45)' }}>(&lt;9.1方)</span>}
-              />
-            </Card>
-          </Col>
-          <Col span={6}>
-            <Card
-              bordered
-              style={{
-                background: 'linear-gradient(135deg, #a8edea 0%, #fed6e3 100%)',
-                borderRadius: 8,
-                boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
-              }}
-            >
-              <Statistic
-                title={<span style={{ color: 'rgba(0,0,0,0.65)', fontSize: 14 }}>已交票 / 未交票</span>}
-                value={kpiStats.submittedCount}
-                suffix={`/ ${kpiStats.notSubmittedCount} 单`}
-                valueStyle={{ color: '#389e0d', fontSize: 24, fontWeight: 'bold' }}
-              />
-            </Card>
-          </Col>
-        </Row>
       )}
 
       <Card>
