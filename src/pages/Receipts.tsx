@@ -51,6 +51,7 @@ import {
   deleteTransportTask,
   submitReceiptToFinance,
   submitReceiptsToFinance,
+  restoreReceipt,
 } from '../api/services/receipts'
 import { fetchCompanyDetail } from '../api/services/companies'
 import { fetchDepartments } from '../api/services/departments'
@@ -572,6 +573,24 @@ const ReceiptsPage = () => {
     })
   }, [selectedRowKeys, activeTab, modal, message, queryClient])
 
+  // 恢复票据
+  const handleRestore = useCallback(async (receipt: Receipt) => {
+    const receiptTypeName = RECEIPT_TYPES.find(t => t.value === receipt.type)?.label || '票据'
+    modal.confirm({
+      title: '确认恢复',
+      content: `确定要恢复这张${receiptTypeName}吗？恢复后将重新显示在列表中。`,
+      onOk: async () => {
+        try {
+          await restoreReceipt(receipt.type, receipt.id)
+          message.success('恢复成功')
+          queryClient.invalidateQueries({ queryKey: ['receipts'] })
+        } catch (error: any) {
+          message.error(error.message || '恢复失败')
+        }
+      },
+    })
+  }, [modal, message, queryClient])
+
   // 打开编辑
   const openEdit = useCallback((receipt: Receipt) => {
     if (!canEditDelete) {
@@ -696,7 +715,7 @@ const ReceiptsPage = () => {
       <Button type="link" size="small" icon={<EyeOutlined />} onClick={() => openDetail(record)} block>
         查看
       </Button>
-      {canEditDelete && (
+      {canEditDelete && !record.deleted_at && (
         <>
           <Button type="link" size="small" icon={<EditOutlined />} onClick={() => openEdit(record)} block>
             编辑
@@ -713,7 +732,17 @@ const ReceiptsPage = () => {
           </Button>
         </>
       )}
-      {record.submitted_to_finance !== 'Y' && !record.deleted_at && (
+      {record.deleted_at && canEditDelete && (
+        <Button
+          type="link"
+          size="small"
+          onClick={() => handleRestore(record)}
+          block
+        >
+          恢复
+        </Button>
+      )}
+      {record.submitted_to_finance !== 'Y' && !record.deleted_at && record.type !== 'charging' && (
         <Button
           type="link"
           size="small"
@@ -725,7 +754,7 @@ const ReceiptsPage = () => {
         </Button>
       )}
     </Space>
-  ), [openDetail, openEdit, handleDelete, canEditDelete, handleSubmitToFinance])
+  ), [openDetail, openEdit, handleDelete, canEditDelete, handleSubmitToFinance, handleRestore])
 
   // 装料单列定义
   const loadingColumns: ColumnsType<Receipt> = useMemo(
@@ -1153,27 +1182,6 @@ const ReceiptsPage = () => {
             )
           }
           return <Tag color="green">正常</Tag>
-        },
-      },
-      {
-        title: '交票状态',
-        dataIndex: 'submitted_to_finance',
-        width: 120,
-        render: (submitted: string, record: Receipt) => {
-          if (submitted === 'Y') {
-            return (
-              <Tag color="blue">
-                已交票
-                {record.submitted_at && (
-                  <>
-                    <br />
-                    <small>{dayjs(record.submitted_at).format('YYYY-MM-DD HH:mm')}</small>
-                  </>
-                )}
-              </Tag>
-            )
-          }
-          return <Tag color="default">未交票</Tag>
         },
       },
       {

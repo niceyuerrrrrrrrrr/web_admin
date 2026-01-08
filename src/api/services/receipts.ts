@@ -323,3 +323,18 @@ export const submitReceiptToFinance = (receiptType: string, receiptId: number) =
 export const submitReceiptsToFinance = (receiptType: string, receiptIds: number[]) =>
   unwrap(client.post(`/receipts/submit-to-finance?receipt_type=${receiptType}`, { receipt_ids: receiptIds }))
 
+/**
+ * 恢复票据
+ */
+export const restoreReceipt = (receiptType: string, receiptId: number) => {
+  const typeMap: Record<string, string> = {
+    loading: 'loading',
+    unloading: 'unloading',
+    charging: 'charging',
+    water: 'water_tickets',
+    departure: 'departure',
+  }
+  const path = typeMap[receiptType] || receiptType
+  return unwrap(client.post(`/receipts/${path}/${receiptId}/restore`))
+}
+
