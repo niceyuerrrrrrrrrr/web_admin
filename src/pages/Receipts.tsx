@@ -1725,30 +1725,55 @@ const ReceiptsPage = () => {
         title: '装料公司',
         dataIndex: 'loading_company',
         width: 150,
+        filters: Array.from(new Set(receipts?.map(r => (r as any).loading_company).filter(Boolean))).map(company => ({
+          text: company as string,
+          value: company as string,
+        })),
+        onFilter: (value, record) => (record as any).loading_company === value,
         render: (value: string) => value || '-',
       },
       {
         title: '工程名称',
         dataIndex: 'project_name',
         width: 150,
+        filters: Array.from(new Set(receipts?.map(r => (r as any).project_name).filter(Boolean))).map(name => ({
+          text: name as string,
+          value: name as string,
+        })),
+        onFilter: (value, record) => (record as any).project_name === value,
         render: (value: string) => value || '-',
       },
       {
         title: '施工地点',
         dataIndex: 'construction_location',
         width: 150,
+        filters: Array.from(new Set(receipts?.map(r => (r as any).construction_location).filter(Boolean))).map(location => ({
+          text: location as string,
+          value: location as string,
+        })),
+        onFilter: (value, record) => (record as any).construction_location === value,
         render: (value: string) => value || '-',
       },
       {
         title: '客户名称',
         dataIndex: 'customer_name',
         width: 150,
+        filters: Array.from(new Set(receipts?.map(r => (r as any).customer_name).filter(Boolean))).map(name => ({
+          text: name as string,
+          value: name as string,
+        })),
+        onFilter: (value, record) => (record as any).customer_name === value,
         render: (value: string) => value || '-',
       },
       {
         title: '施工单位',
         dataIndex: 'construction_unit',
         width: 150,
+        filters: Array.from(new Set(receipts?.map(r => (r as any).construction_unit).filter(Boolean))).map(unit => ({
+          text: unit as string,
+          value: unit as string,
+        })),
+        onFilter: (value, record) => (record as any).construction_unit === value,
         render: (value: string) => value || '-',
       },
       {
