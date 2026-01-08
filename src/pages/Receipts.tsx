@@ -1127,7 +1127,7 @@ const ReceiptsPage = () => {
         render: (_, record) => renderActions(record),
       },
     ],
-    [businessType, renderActions],
+    [businessType, renderActions, matchedReceipts],
   )
 
   // 卸货单列定义
@@ -1635,7 +1635,7 @@ const ReceiptsPage = () => {
         title: '车牌号',
         dataIndex: ['loadBill', 'vehicle_no'],
         width: 120,
-        filters: Array.from(new Set(matchedReceipts?.items?.map(r => r.loadBill?.vehicle_no || r.unloadBill?.vehicle_no).filter(Boolean))).map(no => ({
+        filters: Array.from(new Set(matchedReceipts?.map((r: any) => r.loadBill?.vehicle_no || r.unloadBill?.vehicle_no).filter(Boolean))).map(no => ({
           text: no as string,
           value: no as string,
         })),
@@ -1646,7 +1646,7 @@ const ReceiptsPage = () => {
         title: '司机',
         dataIndex: ['loadBill', 'driver_name'],
         width: 120,
-        filters: Array.from(new Set(matchedReceipts?.items?.map(r => r.loadBill?.driver_name || r.unloadBill?.driver_name).filter(Boolean)))
+        filters: Array.from(new Set(matchedReceipts?.map((r: any) => r.loadBill?.driver_name || r.unloadBill?.driver_name).filter(Boolean)))
           .sort((a, b) => (a || '').localeCompare(b || '', 'zh-CN'))
           .map(name => ({
             text: name as string,
@@ -1659,7 +1659,7 @@ const ReceiptsPage = () => {
         title: '装料公司',
         dataIndex: ['loadBill', 'company'],
         width: 150,
-        filters: Array.from(new Set(matchedReceipts?.items?.map(r => r.loadBill?.company).filter(Boolean))).map(company => ({
+        filters: Array.from(new Set(matchedReceipts?.map((r: any) => r.loadBill?.company).filter(Boolean))).map(company => ({
           text: company as string,
           value: company as string,
         })),
@@ -1670,7 +1670,7 @@ const ReceiptsPage = () => {
         title: '卸货公司',
         dataIndex: ['unloadBill', 'company'],
         width: 150,
-        filters: Array.from(new Set(matchedReceipts?.items?.map(r => r.unloadBill?.company).filter(Boolean))).map(company => ({
+        filters: Array.from(new Set(matchedReceipts?.map((r: any) => r.unloadBill?.company).filter(Boolean))).map(company => ({
           text: company as string,
           value: company as string,
         })),
@@ -1681,7 +1681,7 @@ const ReceiptsPage = () => {
         title: '装料材料',
         dataIndex: ['loadBill', 'material_name'],
         width: 150,
-        filters: Array.from(new Set(matchedReceipts?.items?.map(r => r.loadBill?.material_name).filter(Boolean))).map(name => ({
+        filters: Array.from(new Set(matchedReceipts?.map((r: any) => r.loadBill?.material_name).filter(Boolean))).map(name => ({
           text: name as string,
           value: name as string,
         })),
@@ -1698,7 +1698,7 @@ const ReceiptsPage = () => {
         title: '卸货材料',
         dataIndex: ['unloadBill', 'material_name'],
         width: 150,
-        filters: Array.from(new Set(matchedReceipts?.items?.map(r => r.unloadBill?.material_name).filter(Boolean))).map(name => ({
+        filters: Array.from(new Set(matchedReceipts?.map((r: any) => r.unloadBill?.material_name).filter(Boolean))).map(name => ({
           text: name as string,
           value: name as string,
         })),
