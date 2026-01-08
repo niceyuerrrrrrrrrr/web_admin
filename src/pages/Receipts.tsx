@@ -62,6 +62,7 @@ import {
 import { fetchCompanyDetail } from '../api/services/companies'
 import { fetchDepartments } from '../api/services/departments'
 import { fetchUsers } from '../api/services/users'
+import { fetchDataCleanConfigs, saveDataCleanConfig } from '../api/services/dataCleanConfig'
 import type { Receipt, ReceiptType } from '../api/types'
 import useAuthStore from '../store/auth'
 import useCompanyStore from '../store/company'
@@ -169,6 +170,24 @@ const ReceiptsPage = () => {
   const [editingMatched, setEditingMatched] = useState<any>(null)
   const [matchedEditModalOpen, setMatchedEditModalOpen] = useState(false)
   const showCompanyWarning = isSuperAdmin && !effectiveCompanyId
+
+  // 加载数据清洗配置
+  const { data: cleanConfigs } = useQuery({
+    queryKey: ['dataCleanConfigs', effectiveCompanyId],
+    queryFn: () => fetchDataCleanConfigs(effectiveCompanyId),
+    enabled: !!effectiveCompanyId,
+  })
+
+  // 当配置加载完成后，更新standardValues
+  useEffect(() => {
+    if (cleanConfigs) {
+      const newStandardValues: Record<string, string[]> = {}
+      Object.keys(cleanConfigs).forEach(fieldType => {
+        newStandardValues[fieldType] = cleanConfigs[fieldType].values
+      })
+      setStandardValues(newStandardValues)
+    }
+  }, [cleanConfigs])
 
   // 获取当前公司信息以判断业务类型
   // 如果用户信息中没有业务类型，需要从API获取（非超级管理员也可能需要）
@@ -3971,9 +3990,27 @@ const ReceiptsPage = () => {
           setConfigFieldType('')
           setBatchInputValue('')
         }}
-        onOk={() => {
-          setCleanConfigModalOpen(false)
-          message.success('配置已保存')
+        onOk={async () => {
+          if (!configFieldType) {
+            message.warning('请选择字段类型')
+            return
+          }
+          
+          try {
+            await saveDataCleanConfig({
+              field_type: configFieldType,
+              standard_values: standardValues[configFieldType] || [],
+              company_id: effectiveCompanyId,
+            })
+            
+            message.success('配置已保存')
+            queryClient.invalidateQueries({ queryKey: ['dataCleanConfigs'] })
+            setCleanConfigModalOpen(false)
+            setConfigFieldType('')
+            setBatchInputValue('')
+          } catch (error: any) {
+            message.error(error.message || '保存配置失败')
+          }
         }}
         width={800}
       >
