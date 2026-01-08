@@ -208,7 +208,8 @@ const ReceiptsPage = () => {
         return data
       } catch (error) {
         console.error('加载部门数据失败:', error)
-        throw error
+        // 返回空数据而不是抛出错误，避免页面崩溃
+        return { records: [], total: 0 }
       }
     },
     enabled: !isSuperAdmin || !!effectiveCompanyId,
@@ -230,7 +231,8 @@ const ReceiptsPage = () => {
         return data
       } catch (error) {
         console.error('加载用户数据失败:', error)
-        throw error
+        // 返回空数据而不是抛出错误，避免页面崩溃
+        return { items: [], total: 0, page: 1, size: 1000 }
       }
     },
     enabled: !isSuperAdmin || !!effectiveCompanyId,
