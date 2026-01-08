@@ -131,9 +131,11 @@ const ReceiptsPage = () => {
     tankerVehicleCode?: string
     deletedStatus?: 'all' | 'normal' | 'deleted'
     submittedStatus?: 'all' | 'submitted' | 'not_submitted'
+    volumeFilter?: 'all' | 'small' | 'normal' // 新增：方量筛选
   }>({
     deletedStatus: 'normal', // 默认只显示正常票据
-    submittedStatus: 'all' // 默认显示所有交票状态
+    submittedStatus: 'all', // 默认显示所有交票状态
+    volumeFilter: 'all' // 默认显示所有方量
   })
   const [selectedReceipt, setSelectedReceipt] = useState<Receipt | null>(null)
   const [detailDrawerOpen, setDetailDrawerOpen] = useState(false)
@@ -291,7 +293,20 @@ const ReceiptsPage = () => {
       return null
     }
 
-    const departureReceipts = receipts.filter((r: any) => r.type === 'departure')
+    let departureReceipts = receipts.filter((r: any) => r.type === 'departure')
+    
+    // 根据方量筛选条件过滤
+    if (filters.volumeFilter === 'small') {
+      departureReceipts = departureReceipts.filter((r: any) => {
+        const volume = parseFloat(r.concrete_volume || 0)
+        return volume > 0 && volume < 9.1
+      })
+    } else if (filters.volumeFilter === 'normal') {
+      departureReceipts = departureReceipts.filter((r: any) => {
+        const volume = parseFloat(r.concrete_volume || 0)
+        return volume >= 9.1
+      })
+    }
     
     let totalVolume = 0 // 总方量
     let totalCount = departureReceipts.length // 总单据数量
@@ -320,7 +335,7 @@ const ReceiptsPage = () => {
       submittedCount,
       notSubmittedCount: totalCount - submittedCount,
     }
-  }, [activeTab, receipts])
+  }, [activeTab, receipts, filters.volumeFilter])
 
   // 编辑充电单
   const updateChargingMutation = useMutation({
@@ -478,6 +493,7 @@ const ReceiptsPage = () => {
     tankerVehicleCode?: string
     deletedStatus?: 'all' | 'normal' | 'deleted'
     submittedStatus?: 'all' | 'submitted' | 'not_submitted'
+    volumeFilter?: 'all' | 'small' | 'normal'
   }) => {
     setFilters({
       receiptType: values.receiptType,
@@ -487,14 +503,16 @@ const ReceiptsPage = () => {
       tankerVehicleCode: values.tankerVehicleCode,
       deletedStatus: values.deletedStatus || 'normal',
       submittedStatus: values.submittedStatus || 'all',
+      volumeFilter: values.volumeFilter || 'all',
     })
   }
 
   const handleReset = () => {
-    setFilters({ deletedStatus: 'normal', submittedStatus: 'all' })
+    setFilters({ deletedStatus: 'normal', submittedStatus: 'all', volumeFilter: 'all' })
     searchForm.resetFields()
     searchForm.setFieldValue('deletedStatus', 'normal')
     searchForm.setFieldValue('submittedStatus', 'all')
+    searchForm.setFieldValue('volumeFilter', 'all')
   }
 
   const openDetail = useCallback((receipt: Receipt) => {
@@ -3084,6 +3102,20 @@ const ReceiptsPage = () => {
                 ]}
               />
             </Form.Item>
+            {activeTab === 'departure' && (
+              <Form.Item name="volumeFilter" label="方量筛选" initialValue="all" style={{ marginBottom: 0 }}>
+                <Select
+                  placeholder="选择方量类型"
+                  allowClear
+                  style={{ width: 150 }}
+                  options={[
+                    { label: '全部', value: 'all' },
+                    { label: '小方量(<9.1)', value: 'small' },
+                    { label: '正常方量(≥9.1)', value: 'normal' },
+                  ]}
+                />
+              </Form.Item>
+            )}
             <Form.Item style={{ marginBottom: 0 }}>
               <Button type="primary" htmlType="submit">
                 查询
@@ -3141,45 +3173,77 @@ const ReceiptsPage = () => {
 
       {/* KPI统计卡片 - 仅出厂单显示 */}
       {kpiStats && activeTab === 'departure' && (
-        <Card>
-          <Row gutter={16}>
-            <Col span={6}>
+        <Row gutter={16} style={{ marginBottom: 16 }}>
+          <Col span={6}>
+            <Card
+              bordered
+              style={{
+                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                borderRadius: 8,
+                boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
+              }}
+            >
               <Statistic
-                title="总方量"
+                title={<span style={{ color: 'rgba(255,255,255,0.85)', fontSize: 14 }}>总方量</span>}
                 value={kpiStats.totalVolume}
                 suffix="方"
-                valueStyle={{ color: '#1890ff' }}
+                valueStyle={{ color: '#fff', fontSize: 28, fontWeight: 'bold' }}
               />
-            </Col>
-            <Col span={6}>
+            </Card>
+          </Col>
+          <Col span={6}>
+            <Card
+              bordered
+              style={{
+                background: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
+                borderRadius: 8,
+                boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
+              }}
+            >
               <Statistic
-                title="总单据数量"
+                title={<span style={{ color: 'rgba(255,255,255,0.85)', fontSize: 14 }}>总单据数量</span>}
                 value={kpiStats.totalCount}
                 suffix="单"
-                valueStyle={{ color: '#52c41a' }}
+                valueStyle={{ color: '#fff', fontSize: 28, fontWeight: 'bold' }}
               />
-            </Col>
-            <Col span={6}>
+            </Card>
+          </Col>
+          <Col span={6}>
+            <Card
+              bordered
+              style={{
+                background: 'linear-gradient(135deg, #ffecd2 0%, #fcb69f 100%)',
+                borderRadius: 8,
+                boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
+              }}
+            >
               <Statistic
-                title="小方量单据"
+                title={<span style={{ color: 'rgba(0,0,0,0.65)', fontSize: 14 }}>小方量单据</span>}
                 value={kpiStats.smallVolumeCount}
                 suffix="单"
-                valueStyle={{ color: '#faad14' }}
-                prefix={<span style={{ fontSize: '14px', color: '#8c8c8c' }}>(&lt;9.1方)</span>}
+                valueStyle={{ color: '#d46b08', fontSize: 28, fontWeight: 'bold' }}
+                prefix={<span style={{ fontSize: 12, color: 'rgba(0,0,0,0.45)' }}>(&lt;9.1方)</span>}
               />
-            </Col>
-            <Col span={6}>
-              <Card.Grid style={{ width: '100%', padding: '16px', boxShadow: 'none' }} hoverable={false}>
-                <Statistic
-                  title="已交票 / 未交票"
-                  value={kpiStats.submittedCount}
-                  suffix={`/ ${kpiStats.notSubmittedCount} 单`}
-                  valueStyle={{ color: '#52c41a' }}
-                />
-              </Card.Grid>
-            </Col>
-          </Row>
-        </Card>
+            </Card>
+          </Col>
+          <Col span={6}>
+            <Card
+              bordered
+              style={{
+                background: 'linear-gradient(135deg, #a8edea 0%, #fed6e3 100%)',
+                borderRadius: 8,
+                boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
+              }}
+            >
+              <Statistic
+                title={<span style={{ color: 'rgba(0,0,0,0.65)', fontSize: 14 }}>已交票 / 未交票</span>}
+                value={kpiStats.submittedCount}
+                suffix={`/ ${kpiStats.notSubmittedCount} 单`}
+                valueStyle={{ color: '#389e0d', fontSize: 24, fontWeight: 'bold' }}
+              />
+            </Card>
+          </Col>
+        </Row>
       )}
 
       <Card>
