@@ -3817,34 +3817,28 @@ const ReceiptsPage = () => {
                 }}
                 placeholder="请选择字段"
                 options={(() => {
-                  const commonFields = [
-                    { label: '司机姓名', value: 'driver_name' },
-                    { label: '车牌号', value: 'vehicle_no' },
-                  ]
-                  
-                  if (activeTab === 'loading' || activeTab === 'unloading') {
+                  if (activeTab === 'loading') {
                     return [
                       { label: '公司', value: 'company' },
-                      ...commonFields,
-                      { label: '物料名称', value: 'material_name' },
-                      { label: '物料规格', value: 'material_spec' },
+                      { label: '材料名称', value: 'material_name' },
+                      { label: '规格型号', value: 'material_spec' },
+                    ]
+                  } else if (activeTab === 'unloading') {
+                    return [
+                      { label: '公司', value: 'company' },
+                      { label: '材料名称', value: 'material_name' },
+                      { label: '规格型号', value: 'material_spec' },
                     ]
                   } else if (activeTab === 'departure') {
                     return [
-                      ...commonFields,
+                      { label: '装料公司', value: 'company' },
                       { label: '工程名称', value: 'project_name' },
-                      { label: '浇筑部位', value: 'pour_location' },
-                      { label: '混凝土标号', value: 'concrete_grade' },
+                      { label: '施工地点', value: 'pour_location' },
+                      { label: '客户名称', value: 'customer_name' },
+                      { label: '施工单位', value: 'construction_unit' },
                     ]
-                  } else if (activeTab === 'water') {
-                    return [
-                      ...commonFields,
-                      { label: '公司名称', value: 'company_name' },
-                    ]
-                  } else if (activeTab === 'charging') {
-                    return commonFields
                   }
-                  return commonFields
+                  return []
                 })()}
               />
             </Form.Item>
