@@ -3342,6 +3342,28 @@ const ReceiptsPage = () => {
             </Descriptions>
 
             <Typography.Title level={5} style={{ marginTop: 16 }}>装料单信息（ID: {editingMatched.loadBill?.id}）</Typography.Title>
+            
+            {/* 装料单图片 */}
+            {editingMatched.loadBill?.thumb_url && 
+             !editingMatched.loadBill.thumb_url.startsWith('wxfile://') && 
+             !editingMatched.loadBill.thumb_url.startsWith('file://') && (
+              <div style={{ marginBottom: 16 }}>
+                <Typography.Text strong>装料单图片：</Typography.Text>
+                <div style={{ marginTop: 8 }}>
+                  <Image
+                    src={editingMatched.loadBill.thumb_url}
+                    width={200}
+                    height={200}
+                    style={{ objectFit: 'cover', borderRadius: 8, border: '1px solid #d9d9d9' }}
+                    fallback="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="
+                    preview={{
+                      mask: '点击查看大图',
+                    }}
+                  />
+                </div>
+              </div>
+            )}
+            
             <Form.Item label="公司" name="load_company">
               <Input placeholder="请输入公司名称" />
             </Form.Item>
@@ -3364,6 +3386,28 @@ const ReceiptsPage = () => {
             </Space>
 
             <Typography.Title level={5} style={{ marginTop: 24 }}>卸货单信息（ID: {editingMatched.unloadBill?.id}）</Typography.Title>
+            
+            {/* 卸货单图片 */}
+            {editingMatched.unloadBill?.thumb_url && 
+             !editingMatched.unloadBill.thumb_url.startsWith('wxfile://') && 
+             !editingMatched.unloadBill.thumb_url.startsWith('file://') && (
+              <div style={{ marginBottom: 16 }}>
+                <Typography.Text strong>卸货单图片：</Typography.Text>
+                <div style={{ marginTop: 8 }}>
+                  <Image
+                    src={editingMatched.unloadBill.thumb_url}
+                    width={200}
+                    height={200}
+                    style={{ objectFit: 'cover', borderRadius: 8, border: '1px solid #d9d9d9' }}
+                    fallback="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="
+                    preview={{
+                      mask: '点击查看大图',
+                    }}
+                  />
+                </div>
+              </div>
+            )}
+            
             <Form.Item label="公司" name="unload_company">
               <Input placeholder="请输入公司名称" />
             </Form.Item>
