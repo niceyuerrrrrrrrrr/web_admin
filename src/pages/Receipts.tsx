@@ -4,6 +4,7 @@ import {
   App as AntdApp,
   Button,
   Card,
+  Col,
   DatePicker,
   Descriptions,
   Drawer,
@@ -14,8 +15,10 @@ import {
   Input,
   InputNumber,
   Modal,
+  Row,
   Select,
   Space,
+  Statistic,
   Table,
   Tabs,
   Tag,
@@ -280,6 +283,44 @@ const ReceiptsPage = () => {
 
   const receipts = receiptsQuery.data || []
   const matchedReceipts = matchedReceiptsQuery.data || []
+
+  // 计算当前表格显示数据的KPI统计（仅针对出厂单）
+  const kpiStats = useMemo(() => {
+    // 只对出厂单进行统计
+    if (activeTab !== 'departure') {
+      return null
+    }
+
+    const departureReceipts = receipts.filter((r: any) => r.type === 'departure')
+    
+    let totalVolume = 0 // 总方量
+    let totalCount = departureReceipts.length // 总单据数量
+    let smallVolumeCount = 0 // 小方量单据数量（<9.1）
+    let submittedCount = 0 // 已交票数量
+
+    departureReceipts.forEach((receipt: any) => {
+      const volume = parseFloat(receipt.concrete_volume || 0)
+      totalVolume += volume
+      
+      // 统计小方量单据（本车方量小于9.1）
+      if (volume > 0 && volume < 9.1) {
+        smallVolumeCount++
+      }
+      
+      // 统计已交票数量
+      if (receipt.submitted_to_finance === 'Y') {
+        submittedCount++
+      }
+    })
+
+    return {
+      totalVolume: totalVolume.toFixed(2),
+      totalCount,
+      smallVolumeCount,
+      submittedCount,
+      notSubmittedCount: totalCount - submittedCount,
+    }
+  }, [activeTab, receipts])
 
   // 编辑充电单
   const updateChargingMutation = useMutation({
@@ -3096,6 +3137,49 @@ const ReceiptsPage = () => {
 
       {showCompanyWarning && (
         <Alert type="warning" message="请选择要查看的公司后再查看票据数据" showIcon />
+      )}
+
+      {/* KPI统计卡片 - 仅出厂单显示 */}
+      {kpiStats && activeTab === 'departure' && (
+        <Card>
+          <Row gutter={16}>
+            <Col span={6}>
+              <Statistic
+                title="总方量"
+                value={kpiStats.totalVolume}
+                suffix="方"
+                valueStyle={{ color: '#1890ff' }}
+              />
+            </Col>
+            <Col span={6}>
+              <Statistic
+                title="总单据数量"
+                value={kpiStats.totalCount}
+                suffix="单"
+                valueStyle={{ color: '#52c41a' }}
+              />
+            </Col>
+            <Col span={6}>
+              <Statistic
+                title="小方量单据"
+                value={kpiStats.smallVolumeCount}
+                suffix="单"
+                valueStyle={{ color: '#faad14' }}
+                prefix={<span style={{ fontSize: '14px', color: '#8c8c8c' }}>(&lt;9.1方)</span>}
+              />
+            </Col>
+            <Col span={6}>
+              <Card.Grid style={{ width: '100%', padding: '16px', boxShadow: 'none' }} hoverable={false}>
+                <Statistic
+                  title="已交票 / 未交票"
+                  value={kpiStats.submittedCount}
+                  suffix={`/ ${kpiStats.notSubmittedCount} 单`}
+                  valueStyle={{ color: '#52c41a' }}
+                />
+              </Card.Grid>
+            </Col>
+          </Row>
+        </Card>
       )}
 
       <Card>
