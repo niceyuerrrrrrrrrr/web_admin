@@ -286,6 +286,28 @@ const ReceiptsPage = () => {
   const receipts = receiptsQuery.data || []
   const matchedReceipts = matchedReceiptsQuery.data || []
 
+  // 根据方量筛选条件过滤表格数据
+  const filteredReceipts = useMemo(() => {
+    // 只对出厂单应用方量筛选
+    if (activeTab !== 'departure' || !filters.volumeFilter || filters.volumeFilter === 'all') {
+      return receipts
+    }
+
+    return receipts.filter((r: any) => {
+      if (r.type !== 'departure') return true
+      
+      const volume = parseFloat(r.concrete_volume || 0)
+      
+      if (filters.volumeFilter === 'small') {
+        return volume > 0 && volume < 9.1
+      } else if (filters.volumeFilter === 'normal') {
+        return volume >= 9.1
+      }
+      
+      return true
+    })
+  }, [receipts, activeTab, filters.volumeFilter])
+
   // 计算当前表格显示数据的KPI统计（仅针对出厂单）
   const kpiStats = useMemo(() => {
     // 只对出厂单进行统计
@@ -293,20 +315,8 @@ const ReceiptsPage = () => {
       return null
     }
 
-    let departureReceipts = receipts.filter((r: any) => r.type === 'departure')
-    
-    // 根据方量筛选条件过滤
-    if (filters.volumeFilter === 'small') {
-      departureReceipts = departureReceipts.filter((r: any) => {
-        const volume = parseFloat(r.concrete_volume || 0)
-        return volume > 0 && volume < 9.1
-      })
-    } else if (filters.volumeFilter === 'normal') {
-      departureReceipts = departureReceipts.filter((r: any) => {
-        const volume = parseFloat(r.concrete_volume || 0)
-        return volume >= 9.1
-      })
-    }
+    // 使用filteredReceipts，确保KPI统计和表格数据一致
+    const departureReceipts = filteredReceipts.filter((r: any) => r.type === 'departure')
     
     let totalVolume = 0 // 总方量
     let totalCount = departureReceipts.length // 总单据数量
@@ -335,7 +345,7 @@ const ReceiptsPage = () => {
       submittedCount,
       notSubmittedCount: totalCount - submittedCount,
     }
-  }, [activeTab, receipts, filters.volumeFilter])
+  }, [activeTab, filteredReceipts])
 
   // 编辑充电单
   const updateChargingMutation = useMutation({
@@ -3275,7 +3285,7 @@ const ReceiptsPage = () => {
                     return `${record.type}-${record.id}`
                   }}
                   columns={getColumns(activeTab)}
-                  dataSource={(activeTab === 'matched' ? matchedReceipts : receipts) as any}
+                  dataSource={(activeTab === 'matched' ? matchedReceipts : filteredReceipts) as any}
                   loading={activeTab === 'matched' ? matchedReceiptsQuery.isLoading : receiptsQuery.isLoading}
                   rowSelection={
                     activeTab === 'matched'
@@ -3286,7 +3296,7 @@ const ReceiptsPage = () => {
                         }
                   }
                   pagination={{
-                    total: activeTab === 'matched' ? matchedReceipts.length : receipts.length,
+                    total: activeTab === 'matched' ? matchedReceipts.length : filteredReceipts.length,
                     pageSize: pageSize,
                     showSizeChanger: true,
                     showTotal: (total) => `共 ${total} 条`,
