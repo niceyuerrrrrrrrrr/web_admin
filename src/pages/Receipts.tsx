@@ -1912,7 +1912,13 @@ const ReceiptsPage = () => {
         title: '结算方量',
         dataIndex: 'settlement_volume',
         width: 100,
-        render: (value: string, record: any) => value || record.concrete_volume || '-',
+        render: (value: any, record: any) => {
+          // 处理可能是数字或字符串的情况
+          if (value !== null && value !== undefined && value !== '') {
+            return typeof value === 'number' ? value : value
+          }
+          return record.concrete_volume || '-'
+        },
       },
       {
         title: '累计方量',
@@ -2746,8 +2752,7 @@ const ReceiptsPage = () => {
             提单号: r.bill_no || '',
             进厂时间: r.loading_time ? dayjs(r.loading_time).format('YYYY-MM-DD HH:mm:ss') : '',
             出厂时间: r.exit_time ? dayjs(r.exit_time).format('YYYY-MM-DD HH:mm:ss') : '',
-            交票状态: receipt.submitted_to_finance === 'Y' ? '已交票' : '未交票',
-            交票时间: receipt.submitted_at ? dayjs(receipt.submitted_at).format('YYYY-MM-DD HH:mm:ss') : '',
+            交票状态: receipt.submitted_to_finance === 'Y' ? '已交票' : '未交票'
           }
         } else if (receipt.type === 'water') {
           const r = receipt as Receipt & {
