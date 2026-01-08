@@ -26,6 +26,7 @@ import type { Dayjs } from 'dayjs'
 import dayjs from 'dayjs'
 import {
   DeleteOutlined,
+  DollarOutlined,
   DownloadOutlined,
   EditOutlined,
   EyeOutlined,
@@ -691,13 +692,13 @@ const ReceiptsPage = () => {
 
   // 通用操作列渲染
   const renderActions = useCallback((record: Receipt) => (
-    <Space direction="vertical" size={0}>
-      <Button type="link" size="small" icon={<EyeOutlined />} onClick={() => openDetail(record)}>
+    <Space direction="vertical" size={0} style={{ width: '100%' }}>
+      <Button type="link" size="small" icon={<EyeOutlined />} onClick={() => openDetail(record)} block>
         查看
       </Button>
       {canEditDelete && (
         <>
-          <Button type="link" size="small" icon={<EditOutlined />} onClick={() => openEdit(record)}>
+          <Button type="link" size="small" icon={<EditOutlined />} onClick={() => openEdit(record)} block>
             编辑
           </Button>
           <Button
@@ -706,6 +707,7 @@ const ReceiptsPage = () => {
             danger
             icon={<DeleteOutlined />}
             onClick={() => handleDelete(record)}
+            block
           >
             删除
           </Button>
@@ -715,7 +717,9 @@ const ReceiptsPage = () => {
         <Button
           type="link"
           size="small"
+          icon={<DollarOutlined />}
           onClick={() => handleSubmitToFinance(record)}
+          block
         >
           交票
         </Button>
