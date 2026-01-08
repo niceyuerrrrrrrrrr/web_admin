@@ -482,12 +482,8 @@ const ReceiptsPage = () => {
 
   // 编辑装卸匹配
   const handleEditMatched = useCallback((record: any) => {
-    if (!canEditDelete) {
-      message.warning('无权限编辑装卸匹配')
-      return
-    }
-    
     // 打开详情对话框，显示装料单和卸货单的完整信息
+    // 注意：这里是查看详情，不是真正的编辑功能
     Modal.info({
       title: '装卸匹配详情',
       width: 1000,
@@ -531,7 +527,7 @@ const ReceiptsPage = () => {
       ),
       okText: '关闭',
     })
-  }, [canEditDelete, message])
+  }, [])
 
   // 删除装卸匹配
   const handleDeleteMatched = useCallback((record: any) => {
