@@ -3189,19 +3189,11 @@ const ReceiptsPage = () => {
         </Paragraph>
       </div>
 
-      {/* KPI统计卡片 - 仅出厂单显示 */}
-      {kpiStats && activeTab === 'departure' && (
-        <Row gutter={16}>
+      {/* KPI统计卡片 - 根据票据类型显示不同的统计 */}
+      {activeTab === 'departure' && kpiStats && (
+        <Row gutter={16} style={{ marginBottom: 16 }}>
           <Col span={6}>
-            <Card
-              bordered
-              style={{
-                textAlign: 'center',
-                borderRadius: 8,
-                boxShadow: '0 1px 2px rgba(0,0,0,0.03)',
-                border: '1px solid #f0f0f0'
-              }}
-            >
+            <Card bordered style={{ textAlign: 'center', borderRadius: 8, boxShadow: '0 1px 2px rgba(0,0,0,0.03)', border: '1px solid #f0f0f0' }}>
               <div style={{ color: '#8c8c8c', fontSize: 14, marginBottom: 8 }}>总方量</div>
               <div style={{ fontSize: 30, fontWeight: 600, color: '#000' }}>
                 {kpiStats.totalVolume}
@@ -3210,15 +3202,7 @@ const ReceiptsPage = () => {
             </Card>
           </Col>
           <Col span={6}>
-            <Card
-              bordered
-              style={{
-                textAlign: 'center',
-                borderRadius: 8,
-                boxShadow: '0 1px 2px rgba(0,0,0,0.03)',
-                border: '1px solid #f0f0f0'
-              }}
-            >
+            <Card bordered style={{ textAlign: 'center', borderRadius: 8, boxShadow: '0 1px 2px rgba(0,0,0,0.03)', border: '1px solid #f0f0f0' }}>
               <div style={{ color: '#8c8c8c', fontSize: 14, marginBottom: 8 }}>总单据数量</div>
               <div style={{ fontSize: 30, fontWeight: 600, color: '#000' }}>
                 {kpiStats.totalCount}
@@ -3227,15 +3211,7 @@ const ReceiptsPage = () => {
             </Card>
           </Col>
           <Col span={6}>
-            <Card
-              bordered
-              style={{
-                textAlign: 'center',
-                borderRadius: 8,
-                boxShadow: '0 1px 2px rgba(0,0,0,0.03)',
-                border: '1px solid #f0f0f0'
-              }}
-            >
+            <Card bordered style={{ textAlign: 'center', borderRadius: 8, boxShadow: '0 1px 2px rgba(0,0,0,0.03)', border: '1px solid #f0f0f0' }}>
               <div style={{ color: '#8c8c8c', fontSize: 14, marginBottom: 8 }}>小方量单据</div>
               <div style={{ fontSize: 30, fontWeight: 600, color: '#000' }}>
                 <span style={{ fontSize: 12, color: '#8c8c8c', marginRight: 4 }}>(&lt;9.1方)</span>
@@ -3245,20 +3221,58 @@ const ReceiptsPage = () => {
             </Card>
           </Col>
           <Col span={6}>
-            <Card
-              bordered
-              style={{
-                textAlign: 'center',
-                borderRadius: 8,
-                boxShadow: '0 1px 2px rgba(0,0,0,0.03)',
-                border: '1px solid #f0f0f0'
-              }}
-            >
+            <Card bordered style={{ textAlign: 'center', borderRadius: 8, boxShadow: '0 1px 2px rgba(0,0,0,0.03)', border: '1px solid #f0f0f0' }}>
               <div style={{ color: '#8c8c8c', fontSize: 14, marginBottom: 8 }}>已交票 / 未交票</div>
               <div style={{ fontSize: 30, fontWeight: 600, color: '#000' }}>
                 {kpiStats.submittedCount}
                 <span style={{ fontSize: 16, color: '#8c8c8c', marginLeft: 4 }}>/ {kpiStats.notSubmittedCount} 单</span>
               </div>
+            </Card>
+          </Col>
+        </Row>
+      )}
+
+      {/* 其他票据类型的KPI统计 */}
+      {activeTab === 'matched' && matchedStatistics && (
+        <Row gutter={16} style={{ marginBottom: 16 }}>
+          <Col span={8}>
+            <Card bordered style={{ textAlign: 'center', borderRadius: 8, boxShadow: '0 1px 2px rgba(0,0,0,0.03)', border: '1px solid #f0f0f0' }}>
+              <Statistic title="总任务数" value={matchedStatistics.total_count} suffix="个" />
+            </Card>
+          </Col>
+          <Col span={8}>
+            <Card bordered style={{ textAlign: 'center', borderRadius: 8, boxShadow: '0 1px 2px rgba(0,0,0,0.03)', border: '1px solid #f0f0f0' }}>
+              <Statistic title="正常任务" value={matchedStatistics.normal_count} valueStyle={{ color: '#3f8600' }} suffix="个" />
+            </Card>
+          </Col>
+          <Col span={8}>
+            <Card bordered style={{ textAlign: 'center', borderRadius: 8, boxShadow: '0 1px 2px rgba(0,0,0,0.03)', border: '1px solid #f0f0f0' }}>
+              <Statistic title="已删除任务" value={matchedStatistics.deleted_count} valueStyle={{ color: '#cf1322' }} suffix="个" />
+            </Card>
+          </Col>
+        </Row>
+      )}
+
+      {activeTab !== 'departure' && activeTab !== 'matched' && receiptsStatistics && (
+        <Row gutter={16} style={{ marginBottom: 16 }}>
+          <Col span={6}>
+            <Card bordered style={{ textAlign: 'center', borderRadius: 8, boxShadow: '0 1px 2px rgba(0,0,0,0.03)', border: '1px solid #f0f0f0' }}>
+              <Statistic title="总票据数" value={receiptsStatistics.total_count} suffix="张" />
+            </Card>
+          </Col>
+          <Col span={6}>
+            <Card bordered style={{ textAlign: 'center', borderRadius: 8, boxShadow: '0 1px 2px rgba(0,0,0,0.03)', border: '1px solid #f0f0f0' }}>
+              <Statistic title="正常票据" value={receiptsStatistics.normal_count} valueStyle={{ color: '#3f8600' }} suffix="张" />
+            </Card>
+          </Col>
+          <Col span={6}>
+            <Card bordered style={{ textAlign: 'center', borderRadius: 8, boxShadow: '0 1px 2px rgba(0,0,0,0.03)', border: '1px solid #f0f0f0' }}>
+              <Statistic title="已交票" value={receiptsStatistics.submitted_count} valueStyle={{ color: '#1890ff' }} suffix="张" />
+            </Card>
+          </Col>
+          <Col span={6}>
+            <Card bordered style={{ textAlign: 'center', borderRadius: 8, boxShadow: '0 1px 2px rgba(0,0,0,0.03)', border: '1px solid #f0f0f0' }}>
+              <Statistic title="未交票" value={receiptsStatistics.not_submitted_count} valueStyle={{ color: '#faad14' }} suffix="张" />
             </Card>
           </Col>
         </Row>
@@ -3489,87 +3503,6 @@ const ReceiptsPage = () => {
                         .message || '数据加载失败'
                     }
                   />
-                )}
-
-                {/* KPI统计卡片 */}
-                {activeTab === 'matched' ? (
-                  matchedStatistics && (
-                    <Row gutter={16}>
-                      <Col span={8}>
-                        <Card>
-                          <Statistic
-                            title="总任务数"
-                            value={matchedStatistics.total_count}
-                            suffix="个"
-                          />
-                        </Card>
-                      </Col>
-                      <Col span={8}>
-                        <Card>
-                          <Statistic
-                            title="正常任务"
-                            value={matchedStatistics.normal_count}
-                            valueStyle={{ color: '#3f8600' }}
-                            suffix="个"
-                          />
-                        </Card>
-                      </Col>
-                      <Col span={8}>
-                        <Card>
-                          <Statistic
-                            title="已删除任务"
-                            value={matchedStatistics.deleted_count}
-                            valueStyle={{ color: '#cf1322' }}
-                            suffix="个"
-                          />
-                        </Card>
-                      </Col>
-                    </Row>
-                  )
-                ) : (
-                  receiptsStatistics && (
-                    <Row gutter={16}>
-                      <Col span={6}>
-                        <Card>
-                          <Statistic
-                            title="总票据数"
-                            value={receiptsStatistics.total_count}
-                            suffix="张"
-                          />
-                        </Card>
-                      </Col>
-                      <Col span={6}>
-                        <Card>
-                          <Statistic
-                            title="正常票据"
-                            value={receiptsStatistics.normal_count}
-                            valueStyle={{ color: '#3f8600' }}
-                            suffix="张"
-                          />
-                        </Card>
-                      </Col>
-                      <Col span={6}>
-                        <Card>
-                          <Statistic
-                            title="已交票"
-                            value={receiptsStatistics.submitted_count}
-                            valueStyle={{ color: '#1890ff' }}
-                            suffix="张"
-                          />
-                        </Card>
-                      </Col>
-                      <Col span={6}>
-                        <Card>
-                          <Statistic
-                            title="未交票"
-                            value={receiptsStatistics.not_submitted_count}
-                            valueStyle={{ color: '#faad14' }}
-                            suffix="张"
-                          />
-                        </Card>
-                      </Col>
-                    </Row>
-                  )
                 )}
 
                 <Table
