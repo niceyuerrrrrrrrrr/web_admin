@@ -32,7 +32,16 @@ export const RECEIPT_TYPES: Array<{ value: ReceiptType; label: string }> = [
  * department_id 可选，按部门筛选
  */
 export const fetchReceipts = (params: ReceiptListParams & { userId?: number; scope?: 'mine' | 'all'; departmentId?: number }) =>
-  unwrap<Receipt[]>(
+  unwrap<{
+    receipts: Receipt[]
+    statistics: {
+      total_count: number
+      deleted_count: number
+      normal_count: number
+      submitted_count: number
+      not_submitted_count: number
+    }
+  }>(
     client.get('/receipts', {
       params: {
         user_id: params.userId,
@@ -287,16 +296,23 @@ export const fetchMatchedReceipts = (params: {
   deletedStatus?: string
   vehicleNo?: string
 }) =>
-  unwrap<Array<{
-    id: number
-    task_id: string
-    status: string
-    loadBill: any
-    unloadBill: any
-    created_at?: string
-    finished_at?: string
-    updated_at?: string
-  }>>(
+  unwrap<{
+    receipts: Array<{
+      id: number
+      task_id: string
+      status: string
+      loadBill: any
+      unloadBill: any
+      created_at?: string
+      finished_at?: string
+      updated_at?: string
+    }>
+    statistics: {
+      total_count: number
+      deleted_count: number
+      normal_count: number
+    }
+  }>(
     client.get('/receipts/matched-receipts', {
       params: {
         user_id: params.userId,

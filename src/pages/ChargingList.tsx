@@ -48,7 +48,16 @@ const ChargingList = () => {
   const [editingReceipt, setEditingReceipt] = useState<Receipt | null>(null)
   const [editForm] = Form.useForm()
 
-  const receiptsQuery = useQuery<Receipt[]>({
+  const receiptsQuery = useQuery<{
+    receipts: Receipt[]
+    statistics: {
+      total_count: number
+      deleted_count: number
+      normal_count: number
+      submitted_count: number
+      not_submitted_count: number
+    }
+  }>({
     queryKey: ['receipts', 'charging', filters, effectiveCompanyId],
     queryFn: () =>
       fetchReceipts({
@@ -61,7 +70,7 @@ const ChargingList = () => {
     enabled: !isSuperAdmin || !!effectiveCompanyId,
   })
 
-  const receipts = receiptsQuery.data || []
+  const receipts = receiptsQuery.data?.receipts || []
 
   const handleExport = useCallback(() => {
     if (!receipts.length) {

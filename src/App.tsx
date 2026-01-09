@@ -86,6 +86,7 @@ import WorkWechatCallback from './pages/WorkWechatCallback'
 import NotFoundPage from './pages/NotFound'
 import AttendanceConfigPage from './pages/AttendanceConfig'
 import DriverSalaryPage from './pages/DriverSalary'
+import StaffSalaryPage from './pages/StaffSalary'
 import './App.css'
 import { fetchSystemConfig } from './api/services/systemConfig'
 
@@ -290,10 +291,17 @@ const routeDefinitions = [
       },
       {
         key: 'salary',
-        label: '工资管理',
+        label: '司机工资',
         path: '/salary',
         icon: <DollarOutlined />,
         element: <DriverSalaryPage />,
+      },
+      {
+        key: 'staff-salary',
+        label: '行政/车队长工资',
+        path: '/staff-salary',
+        icon: <DollarOutlined />,
+        element: <StaffSalaryPage />,
       },
     ]
   },

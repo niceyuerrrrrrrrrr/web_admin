@@ -289,7 +289,16 @@ const ReceiptsPage = () => {
 
   // 获取当前标签页的票据数据
   // 注意：对于非超级管理员，后端会根据当前登录用户自动过滤公司，所以即使不传companyId也可以
-  const receiptsQuery = useQuery<Receipt[]>({
+  const receiptsQuery = useQuery<{
+    receipts: Receipt[]
+    statistics: {
+      total_count: number
+      deleted_count: number
+      normal_count: number
+      submitted_count: number
+      not_submitted_count: number
+    }
+  }>({
     queryKey: ['receipts', activeTab, filters, selectedUserId, selectedDepartmentId, effectiveCompanyId],
     queryFn: () =>
       fetchReceipts({
@@ -308,7 +317,23 @@ const ReceiptsPage = () => {
   })
 
   // 获取已匹配的装卸数据（仅挂车模式）
-  const matchedReceiptsQuery = useQuery({
+  const matchedReceiptsQuery = useQuery<{
+    receipts: Array<{
+      id: number
+      task_id: string
+      status: string
+      loadBill: any
+      unloadBill: any
+      created_at?: string
+      finished_at?: string
+      updated_at?: string
+    }>
+    statistics: {
+      total_count: number
+      deleted_count: number
+      normal_count: number
+    }
+  }>({
     queryKey: ['matched-receipts', filters, selectedUserId, effectiveCompanyId],
     queryFn: () =>
       fetchMatchedReceipts({
@@ -322,8 +347,10 @@ const ReceiptsPage = () => {
     enabled: activeTab === 'matched' && (isSuperAdmin ? !!effectiveCompanyId : true),
   })
 
-  const receipts = receiptsQuery.data || []
-  const matchedReceipts = matchedReceiptsQuery.data || []
+  const receipts = receiptsQuery.data?.receipts || []
+  const matchedReceipts = matchedReceiptsQuery.data?.receipts || []
+  const receiptsStatistics = receiptsQuery.data?.statistics
+  const matchedStatistics = matchedReceiptsQuery.data?.statistics
 
   // 根据方量筛选条件过滤表格数据
   const filteredReceipts = useMemo(() => {
@@ -3462,6 +3489,87 @@ const ReceiptsPage = () => {
                         .message || '数据加载失败'
                     }
                   />
+                )}
+
+                {/* KPI统计卡片 */}
+                {activeTab === 'matched' ? (
+                  matchedStatistics && (
+                    <Row gutter={16}>
+                      <Col span={8}>
+                        <Card>
+                          <Statistic
+                            title="总任务数"
+                            value={matchedStatistics.total_count}
+                            suffix="个"
+                          />
+                        </Card>
+                      </Col>
+                      <Col span={8}>
+                        <Card>
+                          <Statistic
+                            title="正常任务"
+                            value={matchedStatistics.normal_count}
+                            valueStyle={{ color: '#3f8600' }}
+                            suffix="个"
+                          />
+                        </Card>
+                      </Col>
+                      <Col span={8}>
+                        <Card>
+                          <Statistic
+                            title="已删除任务"
+                            value={matchedStatistics.deleted_count}
+                            valueStyle={{ color: '#cf1322' }}
+                            suffix="个"
+                          />
+                        </Card>
+                      </Col>
+                    </Row>
+                  )
+                ) : (
+                  receiptsStatistics && (
+                    <Row gutter={16}>
+                      <Col span={6}>
+                        <Card>
+                          <Statistic
+                            title="总票据数"
+                            value={receiptsStatistics.total_count}
+                            suffix="张"
+                          />
+                        </Card>
+                      </Col>
+                      <Col span={6}>
+                        <Card>
+                          <Statistic
+                            title="正常票据"
+                            value={receiptsStatistics.normal_count}
+                            valueStyle={{ color: '#3f8600' }}
+                            suffix="张"
+                          />
+                        </Card>
+                      </Col>
+                      <Col span={6}>
+                        <Card>
+                          <Statistic
+                            title="已交票"
+                            value={receiptsStatistics.submitted_count}
+                            valueStyle={{ color: '#1890ff' }}
+                            suffix="张"
+                          />
+                        </Card>
+                      </Col>
+                      <Col span={6}>
+                        <Card>
+                          <Statistic
+                            title="未交票"
+                            value={receiptsStatistics.not_submitted_count}
+                            valueStyle={{ color: '#faad14' }}
+                            suffix="张"
+                          />
+                        </Card>
+                      </Col>
+                    </Row>
+                  )
                 )}
 
                 <Table

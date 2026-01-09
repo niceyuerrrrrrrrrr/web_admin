@@ -231,7 +231,16 @@ const ReceiptAnalytics = () => {
     setFilters(prev => ({ ...prev, userId: undefined }))
   }, [filters.departmentId])
 
-  const allReceiptsQuery = useQuery<Receipt[]>({
+  const allReceiptsQuery = useQuery<{
+    receipts: Receipt[]
+    statistics: {
+      total_count: number
+      deleted_count: number
+      normal_count: number
+      submitted_count: number
+      not_submitted_count: number
+    }
+  }>({
     queryKey: ['receipts', 'analytics', filters, effectiveCompanyId],
     queryFn: () =>
       fetchReceipts({
@@ -243,10 +252,10 @@ const ReceiptAnalytics = () => {
         departmentId: filters.departmentId,
         scope: isSuperAdmin ? 'all' : (isDriver ? 'mine' : 'all'),
       }),
-    enabled: !!effectiveCompanyId,
+    enabled: isSuperAdmin ? !!effectiveCompanyId : true,
   })
 
-  const receipts = allReceiptsQuery.data || []
+  const receipts = allReceiptsQuery.data?.receipts || []
 
   // Filter receipts in memory by vehicle
   const filteredReceipts = useMemo(() => {
