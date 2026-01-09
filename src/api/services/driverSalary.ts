@@ -82,6 +82,13 @@ export interface ApiResponse<T> {
   data: T
 }
 
+export interface RealtimeTripCount {
+  user_id: number
+  user_name: string
+  business_type: string
+  trip_count: number
+}
+
 // ==================== 全局配置 API ====================
 
 /**
@@ -91,6 +98,31 @@ export const createOrUpdateGlobalConfig = async (
   config: GlobalConfigCreate,
 ): Promise<ApiResponse<any>> => {
   const response = await client.post('/driver-salary/global-config', config)
+  return response.data
+}
+
+/**
+ * 按选中ID批量发放工资条（并发送订阅消息）
+ */
+export const batchSendSalarySlipByIds = async (params: {
+  summary_ids: number[]
+}): Promise<
+  ApiResponse<{
+    total: number
+    success: number
+    failed: number
+    denied: number
+    notify_sent: number
+    results: Array<{
+      summary_id: number
+      status: 'success' | 'failed'
+      salary_slip_id?: number
+      notify_sent?: boolean
+      reason?: string
+    }>
+  }>
+> => {
+  const response = await client.post('/driver-salary/summary/batch-send-by-ids', params)
   return response.data
 }
 
@@ -166,8 +198,32 @@ export const fetchSalarySummaryList = async (params: {
   period?: string
   status?: string
   user_id?: number
-}): Promise<ApiResponse<SalarySummary[]>> => {
+  company_id?: number
+}): Promise<ApiResponse<{
+  summaries: SalarySummary[]
+  statistics: {
+    total_count: number
+    total_trips: number
+    total_trip_income: number
+    total_bonus: number
+    total_deduction: number
+    total_net_salary: number
+    confirmed_count: number
+  }
+}>> => {
   const response = await client.get('/driver-salary/summary/list', { params })
+  return response.data
+}
+
+/**
+ * 实时获取司机趟数（不依赖工资计算结果）
+ */
+export const fetchRealtimeTrips = async (params: {
+  period: string
+  company_id?: number
+  department_id?: number
+}): Promise<ApiResponse<RealtimeTripCount[]>> => {
+  const response = await client.get('/driver-salary/trips/realtime', { params })
   return response.data
 }
 
@@ -184,6 +240,20 @@ export const confirmSalary = async (
 }
 
 /**
+ * 批量确认工资（仅总经理）
+ */
+export const batchConfirmSalary = async (params: {
+  period: string
+  company_id?: number
+  department_id?: number
+}): Promise<ApiResponse<{ updated: number }>> => {
+  const response = await client.post('/driver-salary/summary/batch-confirm', null, {
+    params,
+  })
+  return response.data
+}
+
+/**
  * 发放工资条
  */
 export const sendSalarySlip = async (
@@ -192,5 +262,33 @@ export const sendSalarySlip = async (
   const response = await client.post(
     `/driver-salary/summary/${summaryId}/send`,
   )
+  return response.data
+}
+
+/**
+ * 批量发放工资条（并发送订阅消息）
+ */
+export const batchSendSalarySlip = async (params: {
+  period: string
+  company_id?: number
+  department_id?: number
+}): Promise<
+  ApiResponse<{
+    total: number
+    success: number
+    failed: number
+    notify_sent: number
+    results: Array<{
+      summary_id: number
+      status: 'success' | 'failed'
+      salary_slip_id?: number
+      notify_sent?: boolean
+      reason?: string
+    }>
+  }>
+> => {
+  const response = await client.post('/driver-salary/summary/batch-send', null, {
+    params,
+  })
   return response.data
 }

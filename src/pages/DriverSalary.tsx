@@ -37,9 +37,13 @@ import {
   fetchDriverConfigList,
   createOrUpdateDriverConfig,
   fetchSalarySummaryList,
+  fetchRealtimeTrips,
   calculateDriverSalary,
   batchCalculateSalary,
+  batchConfirmSalary,
   confirmSalary,
+  batchSendSalarySlip,
+  batchSendSalarySlipByIds,
   sendSalarySlip,
   type GlobalConfig,
   type SalarySummary,
@@ -47,6 +51,7 @@ import {
 import { fetchUsers } from '../api/services/users'
 import { fetchDepartments } from '../api/services/departments'
 import useCompanyStore from '../store/company'
+import useAuthStore from '../store/auth'
 
 const DriverSalaryPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState('salary')
@@ -59,9 +64,20 @@ const DriverSalaryPage: React.FC = () => {
   const [selectedSummary, setSelectedSummary] = useState<SalarySummary | null>(
     null,
   )
+  const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([])
   const [editingConfig, setEditingConfig] = useState<Record<number, any>>({})
   const queryClient = useQueryClient()
   const { selectedCompanyId } = useCompanyStore()
+  const { user: currentUser } = useAuthStore()
+
+  const isGeneralManager =
+    currentUser?.role === 'general_manager' || currentUser?.positionType === '总经理'
+
+  const canSendSalarySlip =
+    currentUser?.role === 'super_admin' ||
+    currentUser?.positionType === '超级管理员' ||
+    isGeneralManager ||
+    currentUser?.positionType === '财务'
 
   // ==================== 全局配置 ====================
 
@@ -69,6 +85,34 @@ const DriverSalaryPage: React.FC = () => {
     queryKey: ['globalConfig', selectedPeriod],
     queryFn: () => fetchGlobalConfig(selectedPeriod),
     enabled: activeTab === 'config',
+  })
+
+  const batchSendByIdsMutation = useMutation({
+    mutationFn: batchSendSalarySlipByIds,
+    onSuccess: (res: any) => {
+      const data = res?.data
+      message.success(
+        `发送选中完成：成功${data?.success ?? 0}，失败${data?.failed ?? 0}，无权限${data?.denied ?? 0}，已推送${data?.notify_sent ?? 0}`,
+      )
+      setSelectedRowKeys([])
+      refetchSummary()
+    },
+    onError: (error: any) => {
+      message.error(error.response?.data?.message || '发送选中失败')
+    },
+  })
+
+  const batchConfirmMutation = useMutation({
+    mutationFn: batchConfirmSalary,
+    onSuccess: (res: any) => {
+      const updated = res?.data?.updated
+      message.success(`批量确认成功${updated !== undefined ? `（${updated}条）` : ''}`)
+      refetchSummary()
+      refetchDriverConfig()
+    },
+    onError: (error: any) => {
+      message.error(error.response?.data?.message || '批量确认失败')
+    },
   })
 
   const saveGlobalConfigMutation = useMutation({
@@ -94,9 +138,24 @@ const DriverSalaryPage: React.FC = () => {
   // ==================== 工资汇总 ====================
 
   const { data: summaryData, refetch: refetchSummary } = useQuery({
-    queryKey: ['salarySummary', selectedPeriod],
-    queryFn: () => fetchSalarySummaryList({ period: selectedPeriod }),
-    enabled: activeTab === 'salary',
+    queryKey: ['salarySummary', selectedPeriod, selectedCompanyId],
+    queryFn: () => fetchSalarySummaryList({ 
+      period: selectedPeriod,
+      company_id: selectedCompanyId 
+    }),
+    enabled: activeTab === 'salary' && !!selectedCompanyId,
+  })
+
+  const { data: realtimeTripsData, refetch: refetchRealtimeTrips } = useQuery({
+    queryKey: ['realtimeTrips', selectedPeriod, selectedCompanyId, selectedDepartmentId],
+    queryFn: () =>
+      fetchRealtimeTrips({
+        period: selectedPeriod,
+        company_id: selectedCompanyId || undefined,
+        department_id: selectedDepartmentId,
+      }),
+    enabled: activeTab === 'salary' && !!selectedCompanyId,
+    refetchInterval: 60 * 1000,
   })
 
   const { data: driverConfigData, refetch: refetchDriverConfig } = useQuery({
@@ -183,6 +242,20 @@ const DriverSalaryPage: React.FC = () => {
     },
   })
 
+  const batchSendMutation = useMutation({
+    mutationFn: batchSendSalarySlip,
+    onSuccess: (res: any) => {
+      const data = res?.data
+      message.success(
+        `批量发放完成：成功${data?.success ?? 0}，失败${data?.failed ?? 0}，已推送${data?.notify_sent ?? 0}`,
+      )
+      refetchSummary()
+    },
+    onError: (error: any) => {
+      message.error(error.response?.data?.message || '批量发放失败')
+    },
+  })
+
   const handleViewDetail = (record: SalarySummary) => {
     setSelectedSummary(record)
     setDetailModalVisible(true)
@@ -227,12 +300,13 @@ const DriverSalaryPage: React.FC = () => {
   }
 
   // 合并汇总数据和配置数据
-  // 后端返回格式: { summaries: [...] } 或 { configs: [...] } 或直接数组
+  // 后端返回格式: { summaries: [...], statistics: {...} } 或 { configs: [...] } 或直接数组
   const rawSummaryData = summaryData?.data as any
   const rawConfigData = driverConfigData?.data as any
   const summaryList: any[] = Array.isArray(rawSummaryData) 
     ? rawSummaryData 
     : (rawSummaryData?.summaries || [])
+  const summaryStatistics = rawSummaryData?.statistics || null
   const configList: any[] = Array.isArray(rawConfigData) 
     ? rawConfigData 
     : (rawConfigData?.configs || [])
@@ -298,6 +372,23 @@ const DriverSalaryPage: React.FC = () => {
         }
       }
     })
+
+  const realtimeTripMap = new Map(
+    (((realtimeTripsData as any)?.data as any[]) || []).map((x: any) => [Number(x.user_id), x]),
+  )
+
+  const mergedDataWithRealtimeTrips = mergedData.map((row: any) => {
+    const rt = realtimeTripMap.get(Number(row.user_id))
+    if (!rt) return row
+
+    // 仅在待确认状态下使用实时趟数，避免“已确认/已发放”的工资记录被实时数据覆盖
+    if (row.status && row.status !== 'pending') return row
+
+    return {
+      ...row,
+      trip_count: rt.trip_count,
+    }
+  })
 
   // ==================== 表格列定义 ====================
 
@@ -547,9 +638,11 @@ const DriverSalaryPage: React.FC = () => {
                 title="确认工资？"
                 onConfirm={() => confirmMutation.mutate(record.id)}
               >
-                <Button type="link" size="small">
-                  确认
-                </Button>
+                {isGeneralManager ? (
+                  <Button type="link" size="small">
+                    确认
+                  </Button>
+                ) : null}
               </Popconfirm>
             </>
           )}
@@ -558,9 +651,11 @@ const DriverSalaryPage: React.FC = () => {
               title="发放工资条？"
               onConfirm={() => sendMutation.mutate(record.id)}
             >
-              <Button type="link" size="small">
-                发放
-              </Button>
+              {canSendSalarySlip ? (
+                <Button type="link" size="small">
+                  发放
+                </Button>
+              ) : null}
             </Popconfirm>
           )}
         </Space>
@@ -623,6 +718,7 @@ const DriverSalaryPage: React.FC = () => {
                 if (activeTab === 'salary') {
                   refetchSummary()
                   refetchDriverConfig()
+                  refetchRealtimeTrips()
                 }
               }}
             >
@@ -643,46 +739,46 @@ const DriverSalaryPage: React.FC = () => {
             key="salary"
           >
             {/* 统计卡片 */}
-            <Row gutter={16} style={{ marginBottom: 24 }}>
-              <Col span={6}>
-                <Card>
-                  <Statistic
-                    title="总人数"
-                    value={mergedData.length}
-                    prefix={<DollarOutlined />}
-                  />
-                </Card>
-              </Col>
-              <Col span={6}>
-                <Card>
-                  <Statistic
-                    title="工资总额"
-                    value={totalSalary}
-                    precision={2}
-                    prefix="¥"
-                    valueStyle={{ color: '#3f8600' }}
-                  />
-                </Card>
-              </Col>
-              <Col span={6}>
-                <Card>
-                  <Statistic
-                    title="已确认"
-                    value={confirmedCount}
-                    suffix={`/ ${summaryList.length}`}
-                  />
-                </Card>
-              </Col>
-              <Col span={6}>
-                <Card>
-                  <Statistic
-                    title="已发放"
-                    value={sentCount}
-                    suffix={`/ ${summaryList.length}`}
-                  />
-                </Card>
-              </Col>
-            </Row>
+            {summaryStatistics && (
+              <Row gutter={16} style={{ marginBottom: 24 }}>
+                <Col span={6}>
+                  <Card>
+                    <Statistic
+                      title="总人数"
+                      value={summaryStatistics.total_count}
+                      prefix={<DollarOutlined />}
+                    />
+                  </Card>
+                </Col>
+                <Col span={6}>
+                  <Card>
+                    <Statistic
+                      title="实发工资总额"
+                      value={summaryStatistics.total_net_salary}
+                      precision={2}
+                      prefix="¥"
+                      valueStyle={{ color: '#3f8600' }}
+                    />
+                  </Card>
+                </Col>
+                <Col span={6}>
+                  <Card>
+                    <Statistic
+                      title="总趟数"
+                      value={summaryStatistics.total_trips}
+                    />
+                  </Card>
+                </Col>
+                <Col span={6}>
+                  <Card>
+                    <Statistic
+                      title="已确认"
+                      value={`${summaryStatistics.confirmed_count} / ${summaryStatistics.total_count}`}
+                    />
+                  </Card>
+                </Col>
+              </Row>
+            )}
 
             <div style={{ marginBottom: 16 }}>
               <Space>
@@ -694,6 +790,61 @@ const DriverSalaryPage: React.FC = () => {
                 >
                   批量计算工资
                 </Button>
+                {isGeneralManager ? (
+                  <Popconfirm
+                    title="确认后该周期工资将锁定为已确认，是否继续？"
+                    onConfirm={() =>
+                      batchConfirmMutation.mutate({
+                        period: selectedPeriod,
+                        company_id: selectedCompanyId || undefined,
+                        department_id: selectedDepartmentId,
+                      })
+                    }
+                  >
+                    <Button
+                      danger
+                      loading={batchConfirmMutation.isPending}
+                    >
+                      一键确认
+                    </Button>
+                  </Popconfirm>
+                ) : null}
+                {canSendSalarySlip ? (
+                  <Popconfirm
+                    title="将对该周期所有已确认记录发放工资条，并推送订阅消息，是否继续？"
+                    onConfirm={() =>
+                      batchSendMutation.mutate({
+                        period: selectedPeriod,
+                        company_id: selectedCompanyId || undefined,
+                        department_id: selectedDepartmentId,
+                      })
+                    }
+                  >
+                    <Button
+                      loading={batchSendMutation.isPending}
+                    >
+                      一键发送工资条
+                    </Button>
+                  </Popconfirm>
+                ) : null}
+                {canSendSalarySlip ? (
+                  <Popconfirm
+                    title={`将发放选中的${selectedRowKeys.length}条记录，并推送订阅消息，是否继续？`}
+                    onConfirm={() =>
+                      batchSendByIdsMutation.mutate({
+                        summary_ids: selectedRowKeys.map((k) => Number(k)),
+                      })
+                    }
+                    disabled={selectedRowKeys.length === 0}
+                  >
+                    <Button
+                      disabled={selectedRowKeys.length === 0}
+                      loading={batchSendByIdsMutation.isPending}
+                    >
+                      发送选中
+                    </Button>
+                  </Popconfirm>
+                ) : null}
                 <span style={{ color: '#999', fontSize: 12 }}>
                   提示：勾选奖励项、填写扣款后，点击"保存"按钮，然后点击"重算"更新工资
                 </span>
@@ -701,10 +852,62 @@ const DriverSalaryPage: React.FC = () => {
             </div>
             <Table
               columns={salaryColumns}
-              dataSource={mergedData}
+              dataSource={mergedDataWithRealtimeTrips}
               rowKey="id"
               scroll={{ x: 1800 }}
+              rowSelection={
+                canSendSalarySlip
+                  ? {
+                      selectedRowKeys,
+                      onChange: (keys) => setSelectedRowKeys(keys),
+                      getCheckboxProps: (record: SalarySummary) => ({
+                        disabled: record.status !== 'confirmed',
+                      }),
+                    }
+                  : undefined
+              }
               pagination={false}
+              summary={() => {
+                if (!summaryStatistics) return null
+                return (
+                  <Table.Summary fixed>
+                    <Table.Summary.Row style={{ backgroundColor: '#fafafa' }}>
+                      <Table.Summary.Cell index={0} colSpan={3}>
+                        <strong>总计</strong>
+                      </Table.Summary.Cell>
+                      <Table.Summary.Cell index={3}>
+                        <strong style={{ color: '#1890ff' }}>
+                          {summaryStatistics.total_trips}
+                        </strong>
+                      </Table.Summary.Cell>
+                      <Table.Summary.Cell index={4} />
+                      <Table.Summary.Cell index={5}>
+                        <strong style={{ color: '#1890ff' }}>
+                          ¥{summaryStatistics.total_trip_income.toFixed(2)}
+                        </strong>
+                      </Table.Summary.Cell>
+                      <Table.Summary.Cell index={6} colSpan={4} />
+                      <Table.Summary.Cell index={10}>
+                        <strong style={{ color: '#1890ff' }}>
+                          ¥{summaryStatistics.total_bonus.toFixed(2)}
+                        </strong>
+                      </Table.Summary.Cell>
+                      <Table.Summary.Cell index={11}>
+                        <strong style={{ color: '#ff4d4f' }}>
+                          ¥{summaryStatistics.total_deduction.toFixed(2)}
+                        </strong>
+                      </Table.Summary.Cell>
+                      <Table.Summary.Cell index={12} colSpan={2} />
+                      <Table.Summary.Cell index={14}>
+                        <strong style={{ color: '#1890ff', fontSize: 16 }}>
+                          ¥{summaryStatistics.total_net_salary.toFixed(2)}
+                        </strong>
+                      </Table.Summary.Cell>
+                      <Table.Summary.Cell index={15} colSpan={3} />
+                    </Table.Summary.Row>
+                  </Table.Summary>
+                )
+              }}
             />
           </Tabs.TabPane>
 
