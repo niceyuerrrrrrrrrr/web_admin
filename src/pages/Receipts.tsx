@@ -1966,7 +1966,7 @@ const ReceiptsPage = () => {
         },
       },
     ],
-    [isSuperAdmin, user],
+    [matchedReceipts, isSuperAdmin, user],
   )
 
   // 出厂单列定义（罐车业务）
@@ -2796,23 +2796,61 @@ const ReceiptsPage = () => {
           }
         } else if (receipt.type === 'water') {
           const r = receipt as Receipt & {
+            f_water_ticket_id?: string
+            driver_name?: string
             company?: string
             company_name?: string
             vehicle_no?: string
+            tanker_vehicle_code?: string
             ticket_date?: string
+            image_path?: string
+            thumb_url?: string
+            submitted_to_finance?: string
+            submitted_at?: string
           }
           return {
             ...base,
+            业务单号: r.f_water_ticket_id || '',
+            司机: r.driver_name || '',
             公司: r.company || r.company_name || '',
             车牌号: r.vehicle_no || '',
+            自编车号: r.tanker_vehicle_code || '',
             日期: r.ticket_date ? dayjs(r.ticket_date).format('YYYY-MM-DD') : '',
+            图片路径: r.image_path || r.thumb_url || '',
+            交票状态: r.submitted_to_finance === 'Y' ? '已交票' : '未交票',
+            交票时间: r.submitted_at ? dayjs(r.submitted_at).format('YYYY-MM-DD HH:mm:ss') : '',
           }
         }
         return base
       })
 
       // 创建工作簿
-      const ws = XLSX.utils.json_to_sheet(exportData)
+      const header = (() => {
+        if (activeTab === 'water') {
+          return [
+            '类型',
+            'ID',
+            '创建时间',
+            '业务单号',
+            '司机',
+            '公司',
+            '车牌号',
+            '自编车号',
+            '日期',
+            '交票状态',
+            '交票时间',
+            '图片路径',
+          ]
+        }
+
+        const set = new Set<string>()
+        exportData.forEach((row) => {
+          Object.keys(row).forEach((k) => set.add(k))
+        })
+        return Array.from(set)
+      })()
+
+      const ws = XLSX.utils.json_to_sheet(exportData, { header })
       const wb = XLSX.utils.book_new()
       XLSX.utils.book_append_sheet(wb, ws, '票据数据')
 
@@ -2950,22 +2988,60 @@ const ReceiptsPage = () => {
           }
         } else if (receipt.type === 'water') {
           const r = receipt as Receipt & {
+            f_water_ticket_id?: string
+            driver_name?: string
             company?: string
             company_name?: string
             vehicle_no?: string
+            tanker_vehicle_code?: string
             ticket_date?: string
+            image_path?: string
+            thumb_url?: string
+            submitted_to_finance?: string
+            submitted_at?: string
           }
           return {
             ...base,
+            业务单号: r.f_water_ticket_id || '',
+            司机: r.driver_name || '',
             公司: r.company || r.company_name || '',
             车牌号: r.vehicle_no || '',
+            自编车号: r.tanker_vehicle_code || '',
             日期: r.ticket_date ? dayjs(r.ticket_date).format('YYYY-MM-DD') : '',
+            图片路径: r.image_path || r.thumb_url || '',
+            交票状态: r.submitted_to_finance === 'Y' ? '已交票' : '未交票',
+            交票时间: r.submitted_at ? dayjs(r.submitted_at).format('YYYY-MM-DD HH:mm:ss') : '',
           }
         }
         return base
       })
 
-      const ws = XLSX.utils.json_to_sheet(exportData)
+      const header = (() => {
+        if (activeTab === 'water') {
+          return [
+            '类型',
+            'ID',
+            '创建时间',
+            '业务单号',
+            '司机',
+            '公司',
+            '车牌号',
+            '自编车号',
+            '日期',
+            '交票状态',
+            '交票时间',
+            '图片路径',
+          ]
+        }
+
+        const set = new Set<string>()
+        exportData.forEach((row) => {
+          Object.keys(row).forEach((k) => set.add(k))
+        })
+        return Array.from(set)
+      })()
+
+      const ws = XLSX.utils.json_to_sheet(exportData, { header })
       const wb = XLSX.utils.book_new()
       XLSX.utils.book_append_sheet(wb, ws, '票据数据')
 
