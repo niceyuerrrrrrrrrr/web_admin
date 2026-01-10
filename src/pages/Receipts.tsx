@@ -1188,6 +1188,15 @@ const ReceiptsPage = () => {
         title: '交票状态',
         dataIndex: 'submitted_to_finance',
         width: 120,
+        filters: [
+          { text: '已交票', value: 'Y' },
+          { text: '未交票', value: 'N' },
+        ],
+        onFilter: (value: any, record: Receipt) => {
+          if (value === 'Y') return record.submitted_to_finance === 'Y'
+          if (value === 'N') return record.submitted_to_finance !== 'Y'
+          return true
+        },
         render: (submitted: string, record: Receipt) => {
           if (submitted === 'Y') {
             return (
@@ -1204,6 +1213,17 @@ const ReceiptsPage = () => {
           }
           return <Tag color="default">未交票</Tag>
         },
+      },
+      {
+        title: '交票时间',
+        dataIndex: 'submitted_at',
+        width: 150,
+        sorter: (a: any, b: any) => {
+          const aTime = a.submitted_at || ''
+          const bTime = b.submitted_at || ''
+          return aTime.localeCompare(bTime)
+        },
+        render: (value: string) => (value ? dayjs(value).format('YYYY-MM-DD HH:mm:ss') : '-'),
       },
       {
         title: '装料单图片',
@@ -1381,6 +1401,15 @@ const ReceiptsPage = () => {
         title: '交票状态',
         dataIndex: 'submitted_to_finance',
         width: 120,
+        filters: [
+          { text: '已交票', value: 'Y' },
+          { text: '未交票', value: 'N' },
+        ],
+        onFilter: (value: any, record: Receipt) => {
+          if (value === 'Y') return record.submitted_to_finance === 'Y'
+          if (value === 'N') return record.submitted_to_finance !== 'Y'
+          return true
+        },
         render: (submitted: string, record: Receipt) => {
           if (submitted === 'Y') {
             return (
@@ -1397,6 +1426,17 @@ const ReceiptsPage = () => {
           }
           return <Tag color="default">未交票</Tag>
         },
+      },
+      {
+        title: '交票时间',
+        dataIndex: 'submitted_at',
+        width: 150,
+        sorter: (a: any, b: any) => {
+          const aTime = a.submitted_at || ''
+          const bTime = b.submitted_at || ''
+          return aTime.localeCompare(bTime)
+        },
+        render: (value: string) => (value ? dayjs(value).format('YYYY-MM-DD HH:mm:ss') : '-'),
       },
       {
         title: '卸货单图片',
@@ -1694,6 +1734,15 @@ const ReceiptsPage = () => {
         title: '交票状态',
         dataIndex: 'submitted_to_finance',
         width: 120,
+        filters: [
+          { text: '已交票', value: 'Y' },
+          { text: '未交票', value: 'N' },
+        ],
+        onFilter: (value: any, record: Receipt) => {
+          if (value === 'Y') return record.submitted_to_finance === 'Y'
+          if (value === 'N') return record.submitted_to_finance !== 'Y'
+          return true
+        },
         render: (submitted: string, record: Receipt) => {
           if (submitted === 'Y') {
             return (
@@ -1710,6 +1759,17 @@ const ReceiptsPage = () => {
           }
           return <Tag color="default">未交票</Tag>
         },
+      },
+      {
+        title: '交票时间',
+        dataIndex: 'submitted_at',
+        width: 150,
+        sorter: (a: any, b: any) => {
+          const aTime = a.submitted_at || ''
+          const bTime = b.submitted_at || ''
+          return aTime.localeCompare(bTime)
+        },
+        render: (value: string) => (value ? dayjs(value).format('YYYY-MM-DD HH:mm:ss') : '-'),
       },
       {
         title: '水票图片',
@@ -2291,6 +2351,15 @@ const ReceiptsPage = () => {
         title: '交票状态',
         dataIndex: 'submitted_to_finance',
         width: 120,
+        filters: [
+          { text: '已交票', value: 'Y' },
+          { text: '未交票', value: 'N' },
+        ],
+        onFilter: (value: any, record: Receipt) => {
+          if (value === 'Y') return record.submitted_to_finance === 'Y'
+          if (value === 'N') return record.submitted_to_finance !== 'Y'
+          return true
+        },
         render: (submitted: string, record: Receipt) => {
           if (submitted === 'Y') {
             return (
@@ -2307,6 +2376,17 @@ const ReceiptsPage = () => {
           }
           return <Tag color="default">未交票</Tag>
         },
+      },
+      {
+        title: '交票时间',
+        dataIndex: 'submitted_at',
+        width: 150,
+        sorter: (a: any, b: any) => {
+          const aTime = a.submitted_at || ''
+          const bTime = b.submitted_at || ''
+          return aTime.localeCompare(bTime)
+        },
+        render: (value: string) => (value ? dayjs(value).format('YYYY-MM-DD HH:mm:ss') : '-'),
       },
       {
         title: '出厂单图片',
