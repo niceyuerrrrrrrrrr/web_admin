@@ -929,6 +929,7 @@ const ReceiptsPage = () => {
         company?: string
         driver_name?: string
         vehicle_no?: string
+        user_plate?: string
         material_name?: string
         material_spec?: string
         gross_weight?: number
@@ -937,10 +938,12 @@ const ReceiptsPage = () => {
         loading_time?: string
         unloading_time?: string
       }
+      // 挂车业务优先使用 user_plate，如果没有则使用 vehicle_no
+      const plateValue = businessType === '挂车' ? (r.user_plate || r.vehicle_no) : r.vehicle_no
       editForm.setFieldsValue({
         company: r.company,
         driver_name: r.driver_name,
-        vehicle_no: r.vehicle_no,
+        vehicle_no: plateValue,
         material_name: r.material_name,
         material_spec: r.material_spec,
         gross_weight: r.gross_weight,
@@ -954,6 +957,7 @@ const ReceiptsPage = () => {
         company?: string
         driver_name?: string
         vehicle_no?: string
+        user_plate?: string
         material_name?: string
         material_spec?: string
         gross_weight?: number
@@ -962,10 +966,12 @@ const ReceiptsPage = () => {
         loading_time?: string
         unloading_time?: string
       }
+      // 挂车业务优先使用 user_plate，如果没有则使用 vehicle_no
+      const plateValue = businessType === '挂车' ? (r.user_plate || r.vehicle_no) : r.vehicle_no
       editForm.setFieldsValue({
         company: r.company,
         driver_name: r.driver_name,
-        vehicle_no: r.vehicle_no,
+        vehicle_no: plateValue,
         material_name: r.material_name,
         material_spec: r.material_spec,
         gross_weight: r.gross_weight,
