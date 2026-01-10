@@ -4244,29 +4244,76 @@ const ReceiptsPage = () => {
 
             {cleanField && (
               <>
-                <Form.Item label="选择要替换的旧值（可多选）" required>
-                  <Select
-                    mode="multiple"
-                    value={selectedOldValues}
-                    onChange={setSelectedOldValues}
-                    placeholder="请选择要替换的值"
-                    style={{ width: '100%' }}
-                    options={Array.from(
-                      new Set(
-                        filteredReceipts
-                          .map((r: any) => r[cleanField])
-                          .filter(Boolean)
+                <Form.Item 
+                  label={
+                    <Space>
+                      <span>选择要替换的旧值（可多选）</span>
+                    </Space>
+                  } 
+                  required
+                >
+                  <Space direction="vertical" style={{ width: '100%' }}>
+                    <Select
+                      mode="multiple"
+                      value={selectedOldValues}
+                      onChange={setSelectedOldValues}
+                      placeholder="请选择要替换的值（支持模糊搜索）"
+                      style={{ width: '100%' }}
+                      options={Array.from(
+                        new Set(
+                          filteredReceipts
+                            .map((r: any) => r[cleanField])
+                            .filter(Boolean)
+                        )
                       )
-                    )
-                      .sort((a, b) => String(a).localeCompare(String(b), 'zh-CN'))
-                      .map((value) => ({
-                        label: `${value} (${filteredReceipts.filter((r: any) => r[cleanField] === value).length} 条)`,
-                        value: String(value),
-                      }))}
-                    filterOption={(input, option) =>
-                      (option?.label as string).toLowerCase().includes(input.toLowerCase())
-                    }
-                  />
+                        .sort((a, b) => String(a).localeCompare(String(b), 'zh-CN'))
+                        .map((value) => ({
+                          label: `${value} (${filteredReceipts.filter((r: any) => r[cleanField] === value).length} 条)`,
+                          value: String(value),
+                        }))}
+                      filterOption={(input, option) =>
+                        (option?.label as string).toLowerCase().includes(input.toLowerCase())
+                      }
+                      dropdownRender={(menu) => (
+                        <>
+                          <div style={{ padding: '8px', borderBottom: '1px solid #f0f0f0' }}>
+                            <Button
+                              type="link"
+                              size="small"
+                              onClick={() => {
+                                // 获取当前搜索框的值
+                                const searchInput = document.querySelector('.ant-select-selection-search-input') as HTMLInputElement
+                                const searchValue = searchInput?.value?.toLowerCase() || ''
+                                
+                                // 获取所有可选项
+                                const allOptions = Array.from(
+                                  new Set(
+                                    filteredReceipts
+                                      .map((r: any) => r[cleanField])
+                                      .filter(Boolean)
+                                  )
+                                )
+                                
+                                // 如果有搜索值，筛选匹配的选项；否则选择全部
+                                const filteredOptions = searchValue
+                                  ? allOptions.filter(value => 
+                                      String(value).toLowerCase().includes(searchValue)
+                                    )
+                                  : allOptions
+                                
+                                // 全选当前筛选结果
+                                setSelectedOldValues(filteredOptions.map(v => String(v)))
+                                message.success(`已选择 ${filteredOptions.length} 个值`)
+                              }}
+                            >
+                              全选当前搜索结果
+                            </Button>
+                          </div>
+                          {menu}
+                        </>
+                      )}
+                    />
+                  </Space>
                 </Form.Item>
 
                 <Form.Item label="输入或选择正确的新值" required>
