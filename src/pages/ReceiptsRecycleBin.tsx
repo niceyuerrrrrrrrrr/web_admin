@@ -34,6 +34,8 @@ import client from '../api/client'
 const { Title, Paragraph } = Typography
 const { RangePicker } = DatePicker
 
+type RecycleBinTabType = ReceiptType | 'matched'
+
 // 获取已删除的票据
 const fetchDeletedReceipts = async (params: {
   receiptType?: ReceiptType
@@ -65,6 +67,28 @@ const fetchDeletedReceipts = async (params: {
         ? raw.items
         : []
   return list as Receipt[]
+}
+
+// 获取已删除的装卸匹配
+const fetchDeletedMatchedReceipts = async (params: {
+  startDate?: string
+  endDate?: string
+  companyId?: number
+  departmentId?: number
+}) => {
+  const response = await client.get('/receipts/matched-receipts', {
+    params: {
+      start_date: params.startDate,
+      end_date: params.endDate,
+      company_id: params.companyId,
+      department_id: params.departmentId,
+      deleted_status: 'deleted', // 只获取已删除的
+    },
+  })
+  if (!response.data.success) {
+    throw new Error(response.data.message || '获取失败')
+  }
+  return response.data.data?.receipts || []
 }
 
 // 恢复票据
@@ -101,6 +125,24 @@ const permanentlyDeleteReceipt = async (type: ReceiptType, id: number) => {
   return response.data
 }
 
+// 恢复装卸匹配
+const restoreMatchedReceipt = async (taskId: string) => {
+  const response = await client.post(`/transport-match/${taskId}/restore`)
+  if (!response.data.success) {
+    throw new Error(response.data.message || '恢复失败')
+  }
+  return response.data
+}
+
+// 永久删除装卸匹配
+const permanentlyDeleteMatchedReceipt = async (taskId: string) => {
+  const response = await client.delete(`/transport-match/${taskId}`)
+  if (!response.data.success) {
+    throw new Error(response.data.message || '删除失败')
+  }
+  return response.data
+}
+
 export default function ReceiptsRecycleBin() {
   const { user } = useAuthStore()
   const { selectedCompanyId } = useCompanyStore()
@@ -110,7 +152,7 @@ export default function ReceiptsRecycleBin() {
   const effectiveCompanyId = isSuperAdmin ? selectedCompanyId : user?.companyId
   const showCompanyWarning = isSuperAdmin && !effectiveCompanyId
 
-  const [activeTab, setActiveTab] = useState<ReceiptType>('loading')
+  const [activeTab, setActiveTab] = useState<RecycleBinTabType>('loading')
   const [filters, setFilters] = useState<{
     startDate?: string
     endDate?: string
@@ -179,31 +221,40 @@ export default function ReceiptsRecycleBin() {
 
   // 根据业务类型获取应显示的tabs
   const getVisibleTabs = () => {
-    const allTabs = RECEIPT_TYPES
+    const allTabs = [...RECEIPT_TYPES, { label: '装卸匹配', value: 'matched' }]
     if (!companyBusinessType) return allTabs
     
     if (companyBusinessType === 'truck') {
-      // 挂车：只显示装料单、卸货单、充电单
-      return allTabs.filter((t) => ['loading', 'unloading', 'charging'].includes(t.value))
+      // 挂车：显示装料单、卸货单、充电单、装卸匹配
+      return allTabs.filter((t) => ['loading', 'unloading', 'charging', 'matched'].includes(t.value))
     } else if (companyBusinessType === 'tanker') {
-      // 罐车：只显示出厂单、充电单、水票
+      // 罐车：只显示出厂单、充电单、水票（罐车没有装卸匹配）
       return allTabs.filter((t) => ['departure', 'charging', 'water'].includes(t.value))
     }
     return allTabs
   }
 
   // 获取已删除的票据数据
-  const receiptsQuery = useQuery<Receipt[]>({
+  const receiptsQuery = useQuery<any[]>({
     queryKey: ['deleted-receipts', activeTab, filters, effectiveCompanyId],
-    queryFn: () =>
-      fetchDeletedReceipts({
-        receiptType: activeTab,
+    queryFn: () => {
+      if (activeTab === 'matched') {
+        return fetchDeletedMatchedReceipts({
+          startDate: filters.startDate,
+          endDate: filters.endDate,
+          companyId: effectiveCompanyId,
+          departmentId: filters.departmentId,
+        })
+      }
+      return fetchDeletedReceipts({
+        receiptType: activeTab as ReceiptType,
         startDate: filters.startDate,
         endDate: filters.endDate,
         companyId: effectiveCompanyId,
         departmentId: filters.departmentId,
         userId: filters.userId,
-      }),
+      })
+    },
     enabled: isSuperAdmin ? !!effectiveCompanyId : true,
   })
 
@@ -211,11 +262,17 @@ export default function ReceiptsRecycleBin() {
 
   // 恢复票据
   const restoreMutation = useMutation({
-    mutationFn: ({ type, id }: { type: ReceiptType; id: number }) => restoreReceipt(type, id),
+    mutationFn: ({ type, id, taskId }: { type: RecycleBinTabType; id?: number; taskId?: string }) => {
+      if (type === 'matched' && taskId) {
+        return restoreMatchedReceipt(taskId)
+      }
+      return restoreReceipt(type as ReceiptType, id!)
+    },
     onSuccess: () => {
       message.success('恢复成功')
       queryClient.invalidateQueries({ queryKey: ['deleted-receipts'] })
       queryClient.invalidateQueries({ queryKey: ['receipts'] })
+      queryClient.invalidateQueries({ queryKey: ['matched-receipts'] })
       setSelectedRowKeys([])
     },
     onError: (error) => {
@@ -225,8 +282,12 @@ export default function ReceiptsRecycleBin() {
 
   // 永久删除票据
   const permanentDeleteMutation = useMutation({
-    mutationFn: ({ type, id }: { type: ReceiptType; id: number }) =>
-      permanentlyDeleteReceipt(type, id),
+    mutationFn: ({ type, id, taskId }: { type: RecycleBinTabType; id?: number; taskId?: string }) => {
+      if (type === 'matched' && taskId) {
+        return permanentlyDeleteMatchedReceipt(taskId)
+      }
+      return permanentlyDeleteReceipt(type as ReceiptType, id!)
+    },
     onSuccess: () => {
       message.success('永久删除成功')
       queryClient.invalidateQueries({ queryKey: ['deleted-receipts'] })
@@ -256,18 +317,25 @@ export default function ReceiptsRecycleBin() {
 
   // 单个恢复
   const handleRestore = useCallback(
-    (receipt: Receipt) => {
+    (record: any) => {
+      const isMatched = activeTab === 'matched'
+      const label = isMatched ? '装卸匹配' : RECEIPT_TYPES.find((t) => t.value === record.type)?.label || '票据'
+      
       modal.confirm({
         title: '确认恢复',
-        content: `确定要恢复该${RECEIPT_TYPES.find((t) => t.value === receipt.type)?.label || '票据'}吗？`,
+        content: `确定要恢复该${label}吗？${isMatched ? '同时会恢复关联的装料单和卸货单。' : ''}`,
         okText: '确认',
         cancelText: '取消',
         onOk: async () => {
-          await restoreMutation.mutateAsync({ type: receipt.type, id: receipt.id })
+          if (isMatched) {
+            await restoreMutation.mutateAsync({ type: 'matched', taskId: record.task_id })
+          } else {
+            await restoreMutation.mutateAsync({ type: record.type, id: record.id })
+          }
         },
       })
     },
-    [modal, restoreMutation]
+    [modal, restoreMutation, activeTab]
   )
 
   // 批量恢复
@@ -303,14 +371,17 @@ export default function ReceiptsRecycleBin() {
 
   // 永久删除
   const handlePermanentDelete = useCallback(
-    (receipt: Receipt) => {
+    (record: any) => {
+      const isMatched = activeTab === 'matched'
+      const label = isMatched ? '装卸匹配' : RECEIPT_TYPES.find((t) => t.value === record.type)?.label || '票据'
+      
       modal.confirm({
         title: '确认永久删除',
         content: (
           <div>
             <p>
-              确定要永久删除该{RECEIPT_TYPES.find((t) => t.value === receipt.type)?.label || '票据'}
-              吗？
+              确定要永久删除该{label}吗？
+              {isMatched && '同时会永久删除关联的装料单和卸货单。'}
             </p>
             <p style={{ color: 'red' }}>此操作不可恢复！</p>
           </div>
@@ -319,15 +390,93 @@ export default function ReceiptsRecycleBin() {
         okButtonProps: { danger: true },
         cancelText: '取消',
         onOk: async () => {
-          await permanentDeleteMutation.mutateAsync({ type: receipt.type, id: receipt.id })
+          if (isMatched) {
+            await permanentDeleteMutation.mutateAsync({ type: 'matched', taskId: record.task_id })
+          } else {
+            await permanentDeleteMutation.mutateAsync({ type: record.type, id: record.id })
+          }
         },
       })
     },
-    [modal, permanentDeleteMutation]
+    [modal, permanentDeleteMutation, activeTab]
   )
 
   // 表格列定义
-  const getColumns = (type: ReceiptType): ColumnsType<Receipt> => {
+  const getColumns = (type: RecycleBinTabType): ColumnsType<any> => {
+    // 装卸匹配的列定义
+    if (type === 'matched') {
+      return [
+        {
+          title: '任务ID',
+          dataIndex: 'task_id',
+          key: 'task_id',
+          width: 180,
+        },
+        {
+          title: '装料单',
+          key: 'loading',
+          width: 200,
+          render: (_, record: any) => {
+            const load = record.loadBill
+            return load ? `${load.driver_name || '-'} / ${load.vehicle_no || '-'}` : '-'
+          },
+        },
+        {
+          title: '卸货单',
+          key: 'unloading',
+          width: 200,
+          render: (_, record: any) => {
+            const unload = record.unloadBill
+            return unload ? `${unload.driver_name || '-'} / ${unload.vehicle_no || '-'}` : '-'
+          },
+        },
+        {
+          title: '删除时间',
+          dataIndex: 'deleted_at',
+          key: 'deleted_at',
+          width: 180,
+          render: (val: string) => (val ? dayjs(val).format('YYYY-MM-DD HH:mm') : '-'),
+        },
+        {
+          title: '删除人',
+          dataIndex: 'deleted_by_name',
+          key: 'deleted_by_name',
+          width: 100,
+          render: (val: string) => val || '-',
+        },
+        {
+          title: '操作',
+          key: 'action',
+          width: 180,
+          fixed: 'right' as const,
+          render: (_: any, record: any) => (
+            <Space>
+              <Button
+                type="link"
+                size="small"
+                icon={<RollbackOutlined />}
+                onClick={() => handleRestore(record)}
+                loading={restoreMutation.isPending}
+              >
+                恢复
+              </Button>
+              <Button
+                type="link"
+                size="small"
+                danger
+                icon={<DeleteOutlined />}
+                onClick={() => handlePermanentDelete(record)}
+                loading={permanentDeleteMutation.isPending}
+              >
+                永久删除
+              </Button>
+            </Space>
+          ),
+        },
+      ]
+    }
+
+    // 普通票据的列定义
     const baseColumns: ColumnsType<Receipt> = [
       {
         title: 'ID',
@@ -633,7 +782,11 @@ export default function ReceiptsRecycleBin() {
                 )}
 
                 <Table
-                  rowKey={(record: any) => `${record.type}-${record.id}`}
+                  rowKey={(record: any) => 
+                    activeTab === 'matched' 
+                      ? `matched-${record.task_id}` 
+                      : `${record.type}-${record.id}`
+                  }
                   columns={getColumns(activeTab)}
                   dataSource={receipts as any}
                   loading={receiptsQuery.isLoading}
