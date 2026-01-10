@@ -2214,24 +2214,44 @@ const ReceiptsPage = () => {
         title: '进厂时间',
         dataIndex: 'loading_time',
         width: 150,
+        sorter: (a: any, b: any) => {
+          const aTime = a.loading_time || ''
+          const bTime = b.loading_time || ''
+          return aTime.localeCompare(bTime)
+        },
         render: (value: string) => (value ? dayjs(value).format('YYYY-MM-DD HH:mm:ss') : '-'),
       },
       {
         title: '出厂时间',
         dataIndex: 'exit_time',
         width: 150,
+        sorter: (a: any, b: any) => {
+          const aTime = a.exit_time || ''
+          const bTime = b.exit_time || ''
+          return aTime.localeCompare(bTime)
+        },
         render: (value: string) => (value ? dayjs(value).format('YYYY-MM-DD HH:mm:ss') : '-'),
       },
       {
         title: '生产日期',
         dataIndex: 'production_date',
         width: 120,
+        sorter: (a: any, b: any) => {
+          const aTime = a.production_date || ''
+          const bTime = b.production_date || ''
+          return aTime.localeCompare(bTime)
+        },
         render: (value: string) => (value ? dayjs(value).format('YYYY-MM-DD') : '-'),
       },
       {
         title: '创建时间',
         dataIndex: 'created_at',
         width: 150,
+        sorter: (a: any, b: any) => {
+          const aTime = a.created_at || ''
+          const bTime = b.created_at || ''
+          return aTime.localeCompare(bTime)
+        },
         render: (value: string) => (value ? dayjs(value).format('YYYY-MM-DD HH:mm:ss') : '-'),
       },
       {
