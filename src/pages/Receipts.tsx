@@ -374,43 +374,104 @@ const ReceiptsPage = () => {
     })
   }, [receipts, activeTab, filters.volumeFilter])
 
-  // 计算当前表格显示数据的KPI统计（仅针对出厂单）
+  // 计算当前表格显示数据的KPI统计
   const kpiStats = useMemo(() => {
-    // 只对出厂单进行统计
-    if (activeTab !== 'departure') {
-      return null
+    if (activeTab === 'matched') {
+      return null // 装卸匹配使用单独的统计
     }
 
-    // 使用filteredReceipts，确保KPI统计和表格数据一致
-    const departureReceipts = filteredReceipts.filter((r: any) => r.type === 'departure')
-    
-    let totalVolume = 0 // 总方量
-    let totalCount = departureReceipts.length // 总单据数量
-    let smallVolumeCount = 0 // 小方量单据数量（<9.1）
-    let submittedCount = 0 // 已交票数量
+    const currentReceipts = filteredReceipts.filter((r: any) => r.type === activeTab)
+    const totalCount = currentReceipts.length
+    let submittedCount = 0
 
-    departureReceipts.forEach((receipt: any) => {
-      const volume = parseFloat(receipt.concrete_volume || 0)
-      totalVolume += volume
-      
-      // 统计小方量单据（本车方量小于9.1）
-      if (volume > 0 && volume < 9.1) {
-        smallVolumeCount++
-      }
-      
-      // 统计已交票数量
-      if (receipt.submitted_to_finance === 'Y') {
-        submittedCount++
-      }
-    })
+    // 根据不同票据类型计算不同的统计指标
+    if (activeTab === 'departure') {
+      // 出厂单：总方量、总单据数、小方量单据、已交票/未交票
+      let totalVolume = 0
+      let smallVolumeCount = 0
 
-    return {
-      totalVolume: totalVolume.toFixed(2),
-      totalCount,
-      smallVolumeCount,
-      submittedCount,
-      notSubmittedCount: totalCount - submittedCount,
+      currentReceipts.forEach((receipt: any) => {
+        const volume = parseFloat(receipt.concrete_volume || 0)
+        totalVolume += volume
+        
+        if (volume > 0 && volume < 9.1) {
+          smallVolumeCount++
+        }
+        
+        if (receipt.submitted_to_finance === 'Y') {
+          submittedCount++
+        }
+      })
+
+      return {
+        type: 'departure',
+        totalVolume: totalVolume.toFixed(2),
+        totalCount,
+        smallVolumeCount,
+        submittedCount,
+        notSubmittedCount: totalCount - submittedCount,
+      }
+    } else if (activeTab === 'loading' || activeTab === 'unloading') {
+      // 装料单/卸货单：总吨位、总单据数、已交票/未交票
+      let totalWeight = 0
+
+      currentReceipts.forEach((receipt: any) => {
+        const netWeight = parseFloat(receipt.net_weight || 0)
+        totalWeight += netWeight
+        
+        if (receipt.submitted_to_finance === 'Y') {
+          submittedCount++
+        }
+      })
+
+      return {
+        type: activeTab,
+        totalWeight: totalWeight.toFixed(2),
+        totalCount,
+        submittedCount,
+        notSubmittedCount: totalCount - submittedCount,
+      }
+    } else if (activeTab === 'charging') {
+      // 充电单：总电量、总金额、总单据数、已交票/未交票
+      let totalEnergy = 0
+      let totalAmount = 0
+
+      currentReceipts.forEach((receipt: any) => {
+        const energy = parseFloat(receipt.energy_kwh || 0)
+        const amount = parseFloat(receipt.amount || 0)
+        totalEnergy += energy
+        totalAmount += amount
+        
+        if (receipt.submitted_to_finance === 'Y') {
+          submittedCount++
+        }
+      })
+
+      return {
+        type: 'charging',
+        totalEnergy: totalEnergy.toFixed(2),
+        totalAmount: totalAmount.toFixed(2),
+        totalCount,
+        submittedCount,
+        notSubmittedCount: totalCount - submittedCount,
+      }
+    } else if (activeTab === 'water') {
+      // 水票：总单据数、已交票/未交票
+      currentReceipts.forEach((receipt: any) => {
+        if (receipt.submitted_to_finance === 'Y') {
+          submittedCount++
+        }
+      })
+
+      return {
+        type: 'water',
+        totalCount,
+        submittedCount,
+        notSubmittedCount: totalCount - submittedCount,
+      }
     }
+
+    return null
   }, [activeTab, filteredReceipts])
 
   // 编辑充电单
@@ -3190,7 +3251,7 @@ const ReceiptsPage = () => {
       </div>
 
       {/* KPI统计卡片 - 根据票据类型显示不同的统计 */}
-      {activeTab === 'departure' && kpiStats && (
+      {kpiStats && kpiStats.type === 'departure' && (
         <Row gutter={16} style={{ marginBottom: 16 }}>
           <Col span={6}>
             <Card bordered style={{ textAlign: 'center', borderRadius: 8, boxShadow: '0 1px 2px rgba(0,0,0,0.03)', border: '1px solid #f0f0f0' }}>
@@ -3232,47 +3293,147 @@ const ReceiptsPage = () => {
         </Row>
       )}
 
-      {/* 其他票据类型的KPI统计 */}
-      {activeTab === 'matched' && matchedStatistics && (
+      {kpiStats && (kpiStats.type === 'loading' || kpiStats.type === 'unloading') && (
         <Row gutter={16} style={{ marginBottom: 16 }}>
-          <Col span={8}>
+          <Col span={6}>
             <Card bordered style={{ textAlign: 'center', borderRadius: 8, boxShadow: '0 1px 2px rgba(0,0,0,0.03)', border: '1px solid #f0f0f0' }}>
-              <Statistic title="总任务数" value={matchedStatistics.total_count} suffix="个" />
+              <div style={{ color: '#8c8c8c', fontSize: 14, marginBottom: 8 }}>总吨位</div>
+              <div style={{ fontSize: 30, fontWeight: 600, color: '#000' }}>
+                {kpiStats.totalWeight}
+                <span style={{ fontSize: 16, color: '#8c8c8c', marginLeft: 4 }}>吨</span>
+              </div>
             </Card>
           </Col>
-          <Col span={8}>
+          <Col span={6}>
             <Card bordered style={{ textAlign: 'center', borderRadius: 8, boxShadow: '0 1px 2px rgba(0,0,0,0.03)', border: '1px solid #f0f0f0' }}>
-              <Statistic title="正常任务" value={matchedStatistics.normal_count} valueStyle={{ color: '#3f8600' }} suffix="个" />
+              <div style={{ color: '#8c8c8c', fontSize: 14, marginBottom: 8 }}>总单据数量</div>
+              <div style={{ fontSize: 30, fontWeight: 600, color: '#000' }}>
+                {kpiStats.totalCount}
+                <span style={{ fontSize: 16, color: '#8c8c8c', marginLeft: 4 }}>单</span>
+              </div>
             </Card>
           </Col>
-          <Col span={8}>
+          <Col span={6}>
             <Card bordered style={{ textAlign: 'center', borderRadius: 8, boxShadow: '0 1px 2px rgba(0,0,0,0.03)', border: '1px solid #f0f0f0' }}>
-              <Statistic title="已删除任务" value={matchedStatistics.deleted_count} valueStyle={{ color: '#cf1322' }} suffix="个" />
+              <div style={{ color: '#8c8c8c', fontSize: 14, marginBottom: 8 }}>已交票</div>
+              <div style={{ fontSize: 30, fontWeight: 600, color: '#000' }}>
+                {kpiStats.submittedCount}
+                <span style={{ fontSize: 16, color: '#8c8c8c', marginLeft: 4 }}>单</span>
+              </div>
+            </Card>
+          </Col>
+          <Col span={6}>
+            <Card bordered style={{ textAlign: 'center', borderRadius: 8, boxShadow: '0 1px 2px rgba(0,0,0,0.03)', border: '1px solid #f0f0f0' }}>
+              <div style={{ color: '#8c8c8c', fontSize: 14, marginBottom: 8 }}>未交票</div>
+              <div style={{ fontSize: 30, fontWeight: 600, color: '#000' }}>
+                {kpiStats.notSubmittedCount}
+                <span style={{ fontSize: 16, color: '#8c8c8c', marginLeft: 4 }}>单</span>
+              </div>
             </Card>
           </Col>
         </Row>
       )}
 
-      {activeTab !== 'departure' && activeTab !== 'matched' && receiptsStatistics && (
+      {kpiStats && kpiStats.type === 'charging' && (
         <Row gutter={16} style={{ marginBottom: 16 }}>
           <Col span={6}>
             <Card bordered style={{ textAlign: 'center', borderRadius: 8, boxShadow: '0 1px 2px rgba(0,0,0,0.03)', border: '1px solid #f0f0f0' }}>
-              <Statistic title="总票据数" value={receiptsStatistics.total_count} suffix="张" />
+              <div style={{ color: '#8c8c8c', fontSize: 14, marginBottom: 8 }}>总电量</div>
+              <div style={{ fontSize: 30, fontWeight: 600, color: '#000' }}>
+                {kpiStats.totalEnergy}
+                <span style={{ fontSize: 16, color: '#8c8c8c', marginLeft: 4 }}>kWh</span>
+              </div>
             </Card>
           </Col>
           <Col span={6}>
             <Card bordered style={{ textAlign: 'center', borderRadius: 8, boxShadow: '0 1px 2px rgba(0,0,0,0.03)', border: '1px solid #f0f0f0' }}>
-              <Statistic title="正常票据" value={receiptsStatistics.normal_count} valueStyle={{ color: '#3f8600' }} suffix="张" />
+              <div style={{ color: '#8c8c8c', fontSize: 14, marginBottom: 8 }}>总金额</div>
+              <div style={{ fontSize: 30, fontWeight: 600, color: '#000' }}>
+                {kpiStats.totalAmount}
+                <span style={{ fontSize: 16, color: '#8c8c8c', marginLeft: 4 }}>元</span>
+              </div>
             </Card>
           </Col>
           <Col span={6}>
             <Card bordered style={{ textAlign: 'center', borderRadius: 8, boxShadow: '0 1px 2px rgba(0,0,0,0.03)', border: '1px solid #f0f0f0' }}>
-              <Statistic title="已交票" value={receiptsStatistics.submitted_count} valueStyle={{ color: '#1890ff' }} suffix="张" />
+              <div style={{ color: '#8c8c8c', fontSize: 14, marginBottom: 8 }}>已交票</div>
+              <div style={{ fontSize: 30, fontWeight: 600, color: '#000' }}>
+                {kpiStats.submittedCount}
+                <span style={{ fontSize: 16, color: '#8c8c8c', marginLeft: 4 }}>单</span>
+              </div>
             </Card>
           </Col>
           <Col span={6}>
             <Card bordered style={{ textAlign: 'center', borderRadius: 8, boxShadow: '0 1px 2px rgba(0,0,0,0.03)', border: '1px solid #f0f0f0' }}>
-              <Statistic title="未交票" value={receiptsStatistics.not_submitted_count} valueStyle={{ color: '#faad14' }} suffix="张" />
+              <div style={{ color: '#8c8c8c', fontSize: 14, marginBottom: 8 }}>未交票</div>
+              <div style={{ fontSize: 30, fontWeight: 600, color: '#000' }}>
+                {kpiStats.notSubmittedCount}
+                <span style={{ fontSize: 16, color: '#8c8c8c', marginLeft: 4 }}>单</span>
+              </div>
+            </Card>
+          </Col>
+        </Row>
+      )}
+
+      {kpiStats && kpiStats.type === 'water' && (
+        <Row gutter={16} style={{ marginBottom: 16 }}>
+          <Col span={8}>
+            <Card bordered style={{ textAlign: 'center', borderRadius: 8, boxShadow: '0 1px 2px rgba(0,0,0,0.03)', border: '1px solid #f0f0f0' }}>
+              <div style={{ color: '#8c8c8c', fontSize: 14, marginBottom: 8 }}>总单据数量</div>
+              <div style={{ fontSize: 30, fontWeight: 600, color: '#000' }}>
+                {kpiStats.totalCount}
+                <span style={{ fontSize: 16, color: '#8c8c8c', marginLeft: 4 }}>张</span>
+              </div>
+            </Card>
+          </Col>
+          <Col span={8}>
+            <Card bordered style={{ textAlign: 'center', borderRadius: 8, boxShadow: '0 1px 2px rgba(0,0,0,0.03)', border: '1px solid #f0f0f0' }}>
+              <div style={{ color: '#8c8c8c', fontSize: 14, marginBottom: 8 }}>已交票</div>
+              <div style={{ fontSize: 30, fontWeight: 600, color: '#000' }}>
+                {kpiStats.submittedCount}
+                <span style={{ fontSize: 16, color: '#8c8c8c', marginLeft: 4 }}>张</span>
+              </div>
+            </Card>
+          </Col>
+          <Col span={8}>
+            <Card bordered style={{ textAlign: 'center', borderRadius: 8, boxShadow: '0 1px 2px rgba(0,0,0,0.03)', border: '1px solid #f0f0f0' }}>
+              <div style={{ color: '#8c8c8c', fontSize: 14, marginBottom: 8 }}>未交票</div>
+              <div style={{ fontSize: 30, fontWeight: 600, color: '#000' }}>
+                {kpiStats.notSubmittedCount}
+                <span style={{ fontSize: 16, color: '#8c8c8c', marginLeft: 4 }}>张</span>
+              </div>
+            </Card>
+          </Col>
+        </Row>
+      )}
+
+      {activeTab === 'matched' && matchedStatistics && (
+        <Row gutter={16} style={{ marginBottom: 16 }}>
+          <Col span={8}>
+            <Card bordered style={{ textAlign: 'center', borderRadius: 8, boxShadow: '0 1px 2px rgba(0,0,0,0.03)', border: '1px solid #f0f0f0' }}>
+              <div style={{ color: '#8c8c8c', fontSize: 14, marginBottom: 8 }}>总任务数</div>
+              <div style={{ fontSize: 30, fontWeight: 600, color: '#000' }}>
+                {matchedStatistics.total_count}
+                <span style={{ fontSize: 16, color: '#8c8c8c', marginLeft: 4 }}>个</span>
+              </div>
+            </Card>
+          </Col>
+          <Col span={8}>
+            <Card bordered style={{ textAlign: 'center', borderRadius: 8, boxShadow: '0 1px 2px rgba(0,0,0,0.03)', border: '1px solid #f0f0f0' }}>
+              <div style={{ color: '#8c8c8c', fontSize: 14, marginBottom: 8 }}>正常任务</div>
+              <div style={{ fontSize: 30, fontWeight: 600, color: '#000' }}>
+                {matchedStatistics.normal_count}
+                <span style={{ fontSize: 16, color: '#8c8c8c', marginLeft: 4 }}>个</span>
+              </div>
+            </Card>
+          </Col>
+          <Col span={8}>
+            <Card bordered style={{ textAlign: 'center', borderRadius: 8, boxShadow: '0 1px 2px rgba(0,0,0,0.03)', border: '1px solid #f0f0f0' }}>
+              <div style={{ color: '#8c8c8c', fontSize: 14, marginBottom: 8 }}>已删除任务</div>
+              <div style={{ fontSize: 30, fontWeight: 600, color: '#000' }}>
+                {matchedStatistics.deleted_count}
+                <span style={{ fontSize: 16, color: '#8c8c8c', marginLeft: 4 }}>个</span>
+              </div>
             </Card>
           </Col>
         </Row>
