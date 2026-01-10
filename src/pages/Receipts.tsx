@@ -77,7 +77,19 @@ const getReceiptTypeLabel = (type: ReceiptType) =>
   RECEIPT_TYPES.find((item) => item.value === type)?.label || type
 
 // 生成包含空值选项的筛选器
-const generateFiltersWithEmpty = <T,>(data: T[], field: keyof T, sorted: boolean = false): Array<{ text: string; value: string | null }> => {
+const EMPTY_VALUE_FLAG = '__EMPTY__' // 使用特殊字符串标记空值
+
+// 获取车牌号字段名（挂车使用用户绑定的车牌号，罐车使用OCR识别的车牌号）
+const getVehiclePlateField = (businessType: string) => {
+  return businessType === '挂车' ? 'user_plate' : 'vehicle_no'
+}
+
+// 获取车牌号值
+const getVehiclePlateValue = (record: any, businessType: string) => {
+  return businessType === '挂车' ? (record.user_plate || '-') : (record.vehicle_no || '-')
+}
+
+const generateFiltersWithEmpty = <T,>(data: T[], field: keyof T, sorted: boolean = false): Array<{ text: string; value: string }> => {
   const values = data?.map(item => item[field]) || []
   const nonEmptyValues = Array.from(new Set(values.filter(v => v !== null && v !== undefined && v !== '')))
   
@@ -93,7 +105,7 @@ const generateFiltersWithEmpty = <T,>(data: T[], field: keyof T, sorted: boolean
   // 检查是否有空值数据
   const hasEmpty = values.some(v => v === null || v === undefined || v === '')
   if (hasEmpty) {
-    filters.unshift({ text: '(空值)', value: null as any })
+    filters.unshift({ text: '(空值)', value: EMPTY_VALUE_FLAG })
   }
   
   return filters
@@ -1082,7 +1094,7 @@ const ReceiptsPage = () => {
         width: 150,
         filters: generateFiltersWithEmpty(receipts || [], 'company' as any),
         onFilter: (value, record) => {
-          if (value === null) return !(record as any).company
+          if (value === EMPTY_VALUE_FLAG) return !(record as any).company
           return (record as any).company === value
         },
       },
@@ -1092,19 +1104,21 @@ const ReceiptsPage = () => {
         width: 120,
         filters: generateFiltersWithEmpty(receipts || [], 'driver_name', true),
         onFilter: (value, record) => {
-          if (value === null) return !record.driver_name
+          if (value === EMPTY_VALUE_FLAG) return !record.driver_name
           return record.driver_name === value
         },
       },
       {
         title: '车牌号',
-        dataIndex: 'vehicle_no',
+        dataIndex: getVehiclePlateField(businessType),
         width: 120,
-        filters: generateFiltersWithEmpty(receipts || [], 'vehicle_no'),
+        filters: generateFiltersWithEmpty(receipts || [], getVehiclePlateField(businessType) as any),
         onFilter: (value, record) => {
-          if (value === null) return !record.vehicle_no
-          return record.vehicle_no === value
+          const fieldValue = (record as any)[getVehiclePlateField(businessType)]
+          if (value === EMPTY_VALUE_FLAG) return !fieldValue
+          return fieldValue === value
         },
+        render: (value: string, record: Receipt) => getVehiclePlateValue(record, businessType),
       },
       ...(businessType === '罐车'
         ? [
@@ -1114,7 +1128,7 @@ const ReceiptsPage = () => {
               width: 120,
               filters: generateFiltersWithEmpty(receipts || [], 'tanker_vehicle_code'),
               onFilter: (value: any, record: Receipt) => {
-                if (value === null) return !record.tanker_vehicle_code
+                if (value === EMPTY_VALUE_FLAG) return !record.tanker_vehicle_code
                 return record.tanker_vehicle_code === value
               },
               render: (value: string) => value || '-',
@@ -1127,7 +1141,7 @@ const ReceiptsPage = () => {
         width: 150,
         filters: generateFiltersWithEmpty(receipts || [], 'material_name' as any),
         onFilter: (value, record) => {
-          if (value === null) return !(record as any).material_name
+          if (value === EMPTY_VALUE_FLAG) return !(record as any).material_name
           return (record as any).material_name === value
         },
       },
@@ -1137,7 +1151,7 @@ const ReceiptsPage = () => {
         width: 120,
         filters: generateFiltersWithEmpty(receipts || [], 'material_spec' as any),
         onFilter: (value, record) => {
-          if (value === null) return !(record as any).material_spec
+          if (value === EMPTY_VALUE_FLAG) return !(record as any).material_spec
           return (record as any).material_spec === value
         },
       },
@@ -1293,7 +1307,7 @@ const ReceiptsPage = () => {
         width: 150,
         filters: generateFiltersWithEmpty(receipts || [], 'company' as any),
         onFilter: (value, record) => {
-          if (value === null) return !(record as any).company
+          if (value === EMPTY_VALUE_FLAG) return !(record as any).company
           return (record as any).company === value
         },
       },
@@ -1303,19 +1317,21 @@ const ReceiptsPage = () => {
         width: 120,
         filters: generateFiltersWithEmpty(receipts || [], 'driver_name', true),
         onFilter: (value, record) => {
-          if (value === null) return !record.driver_name
+          if (value === EMPTY_VALUE_FLAG) return !record.driver_name
           return record.driver_name === value
         },
       },
       {
         title: '车牌号',
-        dataIndex: 'vehicle_no',
+        dataIndex: getVehiclePlateField(businessType),
         width: 120,
-        filters: generateFiltersWithEmpty(receipts || [], 'vehicle_no'),
+        filters: generateFiltersWithEmpty(receipts || [], getVehiclePlateField(businessType) as any),
         onFilter: (value, record) => {
-          if (value === null) return !record.vehicle_no
-          return record.vehicle_no === value
+          const fieldValue = (record as any)[getVehiclePlateField(businessType)]
+          if (value === EMPTY_VALUE_FLAG) return !fieldValue
+          return fieldValue === value
         },
+        render: (value: string, record: Receipt) => getVehiclePlateValue(record, businessType),
       },
       ...(businessType === '罐车'
         ? [
@@ -1325,7 +1341,7 @@ const ReceiptsPage = () => {
               width: 120,
               filters: generateFiltersWithEmpty(receipts || [], 'tanker_vehicle_code'),
               onFilter: (value: any, record: Receipt) => {
-                if (value === null) return !record.tanker_vehicle_code
+                if (value === EMPTY_VALUE_FLAG) return !record.tanker_vehicle_code
                 return record.tanker_vehicle_code === value
               },
               render: (value: string) => value || '-',
@@ -1338,7 +1354,7 @@ const ReceiptsPage = () => {
         width: 150,
         filters: generateFiltersWithEmpty(receipts || [], 'material_name' as any),
         onFilter: (value, record) => {
-          if (value === null) return !(record as any).material_name
+          if (value === EMPTY_VALUE_FLAG) return !(record as any).material_name
           return (record as any).material_name === value
         },
       },
@@ -1348,7 +1364,7 @@ const ReceiptsPage = () => {
         width: 120,
         filters: generateFiltersWithEmpty(receipts || [], 'material_spec' as any),
         onFilter: (value, record) => {
-          if (value === null) return !(record as any).material_spec
+          if (value === EMPTY_VALUE_FLAG) return !(record as any).material_spec
           return (record as any).material_spec === value
         },
       },
@@ -1510,7 +1526,7 @@ const ReceiptsPage = () => {
         width: 100,
         filters: generateFiltersWithEmpty(receipts || [], 'driver_name', true),
         onFilter: (value, record) => {
-          if (value === null) return !record.driver_name
+          if (value === EMPTY_VALUE_FLAG) return !record.driver_name
           return record.driver_name === value
         },
         render: (value: string) => value || '-',
@@ -1521,7 +1537,7 @@ const ReceiptsPage = () => {
         width: 100,
         filters: generateFiltersWithEmpty(receipts || [], 'vehicle_no'),
         onFilter: (value, record) => {
-          if (value === null) return !record.vehicle_no
+          if (value === EMPTY_VALUE_FLAG) return !record.vehicle_no
           return record.vehicle_no === value
         },
       },
@@ -1533,7 +1549,7 @@ const ReceiptsPage = () => {
               width: 100,
               filters: generateFiltersWithEmpty(receipts || [], 'tanker_vehicle_code'),
               onFilter: (value: any, record: Receipt) => {
-                if (value === null) return !record.tanker_vehicle_code
+                if (value === EMPTY_VALUE_FLAG) return !record.tanker_vehicle_code
                 return record.tanker_vehicle_code === value
               },
               render: (value: string) => value || '-',
@@ -1674,7 +1690,7 @@ const ReceiptsPage = () => {
         width: 100,
         filters: generateFiltersWithEmpty(receipts || [], 'driver_name', true),
         onFilter: (value, record) => {
-          if (value === null) return !record.driver_name
+          if (value === EMPTY_VALUE_FLAG) return !record.driver_name
           return record.driver_name === value
         },
         render: (value: string) => value || '-',
@@ -1691,7 +1707,7 @@ const ReceiptsPage = () => {
         width: 100,
         filters: generateFiltersWithEmpty(receipts || [], 'vehicle_no'),
         onFilter: (value, record) => {
-          if (value === null) return !record.vehicle_no
+          if (value === EMPTY_VALUE_FLAG) return !record.vehicle_no
           return record.vehicle_no === value
         },
       },
@@ -1703,7 +1719,7 @@ const ReceiptsPage = () => {
               width: 100,
               filters: generateFiltersWithEmpty(receipts || [], 'tanker_vehicle_code'),
               onFilter: (value: any, record: Receipt) => {
-                if (value === null) return !record.tanker_vehicle_code
+                if (value === EMPTY_VALUE_FLAG) return !record.tanker_vehicle_code
                 return record.tanker_vehicle_code === value
               },
               render: (value: string) => value || '-',
@@ -1826,14 +1842,23 @@ const ReceiptsPage = () => {
       },
       {
         title: '车牌号',
-        dataIndex: ['loadBill', 'vehicle_no'],
+        dataIndex: ['loadBill', businessType === '挂车' ? 'user_plate' : 'vehicle_no'],
         width: 120,
-        filters: Array.from(new Set(matchedReceipts?.map((r: any) => r.loadBill?.vehicle_no || r.unloadBill?.vehicle_no).filter(Boolean))).map(no => ({
+        filters: Array.from(new Set(matchedReceipts?.map((r: any) => {
+          const plateField = businessType === '挂车' ? 'user_plate' : 'vehicle_no'
+          return r.loadBill?.[plateField] || r.unloadBill?.[plateField]
+        }).filter(Boolean))).map(no => ({
           text: no as string,
           value: no as string,
         })),
-        onFilter: (value, record) => (record.loadBill?.vehicle_no === value || record.unloadBill?.vehicle_no === value),
-        render: (_, record) => record.loadBill?.vehicle_no || record.unloadBill?.vehicle_no || '-',
+        onFilter: (value, record) => {
+          const plateField = businessType === '挂车' ? 'user_plate' : 'vehicle_no'
+          return (record.loadBill?.[plateField] === value || record.unloadBill?.[plateField] === value)
+        },
+        render: (_, record) => {
+          const plateField = businessType === '挂车' ? 'user_plate' : 'vehicle_no'
+          return record.loadBill?.[plateField] || record.unloadBill?.[plateField] || '-'
+        },
       },
       {
         title: '司机',
@@ -2163,7 +2188,7 @@ const ReceiptsPage = () => {
         width: 100,
         filters: generateFiltersWithEmpty(receipts || [], 'driver_name', true),
         onFilter: (value, record) => {
-          if (value === null) return !record.driver_name
+          if (value === EMPTY_VALUE_FLAG) return !record.driver_name
           return record.driver_name === value
         },
         render: (value: string) => value || '-',
@@ -2174,7 +2199,7 @@ const ReceiptsPage = () => {
         width: 100,
         filters: generateFiltersWithEmpty(receipts || [], 'vehicle_no'),
         onFilter: (value, record) => {
-          if (value === null) return !record.vehicle_no
+          if (value === EMPTY_VALUE_FLAG) return !record.vehicle_no
           return record.vehicle_no === value
         },
         render: (value: string) => value || '-',
@@ -2185,7 +2210,7 @@ const ReceiptsPage = () => {
         width: 100,
         filters: generateFiltersWithEmpty(receipts || [], 'tanker_vehicle_code'),
         onFilter: (value, record) => {
-          if (value === null) return !record.tanker_vehicle_code
+          if (value === EMPTY_VALUE_FLAG) return !record.tanker_vehicle_code
           return record.tanker_vehicle_code === value
         },
         render: (value: string) => value || '-',
@@ -2196,7 +2221,7 @@ const ReceiptsPage = () => {
         width: 150,
         filters: generateFiltersWithEmpty(receipts || [], 'loading_company' as any),
         onFilter: (value, record) => {
-          if (value === null) return !(record as any).loading_company
+          if (value === EMPTY_VALUE_FLAG) return !(record as any).loading_company
           return (record as any).loading_company === value
         },
         render: (value: string) => value || '-',
@@ -2207,7 +2232,7 @@ const ReceiptsPage = () => {
         width: 150,
         filters: generateFiltersWithEmpty(receipts || [], 'project_name' as any),
         onFilter: (value, record) => {
-          if (value === null) return !(record as any).project_name
+          if (value === EMPTY_VALUE_FLAG) return !(record as any).project_name
           return (record as any).project_name === value
         },
         render: (value: string) => value || '-',
@@ -2218,7 +2243,7 @@ const ReceiptsPage = () => {
         width: 150,
         filters: generateFiltersWithEmpty(receipts || [], 'construction_location' as any),
         onFilter: (value, record) => {
-          if (value === null) return !(record as any).construction_location
+          if (value === EMPTY_VALUE_FLAG) return !(record as any).construction_location
           return (record as any).construction_location === value
         },
         render: (value: string) => value || '-',
@@ -2229,7 +2254,7 @@ const ReceiptsPage = () => {
         width: 150,
         filters: generateFiltersWithEmpty(receipts || [], 'customer_name' as any),
         onFilter: (value, record) => {
-          if (value === null) return !(record as any).customer_name
+          if (value === EMPTY_VALUE_FLAG) return !(record as any).customer_name
           return (record as any).customer_name === value
         },
         render: (value: string) => value || '-',
@@ -2240,7 +2265,7 @@ const ReceiptsPage = () => {
         width: 150,
         filters: generateFiltersWithEmpty(receipts || [], 'construction_unit' as any),
         onFilter: (value, record) => {
-          if (value === null) return !(record as any).construction_unit
+          if (value === EMPTY_VALUE_FLAG) return !(record as any).construction_unit
           return (record as any).construction_unit === value
         },
         render: (value: string) => value || '-',
