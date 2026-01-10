@@ -155,6 +155,7 @@ const ReceiptsPage = () => {
   const [cleanField, setCleanField] = useState<string>('')
   const [selectedOldValues, setSelectedOldValues] = useState<string[]>([])
   const [newValue, setNewValue] = useState<string>('')
+  const [oldValueSearchText, setOldValueSearchText] = useState<string>('')
   const [cleanConfigModalOpen, setCleanConfigModalOpen] = useState(false)
   const [configFieldType, setConfigFieldType] = useState<string>('')
   const [standardValues, setStandardValues] = useState<Record<string, string[]>>({
@@ -4167,6 +4168,7 @@ const ReceiptsPage = () => {
           setCleanField('')
           setSelectedOldValues([])
           setNewValue('')
+          setOldValueSearchText('')
         }}
         onOk={async () => {
           if (!cleanField || selectedOldValues.length === 0 || !newValue) {
@@ -4213,6 +4215,7 @@ const ReceiptsPage = () => {
                   setCleanField(value)
                   setSelectedOldValues([])
                   setNewValue('')
+                  setOldValueSearchText('')
                 }}
                 placeholder="请选择字段"
                 options={(() => {
@@ -4259,6 +4262,7 @@ const ReceiptsPage = () => {
                       onChange={setSelectedOldValues}
                       placeholder="请选择要替换的值（支持模糊搜索）"
                       style={{ width: '100%' }}
+                      onSearch={(value) => setOldValueSearchText(value)}
                       options={Array.from(
                         new Set(
                           filteredReceipts
@@ -4281,10 +4285,6 @@ const ReceiptsPage = () => {
                               type="link"
                               size="small"
                               onClick={() => {
-                                // 获取当前搜索框的值
-                                const searchInput = document.querySelector('.ant-select-selection-search-input') as HTMLInputElement
-                                const searchValue = searchInput?.value?.toLowerCase() || ''
-                                
                                 // 获取所有可选项
                                 const allOptions = Array.from(
                                   new Set(
@@ -4295,6 +4295,7 @@ const ReceiptsPage = () => {
                                 )
                                 
                                 // 如果有搜索值，筛选匹配的选项；否则选择全部
+                                const searchValue = oldValueSearchText.toLowerCase()
                                 const filteredOptions = searchValue
                                   ? allOptions.filter(value => 
                                       String(value).toLowerCase().includes(searchValue)
@@ -4306,7 +4307,7 @@ const ReceiptsPage = () => {
                                 message.success(`已选择 ${filteredOptions.length} 个值`)
                               }}
                             >
-                              全选当前搜索结果
+                              全选当前搜索结果 {oldValueSearchText && `(${oldValueSearchText})`}
                             </Button>
                           </div>
                           {menu}
