@@ -164,10 +164,23 @@ export default function ReceiptsRecycleBin() {
   const [drivers, setDrivers] = useState<Array<{ id: number; name: string }>>([])
   const [companyBusinessType, setCompanyBusinessType] = useState<'truck' | 'tanker' | null>(null)
 
-  // 加载部门和司机数据
+  // 加载公司业务类型、部门和司机数据
   useEffect(() => {
-    const loadDepartmentsAndDrivers = async () => {
+    const loadCompanyData = async () => {
       try {
+        // 加载公司业务类型
+        const companyResponse = await client.get('/companies', {
+          params: { company_id: effectiveCompanyId },
+        })
+        if (companyResponse.data.success) {
+          const companies = companyResponse.data.data
+          const company = Array.isArray(companies) ? companies[0] : companies
+          if (company) {
+            const businessType = company.business_type || company.businessType
+            setCompanyBusinessType(businessType === '挂车' ? 'truck' : businessType === '罐车' ? 'tanker' : null)
+          }
+        }
+
         // 从API加载部门列表
         const deptResponse = await client.get('/departments', {
           params: { company_id: effectiveCompanyId },
@@ -207,7 +220,7 @@ export default function ReceiptsRecycleBin() {
           )
         }
       } catch (error) {
-        console.error('加载部门和司机数据失败:', error)
+        console.error('加载公司数据失败:', error)
         // 加载失败时使用空数组
         setDepartments([])
         setDrivers([])
@@ -215,7 +228,7 @@ export default function ReceiptsRecycleBin() {
     }
     
     if (effectiveCompanyId) {
-      loadDepartmentsAndDrivers()
+      loadCompanyData()
     }
   }, [effectiveCompanyId])
 
