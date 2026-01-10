@@ -1110,6 +1110,7 @@ const ReceiptsPage = () => {
       },
       {
         title: '车牌号',
+        key: 'vehicle_plate',
         dataIndex: getVehiclePlateField(businessType),
         width: 120,
         filters: generateFiltersWithEmpty(receipts || [], getVehiclePlateField(businessType) as any),
@@ -1118,7 +1119,7 @@ const ReceiptsPage = () => {
           if (value === EMPTY_VALUE_FLAG) return !fieldValue
           return fieldValue === value
         },
-        render: (value: string, record: Receipt) => getVehiclePlateValue(record, businessType),
+        render: (_: string, record: Receipt) => getVehiclePlateValue(record, businessType),
       },
       ...(businessType === '罐车'
         ? [
@@ -1323,6 +1324,7 @@ const ReceiptsPage = () => {
       },
       {
         title: '车牌号',
+        key: 'vehicle_plate',
         dataIndex: getVehiclePlateField(businessType),
         width: 120,
         filters: generateFiltersWithEmpty(receipts || [], getVehiclePlateField(businessType) as any),
@@ -1331,7 +1333,7 @@ const ReceiptsPage = () => {
           if (value === EMPTY_VALUE_FLAG) return !fieldValue
           return fieldValue === value
         },
-        render: (value: string, record: Receipt) => getVehiclePlateValue(record, businessType),
+        render: (_: string, record: Receipt) => getVehiclePlateValue(record, businessType),
       },
       ...(businessType === '罐车'
         ? [
@@ -1842,6 +1844,7 @@ const ReceiptsPage = () => {
       },
       {
         title: '车牌号',
+        key: 'vehicle_plate',
         dataIndex: ['loadBill', businessType === '挂车' ? 'user_plate' : 'vehicle_no'],
         width: 120,
         filters: Array.from(new Set(matchedReceipts?.map((r: any) => {
