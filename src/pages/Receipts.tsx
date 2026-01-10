@@ -2486,7 +2486,7 @@ const ReceiptsPage = () => {
   const columnSettingsConfig = useMemo(() => {
     const cols = getCurrentColumns(activeTab)
     return cols.map((col) => ({
-      key: String((col as any).dataIndex || (col as any).key || col.title || ''),
+      key: String((col as any).key || (col as any).dataIndex || col.title || ''),
       title: String(col.title || ''),
       visible: true,
       fixed: col.fixed,
@@ -2509,7 +2509,7 @@ const ReceiptsPage = () => {
     for (const cfg of columnConfig) {
       if (!cfg.visible) continue
       const col = originalColumns.find((c) => {
-        const key = String((c as any).dataIndex || (c as any).key || c.title || '')
+        const key = String((c as any).key || (c as any).dataIndex || c.title || '')
         return key === cfg.key
       })
       if (col) {
@@ -2519,7 +2519,7 @@ const ReceiptsPage = () => {
 
     // 添加配置中没有的新列
     for (const col of originalColumns) {
-      const key = String((col as any).dataIndex || (col as any).key || col.title || '')
+      const key = String((col as any).key || (col as any).dataIndex || col.title || '')
       if (!columnConfig.find((c) => c.key === key)) {
         orderedColumns.push(col)
       }
