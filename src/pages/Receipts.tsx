@@ -76,6 +76,29 @@ const { RangePicker } = DatePicker
 const getReceiptTypeLabel = (type: ReceiptType) =>
   RECEIPT_TYPES.find((item) => item.value === type)?.label || type
 
+// 生成包含空值选项的筛选器
+const generateFiltersWithEmpty = <T,>(data: T[], field: keyof T, sorted: boolean = false): Array<{ text: string; value: string | null }> => {
+  const values = data?.map(item => item[field]) || []
+  const nonEmptyValues = Array.from(new Set(values.filter(v => v !== null && v !== undefined && v !== '')))
+  
+  let filters = nonEmptyValues.map(value => ({
+    text: String(value),
+    value: String(value),
+  }))
+  
+  if (sorted) {
+    filters.sort((a, b) => a.text.localeCompare(b.text, 'zh-CN'))
+  }
+  
+  // 检查是否有空值数据
+  const hasEmpty = values.some(v => v === null || v === undefined || v === '')
+  if (hasEmpty) {
+    filters.unshift({ text: '(空值)', value: null as any })
+  }
+  
+  return filters
+}
+
 const ReceiptsPage = () => {
   const queryClient = useQueryClient()
   const { message, modal } = AntdApp.useApp()
@@ -1057,33 +1080,31 @@ const ReceiptsPage = () => {
         title: '公司',
         dataIndex: 'company',
         width: 150,
-        filters: Array.from(new Set(receipts?.map(r => (r as any).company).filter(Boolean))).map(company => ({
-          text: company as string,
-          value: company as string,
-        })),
-        onFilter: (value, record) => (record as any).company === value,
+        filters: generateFiltersWithEmpty(receipts || [], 'company' as any),
+        onFilter: (value, record) => {
+          if (value === null) return !(record as any).company
+          return (record as any).company === value
+        },
       },
       {
         title: '司机',
         dataIndex: 'driver_name',
         width: 120,
-        filters: Array.from(new Set(receipts?.map(r => r.driver_name).filter(Boolean)))
-          .sort((a, b) => (a || '').localeCompare(b || '', 'zh-CN'))
-          .map(name => ({
-            text: name as string,
-            value: name as string,
-          })),
-        onFilter: (value, record) => record.driver_name === value,
+        filters: generateFiltersWithEmpty(receipts || [], 'driver_name', true),
+        onFilter: (value, record) => {
+          if (value === null) return !record.driver_name
+          return record.driver_name === value
+        },
       },
       {
         title: '车牌号',
         dataIndex: 'vehicle_no',
         width: 120,
-        filters: Array.from(new Set(receipts?.map(r => r.vehicle_no).filter(Boolean))).map(no => ({
-          text: no as string,
-          value: no as string,
-        })),
-        onFilter: (value, record) => record.vehicle_no === value,
+        filters: generateFiltersWithEmpty(receipts || [], 'vehicle_no'),
+        onFilter: (value, record) => {
+          if (value === null) return !record.vehicle_no
+          return record.vehicle_no === value
+        },
       },
       ...(businessType === '罐车'
         ? [
@@ -1091,11 +1112,11 @@ const ReceiptsPage = () => {
               title: '自编车号',
               dataIndex: 'tanker_vehicle_code',
               width: 120,
-              filters: Array.from(new Set(receipts?.map(r => r.tanker_vehicle_code).filter(Boolean))).map(code => ({
-                text: code as string,
-                value: code as string,
-              })),
-              onFilter: (value: any, record: Receipt) => record.tanker_vehicle_code === value,
+              filters: generateFiltersWithEmpty(receipts || [], 'tanker_vehicle_code'),
+              onFilter: (value: any, record: Receipt) => {
+                if (value === null) return !record.tanker_vehicle_code
+                return record.tanker_vehicle_code === value
+              },
               render: (value: string) => value || '-',
             },
           ]
@@ -1104,21 +1125,21 @@ const ReceiptsPage = () => {
         title: '材料名称',
         dataIndex: 'material_name',
         width: 150,
-        filters: Array.from(new Set(receipts?.map(r => (r as any).material_name).filter(Boolean))).map(name => ({
-          text: name as string,
-          value: name as string,
-        })),
-        onFilter: (value, record) => (record as any).material_name === value,
+        filters: generateFiltersWithEmpty(receipts || [], 'material_name' as any),
+        onFilter: (value, record) => {
+          if (value === null) return !(record as any).material_name
+          return (record as any).material_name === value
+        },
       },
       {
         title: '规格型号',
         dataIndex: 'material_spec',
         width: 120,
-        filters: Array.from(new Set(receipts?.map(r => (r as any).material_spec).filter(Boolean))).map(spec => ({
-          text: spec as string,
-          value: spec as string,
-        })),
-        onFilter: (value, record) => (record as any).material_spec === value,
+        filters: generateFiltersWithEmpty(receipts || [], 'material_spec' as any),
+        onFilter: (value, record) => {
+          if (value === null) return !(record as any).material_spec
+          return (record as any).material_spec === value
+        },
       },
       {
         title: '毛重(t)',
@@ -1270,33 +1291,31 @@ const ReceiptsPage = () => {
         title: '公司',
         dataIndex: 'company',
         width: 150,
-        filters: Array.from(new Set(receipts?.map(r => (r as any).company).filter(Boolean))).map(company => ({
-          text: company as string,
-          value: company as string,
-        })),
-        onFilter: (value, record) => (record as any).company === value,
+        filters: generateFiltersWithEmpty(receipts || [], 'company' as any),
+        onFilter: (value, record) => {
+          if (value === null) return !(record as any).company
+          return (record as any).company === value
+        },
       },
       {
         title: '司机',
         dataIndex: 'driver_name',
         width: 120,
-        filters: Array.from(new Set(receipts?.map(r => r.driver_name).filter(Boolean)))
-          .sort((a, b) => (a || '').localeCompare(b || '', 'zh-CN'))
-          .map(name => ({
-            text: name as string,
-            value: name as string,
-          })),
-        onFilter: (value, record) => record.driver_name === value,
+        filters: generateFiltersWithEmpty(receipts || [], 'driver_name', true),
+        onFilter: (value, record) => {
+          if (value === null) return !record.driver_name
+          return record.driver_name === value
+        },
       },
       {
         title: '车牌号',
         dataIndex: 'vehicle_no',
         width: 120,
-        filters: Array.from(new Set(receipts?.map(r => r.vehicle_no).filter(Boolean))).map(no => ({
-          text: no as string,
-          value: no as string,
-        })),
-        onFilter: (value, record) => record.vehicle_no === value,
+        filters: generateFiltersWithEmpty(receipts || [], 'vehicle_no'),
+        onFilter: (value, record) => {
+          if (value === null) return !record.vehicle_no
+          return record.vehicle_no === value
+        },
       },
       ...(businessType === '罐车'
         ? [
@@ -1304,11 +1323,11 @@ const ReceiptsPage = () => {
               title: '自编车号',
               dataIndex: 'tanker_vehicle_code',
               width: 120,
-              filters: Array.from(new Set(receipts?.map(r => r.tanker_vehicle_code).filter(Boolean))).map(code => ({
-                text: code as string,
-                value: code as string,
-              })),
-              onFilter: (value: any, record: Receipt) => record.tanker_vehicle_code === value,
+              filters: generateFiltersWithEmpty(receipts || [], 'tanker_vehicle_code'),
+              onFilter: (value: any, record: Receipt) => {
+                if (value === null) return !record.tanker_vehicle_code
+                return record.tanker_vehicle_code === value
+              },
               render: (value: string) => value || '-',
             },
           ]
@@ -1317,21 +1336,21 @@ const ReceiptsPage = () => {
         title: '材料名称',
         dataIndex: 'material_name',
         width: 150,
-        filters: Array.from(new Set(receipts?.map(r => (r as any).material_name).filter(Boolean))).map(name => ({
-          text: name as string,
-          value: name as string,
-        })),
-        onFilter: (value, record) => (record as any).material_name === value,
+        filters: generateFiltersWithEmpty(receipts || [], 'material_name' as any),
+        onFilter: (value, record) => {
+          if (value === null) return !(record as any).material_name
+          return (record as any).material_name === value
+        },
       },
       {
         title: '规格型号',
         dataIndex: 'material_spec',
         width: 120,
-        filters: Array.from(new Set(receipts?.map(r => (r as any).material_spec).filter(Boolean))).map(spec => ({
-          text: spec as string,
-          value: spec as string,
-        })),
-        onFilter: (value, record) => (record as any).material_spec === value,
+        filters: generateFiltersWithEmpty(receipts || [], 'material_spec' as any),
+        onFilter: (value, record) => {
+          if (value === null) return !(record as any).material_spec
+          return (record as any).material_spec === value
+        },
       },
       {
         title: '毛重(t)',
@@ -1489,24 +1508,22 @@ const ReceiptsPage = () => {
         title: '司机',
         dataIndex: 'driver_name',
         width: 100,
-        filters: Array.from(new Set(receipts?.map(r => r.driver_name).filter(Boolean)))
-          .sort((a, b) => (a || '').localeCompare(b || '', 'zh-CN'))
-          .map(name => ({
-            text: name as string,
-            value: name as string,
-          })),
-        onFilter: (value, record) => record.driver_name === value,
+        filters: generateFiltersWithEmpty(receipts || [], 'driver_name', true),
+        onFilter: (value, record) => {
+          if (value === null) return !record.driver_name
+          return record.driver_name === value
+        },
         render: (value: string) => value || '-',
       },
       {
         title: '车牌号',
         dataIndex: 'vehicle_no',
         width: 100,
-        filters: Array.from(new Set(receipts?.map(r => r.vehicle_no).filter(Boolean))).map(no => ({
-          text: no as string,
-          value: no as string,
-        })),
-        onFilter: (value, record) => record.vehicle_no === value,
+        filters: generateFiltersWithEmpty(receipts || [], 'vehicle_no'),
+        onFilter: (value, record) => {
+          if (value === null) return !record.vehicle_no
+          return record.vehicle_no === value
+        },
       },
       ...(businessType === '罐车'
         ? [
@@ -1514,11 +1531,11 @@ const ReceiptsPage = () => {
               title: '自编车号',
               dataIndex: 'tanker_vehicle_code',
               width: 100,
-              filters: Array.from(new Set(receipts?.map(r => r.tanker_vehicle_code).filter(Boolean))).map(code => ({
-                text: code as string,
-                value: code as string,
-              })),
-              onFilter: (value: any, record: Receipt) => record.tanker_vehicle_code === value,
+              filters: generateFiltersWithEmpty(receipts || [], 'tanker_vehicle_code'),
+              onFilter: (value: any, record: Receipt) => {
+                if (value === null) return !record.tanker_vehicle_code
+                return record.tanker_vehicle_code === value
+              },
               render: (value: string) => value || '-',
             },
           ]
@@ -1655,13 +1672,11 @@ const ReceiptsPage = () => {
         title: '司机',
         dataIndex: 'driver_name',
         width: 100,
-        filters: Array.from(new Set(receipts?.map(r => r.driver_name).filter(Boolean)))
-          .sort((a, b) => (a || '').localeCompare(b || '', 'zh-CN'))
-          .map(name => ({
-            text: name as string,
-            value: name as string,
-          })),
-        onFilter: (value, record) => record.driver_name === value,
+        filters: generateFiltersWithEmpty(receipts || [], 'driver_name', true),
+        onFilter: (value, record) => {
+          if (value === null) return !record.driver_name
+          return record.driver_name === value
+        },
         render: (value: string) => value || '-',
       },
       {
@@ -1674,11 +1689,11 @@ const ReceiptsPage = () => {
         title: '车牌号',
         dataIndex: 'vehicle_no',
         width: 100,
-        filters: Array.from(new Set(receipts?.map(r => r.vehicle_no).filter(Boolean))).map(no => ({
-          text: no as string,
-          value: no as string,
-        })),
-        onFilter: (value, record) => record.vehicle_no === value,
+        filters: generateFiltersWithEmpty(receipts || [], 'vehicle_no'),
+        onFilter: (value, record) => {
+          if (value === null) return !record.vehicle_no
+          return record.vehicle_no === value
+        },
       },
       ...(businessType === '罐车'
         ? [
@@ -1686,11 +1701,11 @@ const ReceiptsPage = () => {
               title: '自编车号',
               dataIndex: 'tanker_vehicle_code',
               width: 100,
-              filters: Array.from(new Set(receipts?.map(r => r.tanker_vehicle_code).filter(Boolean))).map(code => ({
-                text: code as string,
-                value: code as string,
-              })),
-              onFilter: (value: any, record: Receipt) => record.tanker_vehicle_code === value,
+              filters: generateFiltersWithEmpty(receipts || [], 'tanker_vehicle_code'),
+              onFilter: (value: any, record: Receipt) => {
+                if (value === null) return !record.tanker_vehicle_code
+                return record.tanker_vehicle_code === value
+              },
               render: (value: string) => value || '-',
             },
           ]
@@ -2146,90 +2161,88 @@ const ReceiptsPage = () => {
         title: '司机',
         dataIndex: 'driver_name',
         width: 100,
-        filters: (Array.isArray(receipts) ? Array.from(new Set(receipts.map(r => r.driver_name).filter(Boolean))) : [])
-          .sort((a, b) => (a || '').localeCompare(b || '', 'zh-CN'))
-          .map(name => ({
-            text: name as string,
-            value: name as string,
-          })),
-        onFilter: (value, record) => record.driver_name === value,
+        filters: generateFiltersWithEmpty(receipts || [], 'driver_name', true),
+        onFilter: (value, record) => {
+          if (value === null) return !record.driver_name
+          return record.driver_name === value
+        },
         render: (value: string) => value || '-',
       },
       {
         title: '车牌号',
         dataIndex: 'vehicle_no',
         width: 100,
-        filters: (Array.isArray(receipts) ? Array.from(new Set(receipts.map(r => r.vehicle_no).filter(Boolean))) : []).map(no => ({
-          text: no as string,
-          value: no as string,
-        })),
-        onFilter: (value, record) => record.vehicle_no === value,
+        filters: generateFiltersWithEmpty(receipts || [], 'vehicle_no'),
+        onFilter: (value, record) => {
+          if (value === null) return !record.vehicle_no
+          return record.vehicle_no === value
+        },
         render: (value: string) => value || '-',
       },
       {
         title: '自编车号',
         dataIndex: 'tanker_vehicle_code',
         width: 100,
-        filters: (Array.isArray(receipts) ? Array.from(new Set(receipts.map(r => r.tanker_vehicle_code).filter(Boolean))) : []).map(code => ({
-          text: code as string,
-          value: code as string,
-        })),
-        onFilter: (value, record) => record.tanker_vehicle_code === value,
+        filters: generateFiltersWithEmpty(receipts || [], 'tanker_vehicle_code'),
+        onFilter: (value, record) => {
+          if (value === null) return !record.tanker_vehicle_code
+          return record.tanker_vehicle_code === value
+        },
         render: (value: string) => value || '-',
       },
       {
         title: '装料公司',
         dataIndex: 'loading_company',
         width: 150,
-        filters: (Array.isArray(receipts) ? Array.from(new Set(receipts.map(r => (r as any).loading_company).filter(Boolean))) : []).map(company => ({
-          text: company as string,
-          value: company as string,
-        })),
-        onFilter: (value, record) => (record as any).loading_company === value,
+        filters: generateFiltersWithEmpty(receipts || [], 'loading_company' as any),
+        onFilter: (value, record) => {
+          if (value === null) return !(record as any).loading_company
+          return (record as any).loading_company === value
+        },
         render: (value: string) => value || '-',
       },
       {
         title: '工程名称',
         dataIndex: 'project_name',
         width: 150,
-        filters: (Array.isArray(receipts) ? Array.from(new Set(receipts.map(r => (r as any).project_name).filter(Boolean))) : []).map(name => ({
-          text: name as string,
-          value: name as string,
-        })),
-        onFilter: (value, record) => (record as any).project_name === value,
+        filters: generateFiltersWithEmpty(receipts || [], 'project_name' as any),
+        onFilter: (value, record) => {
+          if (value === null) return !(record as any).project_name
+          return (record as any).project_name === value
+        },
         render: (value: string) => value || '-',
       },
       {
         title: '施工地点',
         dataIndex: 'construction_location',
         width: 150,
-        filters: (Array.isArray(receipts) ? Array.from(new Set(receipts.map(r => (r as any).construction_location).filter(Boolean))) : []).map(location => ({
-          text: location as string,
-          value: location as string,
-        })),
-        onFilter: (value, record) => (record as any).construction_location === value,
+        filters: generateFiltersWithEmpty(receipts || [], 'construction_location' as any),
+        onFilter: (value, record) => {
+          if (value === null) return !(record as any).construction_location
+          return (record as any).construction_location === value
+        },
         render: (value: string) => value || '-',
       },
       {
         title: '客户名称',
         dataIndex: 'customer_name',
         width: 150,
-        filters: (Array.isArray(receipts) ? Array.from(new Set(receipts.map(r => (r as any).customer_name).filter(Boolean))) : []).map(name => ({
-          text: name as string,
-          value: name as string,
-        })),
-        onFilter: (value, record) => (record as any).customer_name === value,
+        filters: generateFiltersWithEmpty(receipts || [], 'customer_name' as any),
+        onFilter: (value, record) => {
+          if (value === null) return !(record as any).customer_name
+          return (record as any).customer_name === value
+        },
         render: (value: string) => value || '-',
       },
       {
         title: '施工单位',
         dataIndex: 'construction_unit',
         width: 150,
-        filters: (Array.isArray(receipts) ? Array.from(new Set(receipts.map(r => (r as any).construction_unit).filter(Boolean))) : []).map(unit => ({
-          text: unit as string,
-          value: unit as string,
-        })),
-        onFilter: (value, record) => (record as any).construction_unit === value,
+        filters: generateFiltersWithEmpty(receipts || [], 'construction_unit' as any),
+        onFilter: (value, record) => {
+          if (value === null) return !(record as any).construction_unit
+          return (record as any).construction_unit === value
+        },
         render: (value: string) => value || '-',
       },
       {
