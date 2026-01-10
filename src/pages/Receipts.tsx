@@ -1511,12 +1511,22 @@ const ReceiptsPage = () => {
         title: '开始时间',
         dataIndex: 'start_time',
         width: 150,
+        sorter: (a: any, b: any) => {
+          const aTime = a.start_time || ''
+          const bTime = b.start_time || ''
+          return aTime.localeCompare(bTime)
+        },
         render: (value: string) => (value ? dayjs(value).format('YYYY-MM-DD HH:mm:ss') : '-'),
       },
       {
         title: '结束时间',
         dataIndex: 'end_time',
         width: 150,
+        sorter: (a: any, b: any) => {
+          const aTime = a.end_time || ''
+          const bTime = b.end_time || ''
+          return aTime.localeCompare(bTime)
+        },
         render: (value: string) => (value ? dayjs(value).format('YYYY-MM-DD HH:mm:ss') : '-'),
       },
       {
