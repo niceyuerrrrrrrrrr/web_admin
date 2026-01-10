@@ -333,6 +333,12 @@ export const deleteTransportTask = (taskId: string) =>
   unwrap(client.delete(`/transport-match/${taskId}`))
 
 /**
+ * 恢复运输任务（装卸匹配）
+ */
+export const restoreTransportTask = (taskId: string) =>
+  unwrap(client.post(`/transport-match/${taskId}/restore`))
+
+/**
  * 交票（单张）
  */
 export const submitReceiptToFinance = (receiptType: string, receiptId: number) =>

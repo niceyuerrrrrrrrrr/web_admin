@@ -55,6 +55,7 @@ import {
   updateDepartureReceipt,
   deleteDepartureReceipt,
   deleteTransportTask,
+  restoreTransportTask,
   submitReceiptToFinance,
   submitReceiptsToFinance,
   restoreReceipt,
@@ -123,6 +124,8 @@ const ReceiptsPage = () => {
   // 统计、统计员、车队长、财务、总经理等管理角色可以编辑和删除
   const isManager = ['统计', '统计员', '车队长', '财务', '总经理'].includes(user?.positionType || '')
   const canEditDelete = isSuperAdmin || isManager || !isDriver // 超级管理员、管理角色或非司机可以编辑和删除
+
+  const canRestoreMatched = isSuperAdmin || ['统计', '统计员'].includes(user?.positionType || '')
   
   // 如果用户信息中没有公司信息，从API获取
   const meQuery = useQuery({
@@ -657,6 +660,17 @@ const ReceiptsPage = () => {
     },
   })
 
+  const restoreTransportTaskMutation = useMutation({
+    mutationFn: (taskId: string) => restoreTransportTask(taskId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['matched-receipts'] })
+      message.success('恢复成功')
+    },
+    onError: (error) => {
+      message.error((error as Error).message || '恢复失败')
+    },
+  })
+
   // 统计数据移除
 
   const handleSearch = (values: {
@@ -861,6 +875,37 @@ const ReceiptsPage = () => {
       },
     })
   }, [modal, deleteTransportTaskMutation, user, message])
+
+  const handleRestoreMatched = useCallback((record: any) => {
+    if (!canRestoreMatched) {
+      message.warning('无权限恢复装卸匹配')
+      return
+    }
+    modal.confirm({
+      title: '确认恢复装卸匹配',
+      content: (
+        <div>
+          <p>确定要恢复任务 <strong>{record.task_id}</strong> 的装卸匹配吗？</p>
+          <Alert
+            message="提示"
+            description="恢复后将同时恢复关联的装料单、卸货单及运输任务。"
+            type="info"
+            showIcon
+            style={{ marginTop: 16 }}
+          />
+        </div>
+      ),
+      okText: '确认恢复',
+      cancelText: '取消',
+      onOk: async () => {
+        try {
+          await restoreTransportTaskMutation.mutateAsync(record.task_id)
+        } catch (error) {
+          // Error is handled by mutation
+        }
+      },
+    })
+  }, [modal, restoreTransportTaskMutation, canRestoreMatched, message])
 
   // 交票功能
   const handleSubmitToFinance = useCallback(async (receipt: Receipt) => {
@@ -2134,7 +2179,7 @@ const ReceiptsPage = () => {
         width: 120,
         fixed: 'right',
         render: (_, record) => {
-          // 临时：始终显示删除按钮（用于调试）
+          const showRestoreOnly = filters.deletedStatus === 'deleted'
           return (
             <Space direction="vertical" size="small" style={{ width: '100%' }}>
               <Button
@@ -2150,31 +2195,46 @@ const ReceiptsPage = () => {
               >
                 查看
               </Button>
-              <Button
-                type="link"
-                size="small"
-                icon={<EditOutlined />}
-                onClick={() => handleEditMatched(record)}
-                style={{ padding: 0, height: 'auto' }}
-              >
-                编辑
-              </Button>
-              <Button
-                type="link"
-                size="small"
-                danger
-                icon={<DeleteOutlined />}
-                onClick={() => handleDeleteMatched(record)}
-                style={{ padding: 0, height: 'auto' }}
-              >
-                删除
-              </Button>
+              {!showRestoreOnly && (
+                <>
+                  <Button
+                    type="link"
+                    size="small"
+                    icon={<EditOutlined />}
+                    onClick={() => handleEditMatched(record)}
+                    style={{ padding: 0, height: 'auto' }}
+                  >
+                    编辑
+                  </Button>
+                  <Button
+                    type="link"
+                    size="small"
+                    danger
+                    icon={<DeleteOutlined />}
+                    onClick={() => handleDeleteMatched(record)}
+                    style={{ padding: 0, height: 'auto' }}
+                  >
+                    删除
+                  </Button>
+                </>
+              )}
+              {showRestoreOnly && canRestoreMatched && (
+                <Button
+                  type="link"
+                  size="small"
+                  icon={<SwapOutlined />}
+                  onClick={() => handleRestoreMatched(record)}
+                  style={{ padding: 0, height: 'auto' }}
+                >
+                  恢复
+                </Button>
+              )}
             </Space>
           )
         },
       },
     ],
-    [matchedReceipts, isSuperAdmin, user],
+    [matchedReceipts, isSuperAdmin, user, filters.deletedStatus, canRestoreMatched, handleRestoreMatched, handleEditMatched, handleDeleteMatched],
   )
 
   // 出厂单列定义（罐车业务）
