@@ -5,14 +5,18 @@ import {
   Button,
   Card,
   DatePicker,
+  Descriptions,
+  Drawer,
   Flex,
   Form,
+  Image,
   Input,
   Modal,
   Select,
   Space,
   Table,
   Tabs,
+  Tag,
   Typography,
   message,
 } from 'antd'
@@ -21,6 +25,7 @@ import type { Dayjs } from 'dayjs'
 import dayjs from 'dayjs'
 import {
   DeleteOutlined,
+  EyeOutlined,
   ReloadOutlined,
   RollbackOutlined,
 } from '@ant-design/icons'
@@ -163,6 +168,8 @@ export default function ReceiptsRecycleBin() {
   const [departments, setDepartments] = useState<Array<{ id: number; name: string }>>([])
   const [drivers, setDrivers] = useState<Array<{ id: number; name: string }>>([])
   const [companyBusinessType, setCompanyBusinessType] = useState<'truck' | 'tanker' | null>(null)
+  const [detailDrawerOpen, setDetailDrawerOpen] = useState(false)
+  const [selectedReceipt, setSelectedReceipt] = useState<any>(null)
 
   // 加载公司业务类型、部门和司机数据
   useEffect(() => {
@@ -328,6 +335,12 @@ export default function ReceiptsRecycleBin() {
     setFilters({})
   }
 
+  // 查看详情
+  const handleViewDetail = useCallback((record: any) => {
+    setSelectedReceipt(record)
+    setDetailDrawerOpen(true)
+  }, [])
+
   // 单个恢复
   const handleRestore = useCallback(
     (record: any) => {
@@ -414,6 +427,189 @@ export default function ReceiptsRecycleBin() {
     [modal, permanentDeleteMutation, activeTab]
   )
 
+  // 渲染详情
+  const renderDetail = () => {
+    if (!selectedReceipt) return null
+
+    const receipt = selectedReceipt
+    const isMatched = activeTab === 'matched'
+
+    // 装卸匹配详情
+    if (isMatched) {
+      return (
+        <Space direction="vertical" style={{ width: '100%' }} size="large">
+          <Card title="匹配信息" size="small">
+            <Descriptions column={1} bordered size="small">
+              <Descriptions.Item label="任务ID">{receipt.task_id || '-'}</Descriptions.Item>
+              <Descriptions.Item label="状态">
+                <Tag color={receipt.status === 'finished' ? 'green' : 'blue'}>
+                  {receipt.status === 'finished' ? '已完成' : '进行中'}
+                </Tag>
+              </Descriptions.Item>
+              <Descriptions.Item label="创建时间">
+                {receipt.created_at ? dayjs(receipt.created_at).format('YYYY-MM-DD HH:mm:ss') : '-'}
+              </Descriptions.Item>
+              {receipt.deleted_at && (
+                <>
+                  <Descriptions.Item label="删除时间">
+                    {dayjs(receipt.deleted_at).format('YYYY-MM-DD HH:mm:ss')}
+                  </Descriptions.Item>
+                  <Descriptions.Item label="删除人">
+                    {receipt.deleted_by_name || '-'}
+                  </Descriptions.Item>
+                </>
+              )}
+            </Descriptions>
+          </Card>
+
+          <Card title="装料单信息" size="small">
+            <Descriptions column={1} bordered size="small">
+              {receipt.loadBill?.thumb_url && !receipt.loadBill.thumb_url.startsWith('wxfile://') && (
+                <Descriptions.Item label="票据图片">
+                  <Image src={receipt.loadBill.thumb_url} alt="装料单图片" style={{ maxWidth: '100%' }} />
+                </Descriptions.Item>
+              )}
+              <Descriptions.Item label="公司">{receipt.loadBill?.company || '-'}</Descriptions.Item>
+              <Descriptions.Item label="司机">{receipt.loadBill?.driver_name || '-'}</Descriptions.Item>
+              <Descriptions.Item label="车牌号">{receipt.loadBill?.vehicle_no || '-'}</Descriptions.Item>
+              <Descriptions.Item label="材料名称">{receipt.loadBill?.material_name || '-'}</Descriptions.Item>
+              <Descriptions.Item label="规格型号">{receipt.loadBill?.material_spec || '-'}</Descriptions.Item>
+              <Descriptions.Item label="毛重(t)">
+                {receipt.loadBill?.gross_weight ? Number(receipt.loadBill.gross_weight).toFixed(2) : '-'}
+              </Descriptions.Item>
+              <Descriptions.Item label="净重(t)">
+                {receipt.loadBill?.net_weight ? Number(receipt.loadBill.net_weight).toFixed(2) : '-'}
+              </Descriptions.Item>
+              <Descriptions.Item label="皮重(t)">
+                {receipt.loadBill?.tare_weight ? Number(receipt.loadBill.tare_weight).toFixed(2) : '-'}
+              </Descriptions.Item>
+            </Descriptions>
+          </Card>
+
+          <Card title="卸货单信息" size="small">
+            <Descriptions column={1} bordered size="small">
+              {receipt.unloadBill?.thumb_url && !receipt.unloadBill.thumb_url.startsWith('wxfile://') && (
+                <Descriptions.Item label="票据图片">
+                  <Image src={receipt.unloadBill.thumb_url} alt="卸货单图片" style={{ maxWidth: '100%' }} />
+                </Descriptions.Item>
+              )}
+              <Descriptions.Item label="公司">{receipt.unloadBill?.company || '-'}</Descriptions.Item>
+              <Descriptions.Item label="司机">{receipt.unloadBill?.driver_name || '-'}</Descriptions.Item>
+              <Descriptions.Item label="车牌号">{receipt.unloadBill?.vehicle_no || '-'}</Descriptions.Item>
+              <Descriptions.Item label="材料名称">{receipt.unloadBill?.material_name || '-'}</Descriptions.Item>
+              <Descriptions.Item label="规格型号">{receipt.unloadBill?.material_spec || '-'}</Descriptions.Item>
+              <Descriptions.Item label="毛重(t)">
+                {receipt.unloadBill?.gross_weight ? Number(receipt.unloadBill.gross_weight).toFixed(2) : '-'}
+              </Descriptions.Item>
+              <Descriptions.Item label="净重(t)">
+                {receipt.unloadBill?.net_weight ? Number(receipt.unloadBill.net_weight).toFixed(2) : '-'}
+              </Descriptions.Item>
+              <Descriptions.Item label="皮重(t)">
+                {receipt.unloadBill?.tare_weight ? Number(receipt.unloadBill.tare_weight).toFixed(2) : '-'}
+              </Descriptions.Item>
+            </Descriptions>
+          </Card>
+        </Space>
+      )
+    }
+
+    // 普通票据详情
+    const imageUrl = receipt.thumb_url || receipt.image_path
+    const hasValidImage = imageUrl && !imageUrl.startsWith('wxfile://') && !imageUrl.startsWith('file://')
+
+    return (
+      <Space direction="vertical" style={{ width: '100%' }} size="large">
+        {hasValidImage && (
+          <Card title="票据图片" size="small">
+            <Image src={imageUrl} alt="票据图片" style={{ maxWidth: '100%' }} />
+          </Card>
+        )}
+
+        <Card title="基本信息" size="small">
+          <Descriptions column={1} bordered size="small">
+            <Descriptions.Item label="类型">
+              {RECEIPT_TYPES.find((t) => t.value === receipt.type)?.label || '-'}
+            </Descriptions.Item>
+            
+            {(receipt.type === 'loading' || receipt.type === 'unloading') && (
+              <>
+                <Descriptions.Item label="公司">{receipt.company || '-'}</Descriptions.Item>
+                <Descriptions.Item label="司机">{receipt.driver_name || '-'}</Descriptions.Item>
+                <Descriptions.Item label="车牌号">{receipt.vehicle_no || '-'}</Descriptions.Item>
+                <Descriptions.Item label="材料名称">{receipt.material_name || '-'}</Descriptions.Item>
+                <Descriptions.Item label="规格型号">{receipt.material_spec || '-'}</Descriptions.Item>
+                <Descriptions.Item label="毛重(t)">
+                  {receipt.gross_weight ? Number(receipt.gross_weight).toFixed(2) : '-'}
+                </Descriptions.Item>
+                <Descriptions.Item label="净重(t)">
+                  {receipt.net_weight ? Number(receipt.net_weight).toFixed(2) : '-'}
+                </Descriptions.Item>
+                <Descriptions.Item label="皮重(t)">
+                  {receipt.tare_weight ? Number(receipt.tare_weight).toFixed(2) : '-'}
+                </Descriptions.Item>
+              </>
+            )}
+
+            {receipt.type === 'charging' && (
+              <>
+                <Descriptions.Item label="司机">{receipt.driver_name || '-'}</Descriptions.Item>
+                <Descriptions.Item label="车牌号">{receipt.vehicle_no || '-'}</Descriptions.Item>
+                <Descriptions.Item label="充电站">{(receipt as any).charging_station || '-'}</Descriptions.Item>
+                <Descriptions.Item label="充电桩">{(receipt as any).charging_pile || '-'}</Descriptions.Item>
+                <Descriptions.Item label="电量(kWh)">
+                  {(receipt as any).energy_kwh ? Number((receipt as any).energy_kwh).toFixed(2) : '-'}
+                </Descriptions.Item>
+                <Descriptions.Item label="金额(元)">
+                  {(receipt as any).amount ? Number((receipt as any).amount).toFixed(2) : '-'}
+                </Descriptions.Item>
+              </>
+            )}
+
+            {receipt.type === 'water' && (
+              <>
+                <Descriptions.Item label="业务单号">{(receipt as any).f_water_ticket_id || '-'}</Descriptions.Item>
+                <Descriptions.Item label="司机">{receipt.driver_name || '-'}</Descriptions.Item>
+                <Descriptions.Item label="公司">{(receipt as any).company_name || '-'}</Descriptions.Item>
+                <Descriptions.Item label="车牌号">{receipt.vehicle_no || '-'}</Descriptions.Item>
+                <Descriptions.Item label="日期">
+                  {(receipt as any).ticket_date ? dayjs((receipt as any).ticket_date).format('YYYY-MM-DD') : '-'}
+                </Descriptions.Item>
+              </>
+            )}
+
+            {receipt.type === 'departure' && (
+              <>
+                <Descriptions.Item label="司机">{receipt.driver_name || '-'}</Descriptions.Item>
+                <Descriptions.Item label="车牌号">{receipt.vehicle_no || '-'}</Descriptions.Item>
+                <Descriptions.Item label="自编车号">{(receipt as any).tanker_vehicle_code || '-'}</Descriptions.Item>
+                <Descriptions.Item label="装料公司">{(receipt as any).loading_company || '-'}</Descriptions.Item>
+                <Descriptions.Item label="工程名称">{(receipt as any).project_name || '-'}</Descriptions.Item>
+                <Descriptions.Item label="方量">
+                  {(receipt as any).concrete_volume ? Number((receipt as any).concrete_volume).toFixed(2) : '-'}
+                </Descriptions.Item>
+              </>
+            )}
+
+            <Descriptions.Item label="创建时间">
+              {receipt.created_at ? dayjs(receipt.created_at).format('YYYY-MM-DD HH:mm:ss') : '-'}
+            </Descriptions.Item>
+
+            {receipt.deleted_at && (
+              <>
+                <Descriptions.Item label="删除时间">
+                  {dayjs(receipt.deleted_at).format('YYYY-MM-DD HH:mm:ss')}
+                </Descriptions.Item>
+                <Descriptions.Item label="删除人">
+                  {receipt.deleted_by_name || '-'}
+                </Descriptions.Item>
+              </>
+            )}
+          </Descriptions>
+        </Card>
+      </Space>
+    )
+  }
+
   // 表格列定义
   const getColumns = (type: RecycleBinTabType): ColumnsType<any> => {
     // 装卸匹配的列定义
@@ -444,6 +640,46 @@ export default function ReceiptsRecycleBin() {
           },
         },
         {
+          title: '装料单图片',
+          key: 'load_image',
+          width: 100,
+          render: (_, record: any) => {
+            const thumbUrl = record.loadBill?.thumb_url
+            if (!thumbUrl || thumbUrl.startsWith('wxfile://') || thumbUrl.startsWith('file://')) {
+              return '-'
+            }
+            return (
+              <Image
+                src={thumbUrl}
+                width={60}
+                height={60}
+                style={{ objectFit: 'cover', borderRadius: 4 }}
+                fallback="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="
+              />
+            )
+          },
+        },
+        {
+          title: '卸货单图片',
+          key: 'unload_image',
+          width: 100,
+          render: (_, record: any) => {
+            const thumbUrl = record.unloadBill?.thumb_url
+            if (!thumbUrl || thumbUrl.startsWith('wxfile://') || thumbUrl.startsWith('file://')) {
+              return '-'
+            }
+            return (
+              <Image
+                src={thumbUrl}
+                width={60}
+                height={60}
+                style={{ objectFit: 'cover', borderRadius: 4 }}
+                fallback="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="
+              />
+            )
+          },
+        },
+        {
           title: '删除时间',
           dataIndex: 'deleted_at',
           key: 'deleted_at',
@@ -460,16 +696,26 @@ export default function ReceiptsRecycleBin() {
         {
           title: '操作',
           key: 'action',
-          width: 180,
+          width: 200,
           fixed: 'right' as const,
           render: (_: any, record: any) => (
-            <Space>
+            <Space direction="vertical" size="small">
+              <Button
+                type="link"
+                size="small"
+                icon={<EyeOutlined />}
+                onClick={() => handleViewDetail(record)}
+                style={{ padding: 0, height: 'auto' }}
+              >
+                查看详情
+              </Button>
               <Button
                 type="link"
                 size="small"
                 icon={<RollbackOutlined />}
                 onClick={() => handleRestore(record)}
                 loading={restoreMutation.isPending}
+                style={{ padding: 0, height: 'auto' }}
               >
                 恢复
               </Button>
@@ -480,6 +726,7 @@ export default function ReceiptsRecycleBin() {
                 icon={<DeleteOutlined />}
                 onClick={() => handlePermanentDelete(record)}
                 loading={permanentDeleteMutation.isPending}
+                style={{ padding: 0, height: 'auto' }}
               >
                 永久删除
               </Button>
@@ -549,6 +796,26 @@ export default function ReceiptsRecycleBin() {
           key: 'net_weight',
           width: 100,
           render: (val: any) => (val != null && val !== '' ? Number(val).toFixed(2) : '-'),
+        },
+        {
+          title: '图片',
+          dataIndex: 'thumb_url',
+          key: 'thumb_url',
+          width: 100,
+          render: (val: string) => {
+            if (!val || val.startsWith('wxfile://') || val.startsWith('file://')) {
+              return '-'
+            }
+            return (
+              <Image
+                src={val}
+                width={60}
+                height={60}
+                style={{ objectFit: 'cover', borderRadius: 4 }}
+                fallback="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="
+              />
+            )
+          },
         }
       )
     } else if (type === 'charging') {
@@ -593,6 +860,26 @@ export default function ReceiptsRecycleBin() {
           key: 'amount',
           width: 100,
           render: (val: any) => (val != null && val !== '' ? Number(val).toFixed(2) : '-'),
+        },
+        {
+          title: '图片',
+          dataIndex: 'thumb_url',
+          key: 'thumb_url',
+          width: 100,
+          render: (val: string) => {
+            if (!val || val.startsWith('wxfile://') || val.startsWith('file://')) {
+              return '-'
+            }
+            return (
+              <Image
+                src={val}
+                width={60}
+                height={60}
+                style={{ objectFit: 'cover', borderRadius: 4 }}
+                fallback="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="
+              />
+            )
+          },
         }
       )
     } else if (type === 'water') {
@@ -623,6 +910,26 @@ export default function ReceiptsRecycleBin() {
           key: 'ticket_date',
           width: 120,
           render: (val: string) => (val ? dayjs(val).format('YYYY-MM-DD') : '-'),
+        },
+        {
+          title: '图片',
+          key: 'image',
+          width: 100,
+          render: (_, record: any) => {
+            const imageUrl = record.thumb_url || record.image_path
+            if (!imageUrl || imageUrl.startsWith('wxfile://') || imageUrl.startsWith('file://')) {
+              return '-'
+            }
+            return (
+              <Image
+                src={imageUrl}
+                width={60}
+                height={60}
+                style={{ objectFit: 'cover', borderRadius: 4 }}
+                fallback="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="
+              />
+            )
+          },
         }
       )
     } else if (type === 'departure') {
@@ -660,6 +967,26 @@ export default function ReceiptsRecycleBin() {
           key: 'concrete_volume',
           width: 100,
           render: (val: any) => (val != null && val !== '' ? Number(val).toFixed(2) : '-'),
+        },
+        {
+          title: '图片',
+          key: 'image',
+          width: 100,
+          render: (_, record: any) => {
+            const imageUrl = record.thumb_url || record.image_path
+            if (!imageUrl || imageUrl.startsWith('wxfile://') || imageUrl.startsWith('file://')) {
+              return '-'
+            }
+            return (
+              <Image
+                src={imageUrl}
+                width={60}
+                height={60}
+                style={{ objectFit: 'cover', borderRadius: 4 }}
+                fallback="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="
+              />
+            )
+          },
         }
       )
     }
@@ -675,16 +1002,26 @@ export default function ReceiptsRecycleBin() {
       {
         title: '操作',
         key: 'action',
-        width: 180,
+        width: 200,
         fixed: 'right',
         render: (_: any, record: Receipt) => (
-          <Space>
+          <Space direction="vertical" size="small">
+            <Button
+              type="link"
+              size="small"
+              icon={<EyeOutlined />}
+              onClick={() => handleViewDetail(record)}
+              style={{ padding: 0, height: 'auto' }}
+            >
+              查看详情
+            </Button>
             <Button
               type="link"
               size="small"
               icon={<RollbackOutlined />}
               onClick={() => handleRestore(record)}
               loading={restoreMutation.isPending}
+              style={{ padding: 0, height: 'auto' }}
             >
               恢复
             </Button>
@@ -695,6 +1032,7 @@ export default function ReceiptsRecycleBin() {
               icon={<DeleteOutlined />}
               onClick={() => handlePermanentDelete(record)}
               loading={permanentDeleteMutation.isPending}
+              style={{ padding: 0, height: 'auto' }}
             >
               永久删除
             </Button>
@@ -820,6 +1158,20 @@ export default function ReceiptsRecycleBin() {
           }))}
         />
       </Card>
+
+      {/* 详情抽屉 */}
+      <Drawer
+        title="票据详情"
+        placement="right"
+        width={600}
+        open={detailDrawerOpen}
+        onClose={() => {
+          setDetailDrawerOpen(false)
+          setSelectedReceipt(null)
+        }}
+      >
+        {selectedReceipt && renderDetail()}
+      </Drawer>
     </Space>
   )
 }

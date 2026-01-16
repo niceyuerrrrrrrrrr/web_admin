@@ -22,6 +22,7 @@ import {
   Table,
   Tabs,
   Tag,
+  Tooltip,
   Typography,
 } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
@@ -36,6 +37,7 @@ import {
   ReloadOutlined,
   ToolOutlined,
   SwapOutlined,
+  FormOutlined,
 } from '@ant-design/icons'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import * as XLSX from 'xlsx'
@@ -59,6 +61,7 @@ import {
   submitReceiptToFinance,
   submitReceiptsToFinance,
   restoreReceipt,
+  updateTransportTaskRemarks,
 } from '../api/services/receipts'
 import { fetchCompanyDetail } from '../api/services/companies'
 import { fetchDepartments } from '../api/services/departments'
@@ -209,6 +212,17 @@ const ReceiptsPage = () => {
   const [editingMatched, setEditingMatched] = useState<any>(null)
   const [matchedEditModalOpen, setMatchedEditModalOpen] = useState(false)
   const showCompanyWarning = isSuperAdmin && !effectiveCompanyId
+
+  // 备注编辑相关状态
+  const [remarksModalOpen, setRemarksModalOpen] = useState(false)
+  const [editingTaskId, setEditingTaskId] = useState<string | null>(null)
+  const [editingLoadBillId, setEditingLoadBillId] = useState<number | null>(null)
+  const [editingUnloadBillId, setEditingUnloadBillId] = useState<number | null>(null)
+  const [remarksForm] = Form.useForm()
+
+  // 表格筛选状态 - 用于同步KPI和分页
+  const [tableFilteredData, setTableFilteredData] = useState<any[]>([])
+  const [tableFilters, setTableFilters] = useState<Record<string, any>>({})
 
   // 加载数据清洗配置
   const { data: cleanConfigs } = useQuery({
@@ -413,13 +427,33 @@ const ReceiptsPage = () => {
     })
   }, [receipts, activeTab, filters.volumeFilter])
 
-  // 计算当前表格显示数据的KPI统计
+  // 当数据源变化或切换tab时，重置表格筛选数据
+  useEffect(() => {
+    const currentData = activeTab === 'matched' ? matchedReceipts : filteredReceipts
+    setTableFilteredData(currentData)
+    setTableFilters({}) // 重置筛选条件
+  }, [filteredReceipts, matchedReceipts, activeTab])
+
+  // 表格筛选/排序/分页变化时的处理函数
+  const handleTableChange = useCallback((
+    _pagination: any,
+    filters: Record<string, any>,
+    _sorter: any,
+    extra: { currentDataSource: any[] }
+  ) => {
+    // extra.currentDataSource 包含筛选后的数据
+    setTableFilteredData(extra.currentDataSource)
+    setTableFilters(filters)
+  }, [])
+
+  // 计算当前表格显示数据的KPI统计（使用筛选后的数据）
   const kpiStats = useMemo(() => {
     if (activeTab === 'matched') {
       return null // 装卸匹配使用单独的统计
     }
 
-    const currentReceipts = filteredReceipts.filter((r: any) => r.type === activeTab)
+    // 使用表格筛选后的数据计算KPI
+    const currentReceipts = tableFilteredData.filter((r: any) => r.type === activeTab)
     const totalCount = currentReceipts.length
     let submittedCount = 0
 
@@ -511,7 +545,22 @@ const ReceiptsPage = () => {
     }
 
     return null
-  }, [activeTab, filteredReceipts])
+  }, [activeTab, tableFilteredData])
+
+  // 计算装卸匹配的筛选后统计
+  const filteredMatchedStats = useMemo(() => {
+    if (activeTab !== 'matched') return null
+    
+    const totalCount = tableFilteredData.length
+    const normalCount = tableFilteredData.filter((r: any) => !r.is_deleted).length
+    const deletedCount = tableFilteredData.filter((r: any) => r.is_deleted).length
+    
+    return {
+      total_count: totalCount,
+      normal_count: normalCount,
+      deleted_count: deletedCount,
+    }
+  }, [activeTab, tableFilteredData])
 
   // 编辑充电单
   const updateChargingMutation = useMutation({
@@ -907,6 +956,57 @@ const ReceiptsPage = () => {
     })
   }, [modal, restoreTransportTaskMutation, canRestoreMatched, message])
 
+  // 编辑备注
+  const handleEditRemarks = useCallback((record: any) => {
+    setEditingTaskId(record.task_id)
+    setEditingLoadBillId(record.loadBill?.id || null)
+    setEditingUnloadBillId(record.unloadBill?.id || null)
+    remarksForm.setFieldsValue({
+      task_remarks: record.remarks || '',
+      load_remarks: record.loadBill?.remarks || '',
+      unload_remarks: record.unloadBill?.remarks || ''
+    })
+    setRemarksModalOpen(true)
+  }, [remarksForm])
+
+  // 保存备注
+  const handleSaveRemarks = useCallback(async () => {
+    try {
+      const values = await remarksForm.validateFields()
+      
+      // 保存运输任务备注
+      if (editingTaskId) {
+        await updateTransportTaskRemarks(editingTaskId, values.task_remarks || '')
+      }
+      
+      // 保存装料单备注
+      if (editingLoadBillId) {
+        await updateLoadingReceipt(editingLoadBillId, {
+          remarks: values.load_remarks || ''
+        })
+      }
+      
+      // 保存卸货单备注
+      if (editingUnloadBillId) {
+        await updateUnloadingReceipt(editingUnloadBillId, {
+          remarks: values.unload_remarks || ''
+        })
+      }
+      
+      message.success('备注已更新')
+      setRemarksModalOpen(false)
+      remarksForm.resetFields()
+      setEditingTaskId(null)
+      setEditingLoadBillId(null)
+      setEditingUnloadBillId(null)
+      
+      // 刷新列表
+      queryClient.invalidateQueries({ queryKey: ['matched-receipts'] })
+    } catch (error) {
+      message.error((error as Error).message || '保存失败')
+    }
+  }, [editingTaskId, editingLoadBillId, editingUnloadBillId, remarksForm, queryClient, message])
+
   // 交票功能
   const handleSubmitToFinance = useCallback(async (receipt: Receipt) => {
     try {
@@ -1211,41 +1311,76 @@ const ReceiptsPage = () => {
         title: '毛重(t)',
         dataIndex: 'gross_weight',
         width: 100,
+        sorter: (a: any, b: any) => {
+          const aWeight = a.gross_weight != null ? Number(a.gross_weight) : 0
+          const bWeight = b.gross_weight != null ? Number(b.gross_weight) : 0
+          return aWeight - bWeight
+        },
         render: (value: any) => (value != null && value !== '' ? Number(value).toFixed(2) : '-'),
       },
       {
         title: '净重(t)',
         dataIndex: 'net_weight',
         width: 100,
+        sorter: (a: any, b: any) => {
+          const aWeight = a.net_weight != null ? Number(a.net_weight) : 0
+          const bWeight = b.net_weight != null ? Number(b.net_weight) : 0
+          return aWeight - bWeight
+        },
         render: (value: any) => (value != null && value !== '' ? Number(value).toFixed(2) : '-'),
       },
       {
         title: '皮重(t)',
         dataIndex: 'tare_weight',
         width: 100,
+        sorter: (a: any, b: any) => {
+          const aWeight = a.tare_weight != null ? Number(a.tare_weight) : 0
+          const bWeight = b.tare_weight != null ? Number(b.tare_weight) : 0
+          return aWeight - bWeight
+        },
         render: (value: any) => (value != null && value !== '' ? Number(value).toFixed(2) : '-'),
       },
       {
         title: '进厂时间',
         dataIndex: 'loading_time',
         width: 180,
+        sorter: (a: any, b: any) => {
+          const aTime = a.loading_time || ''
+          const bTime = b.loading_time || ''
+          return aTime.localeCompare(bTime)
+        },
         render: (value: string) => (value ? dayjs(value).format('YYYY-MM-DD HH:mm:ss') : '-'),
       },
       {
         title: '出厂时间',
         dataIndex: 'unloading_time',
         width: 180,
+        sorter: (a: any, b: any) => {
+          const aTime = a.unloading_time || ''
+          const bTime = b.unloading_time || ''
+          return aTime.localeCompare(bTime)
+        },
         render: (value: string) => (value ? dayjs(value).format('YYYY-MM-DD HH:mm:ss') : '-'),
       },
       {
         title: '任务ID',
         dataIndex: 'task_id',
         width: 200,
+        filters: generateFiltersWithEmpty(receipts || [], 'task_id' as any),
+        onFilter: (value, record) => {
+          if (value === EMPTY_VALUE_FLAG) return !(record as any).task_id
+          return (record as any).task_id === value
+        },
       },
       {
         title: '创建时间',
         dataIndex: 'created_at',
         width: 180,
+        sorter: (a: any, b: any) => {
+          const aTime = a.created_at || ''
+          const bTime = b.created_at || ''
+          return aTime.localeCompare(bTime)
+        },
         render: (value: string) => (value ? dayjs(value).format('YYYY-MM-DD HH:mm:ss') : '-'),
       },
       {
@@ -1311,6 +1446,80 @@ const ReceiptsPage = () => {
           return aTime.localeCompare(bTime)
         },
         render: (value: string) => (value ? dayjs(value).format('YYYY-MM-DD HH:mm:ss') : '-'),
+      },
+      {
+        title: '备注',
+        dataIndex: 'remarks',
+        key: 'remarks',
+        width: 200,
+        ellipsis: {
+          showTitle: false,
+        },
+        filters: [
+          { text: '有备注', value: 'has_remarks' },
+          { text: '无备注', value: 'no_remarks' },
+        ],
+        onFilter: (value, record) => {
+          const hasRemarks = !!(record.remarks && record.remarks.trim() !== '')
+          if (value === 'has_remarks') return hasRemarks
+          if (value === 'no_remarks') return !hasRemarks
+          return true
+        },
+        render: (value: string | null) => {
+          if (!value || value.trim() === '') {
+            return <span style={{ color: '#999' }}>-</span>
+          }
+          return (
+            <Tooltip title={value} placement="topLeft">
+              <span style={{ 
+                display: 'inline-block',
+                maxWidth: '180px',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap'
+              }}>
+                {value}
+              </span>
+            </Tooltip>
+          )
+        },
+      },
+      {
+        title: '运输任务备注',
+        dataIndex: 'remarks',
+        key: 'task_remarks',
+        width: 200,
+        ellipsis: {
+          showTitle: false,
+        },
+        filters: [
+          { text: '有备注', value: 'has_remarks' },
+          { text: '无备注', value: 'no_remarks' },
+        ],
+        onFilter: (value, record) => {
+          const hasRemarks = !!(record.remarks && record.remarks.trim() !== '')
+          if (value === 'has_remarks') return hasRemarks
+          if (value === 'no_remarks') return !hasRemarks
+          return true
+        },
+        render: (value: string | null) => {
+          if (!value || value.trim() === '') {
+            return <span style={{ color: '#999' }}>-</span>
+          }
+          return (
+            <Tooltip title={value} placement="topLeft">
+              <span style={{ 
+                display: 'inline-block',
+                maxWidth: '180px',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap'
+              }}>
+                {value}
+              </span>
+            </Tooltip>
+          )
+        },
       },
       {
         title: '装料单图片',
@@ -1425,41 +1634,76 @@ const ReceiptsPage = () => {
         title: '毛重(t)',
         dataIndex: 'gross_weight',
         width: 100,
+        sorter: (a: any, b: any) => {
+          const aWeight = a.gross_weight != null ? Number(a.gross_weight) : 0
+          const bWeight = b.gross_weight != null ? Number(b.gross_weight) : 0
+          return aWeight - bWeight
+        },
         render: (value: any) => (value != null && value !== '' ? Number(value).toFixed(2) : '-'),
       },
       {
         title: '净重(t)',
         dataIndex: 'net_weight',
         width: 100,
+        sorter: (a: any, b: any) => {
+          const aWeight = a.net_weight != null ? Number(a.net_weight) : 0
+          const bWeight = b.net_weight != null ? Number(b.net_weight) : 0
+          return aWeight - bWeight
+        },
         render: (value: any) => (value != null && value !== '' ? Number(value).toFixed(2) : '-'),
       },
       {
         title: '皮重(t)',
         dataIndex: 'tare_weight',
         width: 100,
+        sorter: (a: any, b: any) => {
+          const aWeight = a.tare_weight != null ? Number(a.tare_weight) : 0
+          const bWeight = b.tare_weight != null ? Number(b.tare_weight) : 0
+          return aWeight - bWeight
+        },
         render: (value: any) => (value != null && value !== '' ? Number(value).toFixed(2) : '-'),
       },
       {
         title: '进厂时间',
         dataIndex: 'loading_time',
         width: 180,
+        sorter: (a: any, b: any) => {
+          const aTime = a.loading_time || ''
+          const bTime = b.loading_time || ''
+          return aTime.localeCompare(bTime)
+        },
         render: (value: string) => (value ? dayjs(value).format('YYYY-MM-DD HH:mm:ss') : '-'),
       },
       {
         title: '出厂时间',
         dataIndex: 'unloading_time',
         width: 180,
+        sorter: (a: any, b: any) => {
+          const aTime = a.unloading_time || ''
+          const bTime = b.unloading_time || ''
+          return aTime.localeCompare(bTime)
+        },
         render: (value: string) => (value ? dayjs(value).format('YYYY-MM-DD HH:mm:ss') : '-'),
       },
       {
         title: '任务ID',
         dataIndex: 'task_id',
         width: 200,
+        filters: generateFiltersWithEmpty(receipts || [], 'task_id' as any),
+        onFilter: (value, record) => {
+          if (value === EMPTY_VALUE_FLAG) return !(record as any).task_id
+          return (record as any).task_id === value
+        },
       },
       {
         title: '创建时间',
         dataIndex: 'created_at',
         width: 180,
+        sorter: (a: any, b: any) => {
+          const aTime = a.created_at || ''
+          const bTime = b.created_at || ''
+          return aTime.localeCompare(bTime)
+        },
         render: (value: string) => (value ? dayjs(value).format('YYYY-MM-DD HH:mm:ss') : '-'),
       },
       {
@@ -1527,6 +1771,43 @@ const ReceiptsPage = () => {
         render: (value: string) => (value ? dayjs(value).format('YYYY-MM-DD HH:mm:ss') : '-'),
       },
       {
+        title: '备注',
+        dataIndex: 'remarks',
+        key: 'remarks',
+        width: 200,
+        ellipsis: {
+          showTitle: false,
+        },
+        filters: [
+          { text: '有备注', value: 'has_remarks' },
+          { text: '无备注', value: 'no_remarks' },
+        ],
+        onFilter: (value, record) => {
+          const hasRemarks = !!(record.remarks && record.remarks.trim() !== '')
+          if (value === 'has_remarks') return hasRemarks
+          if (value === 'no_remarks') return !hasRemarks
+          return true
+        },
+        render: (value: string | null) => {
+          if (!value || value.trim() === '') {
+            return <span style={{ color: '#999' }}>-</span>
+          }
+          return (
+            <Tooltip title={value} placement="topLeft">
+              <span style={{ 
+                display: 'inline-block',
+                maxWidth: '180px',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap'
+              }}>
+                {value}
+              </span>
+            </Tooltip>
+          )
+        },
+      },
+      {
         title: '卸货单图片',
         dataIndex: 'thumb_url',
         key: 'thumb_url',
@@ -1571,6 +1852,11 @@ const ReceiptsPage = () => {
         title: '单据编号',
         dataIndex: 'receipt_number',
         width: 150,
+        filters: generateFiltersWithEmpty(receipts || [], 'receipt_number' as any),
+        onFilter: (value, record) => {
+          if (value === EMPTY_VALUE_FLAG) return !(record as any).receipt_number
+          return (record as any).receipt_number === value
+        },
         render: (value: string) => value || '-',
       },
       {
@@ -1613,24 +1899,44 @@ const ReceiptsPage = () => {
         title: '充电站',
         dataIndex: 'charging_station',
         width: 150,
+        filters: generateFiltersWithEmpty(receipts || [], 'charging_station' as any),
+        onFilter: (value, record) => {
+          if (value === EMPTY_VALUE_FLAG) return !(record as any).charging_station
+          return (record as any).charging_station === value
+        },
         render: (value: string) => value || '-',
       },
       {
         title: '充电桩',
         dataIndex: 'charging_pile',
         width: 100,
+        filters: generateFiltersWithEmpty(receipts || [], 'charging_pile' as any),
+        onFilter: (value, record) => {
+          if (value === EMPTY_VALUE_FLAG) return !(record as any).charging_pile
+          return (record as any).charging_pile === value
+        },
         render: (value: string) => value || '-',
       },
       {
         title: '电量(kWh)',
         dataIndex: 'energy_kwh',
         width: 100,
+        sorter: (a: any, b: any) => {
+          const aEnergy = a.energy_kwh != null ? Number(a.energy_kwh) : 0
+          const bEnergy = b.energy_kwh != null ? Number(b.energy_kwh) : 0
+          return aEnergy - bEnergy
+        },
         render: (value: any) => (value != null && value !== '' ? Number(value).toFixed(2) : '-'),
       },
       {
         title: '金额(元)',
         dataIndex: 'amount',
         width: 100,
+        sorter: (a: any, b: any) => {
+          const aAmount = a.amount != null ? Number(a.amount) : 0
+          const bAmount = b.amount != null ? Number(b.amount) : 0
+          return aAmount - bAmount
+        },
         render: (value: any) => (value != null && value !== '' ? Number(value).toFixed(2) : '-'),
       },
       {
@@ -1665,6 +1971,11 @@ const ReceiptsPage = () => {
         title: '创建时间',
         dataIndex: 'created_at',
         width: 150,
+        sorter: (a: any, b: any) => {
+          const aTime = a.created_at || ''
+          const bTime = b.created_at || ''
+          return aTime.localeCompare(bTime)
+        },
         render: (value: string) => (value ? dayjs(value).format('YYYY-MM-DD HH:mm:ss') : '-'),
       },
       {
@@ -1688,6 +1999,43 @@ const ReceiptsPage = () => {
             )
           }
           return <Tag color="green">正常</Tag>
+        },
+      },
+      {
+        title: '备注',
+        dataIndex: 'remarks',
+        key: 'remarks',
+        width: 200,
+        ellipsis: {
+          showTitle: false,
+        },
+        filters: [
+          { text: '有备注', value: 'has_remarks' },
+          { text: '无备注', value: 'no_remarks' },
+        ],
+        onFilter: (value, record) => {
+          const hasRemarks = !!(record.remarks && record.remarks.trim() !== '')
+          if (value === 'has_remarks') return hasRemarks
+          if (value === 'no_remarks') return !hasRemarks
+          return true
+        },
+        render: (value: string | null) => {
+          if (!value || value.trim() === '') {
+            return <span style={{ color: '#999' }}>-</span>
+          }
+          return (
+            <Tooltip title={value} placement="topLeft">
+              <span style={{ 
+                display: 'inline-block',
+                maxWidth: '180px',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap'
+              }}>
+                {value}
+              </span>
+            </Tooltip>
+          )
         },
       },
       {
@@ -1735,6 +2083,11 @@ const ReceiptsPage = () => {
         title: '业务单号',
         dataIndex: 'f_water_ticket_id',
         width: 150,
+        filters: generateFiltersWithEmpty(receipts || [], 'f_water_ticket_id' as any),
+        onFilter: (value, record) => {
+          if (value === EMPTY_VALUE_FLAG) return !(record as any).f_water_ticket_id
+          return (record as any).f_water_ticket_id === value
+        },
         render: (value: string) => value || '-',
       },
       {
@@ -1752,6 +2105,11 @@ const ReceiptsPage = () => {
         title: '公司',
         dataIndex: 'company_name',
         width: 150,
+        filters: generateFiltersWithEmpty(receipts || [], 'company_name' as any),
+        onFilter: (value, record) => {
+          if (value === EMPTY_VALUE_FLAG) return !(record as any).company_name
+          return (record as any).company_name === value
+        },
         render: (value: string) => value || '-',
       },
       {
@@ -1783,12 +2141,22 @@ const ReceiptsPage = () => {
         title: '日期',
         dataIndex: 'ticket_date',
         width: 120,
+        sorter: (a: any, b: any) => {
+          const aDate = a.ticket_date || ''
+          const bDate = b.ticket_date || ''
+          return aDate.localeCompare(bDate)
+        },
         render: (value: string) => (value ? dayjs(value).format('YYYY-MM-DD') : '-'),
       },
       {
         title: '创建时间',
         dataIndex: 'created_at',
         width: 150,
+        sorter: (a: any, b: any) => {
+          const aTime = a.created_at || ''
+          const bTime = b.created_at || ''
+          return aTime.localeCompare(bTime)
+        },
         render: (value: string) => (value ? dayjs(value).format('YYYY-MM-DD HH:mm:ss') : '-'),
       },
       {
@@ -1854,6 +2222,43 @@ const ReceiptsPage = () => {
           return aTime.localeCompare(bTime)
         },
         render: (value: string) => (value ? dayjs(value).format('YYYY-MM-DD HH:mm:ss') : '-'),
+      },
+      {
+        title: '备注',
+        dataIndex: 'remarks',
+        key: 'remarks',
+        width: 200,
+        ellipsis: {
+          showTitle: false,
+        },
+        filters: [
+          { text: '有备注', value: 'has_remarks' },
+          { text: '无备注', value: 'no_remarks' },
+        ],
+        onFilter: (value, record) => {
+          const hasRemarks = !!(record.remarks && record.remarks.trim() !== '')
+          if (value === 'has_remarks') return hasRemarks
+          if (value === 'no_remarks') return !hasRemarks
+          return true
+        },
+        render: (value: string | null) => {
+          if (!value || value.trim() === '') {
+            return <span style={{ color: '#999' }}>-</span>
+          }
+          return (
+            <Tooltip title={value} placement="topLeft">
+              <span style={{ 
+                display: 'inline-block',
+                maxWidth: '180px',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap'
+              }}>
+                {value}
+              </span>
+            </Tooltip>
+          )
+        },
       },
       {
         title: '水票图片',
@@ -2129,6 +2534,80 @@ const ReceiptsPage = () => {
         },
       },
       {
+        title: '装料备注',
+        dataIndex: ['loadBill', 'remarks'],
+        key: 'load_remarks',
+        width: 200,
+        ellipsis: {
+          showTitle: false,
+        },
+        filters: [
+          { text: '有备注', value: 'has_remarks' },
+          { text: '无备注', value: 'no_remarks' },
+        ],
+        onFilter: (value, record) => {
+          const hasRemarks = !!(record.loadBill?.remarks && record.loadBill.remarks.trim() !== '')
+          if (value === 'has_remarks') return hasRemarks
+          if (value === 'no_remarks') return !hasRemarks
+          return true
+        },
+        render: (value: string | null) => {
+          if (!value || value.trim() === '') {
+            return <span style={{ color: '#999' }}>-</span>
+          }
+          return (
+            <Tooltip title={value} placement="topLeft">
+              <span style={{ 
+                display: 'inline-block',
+                maxWidth: '180px',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap'
+              }}>
+                {value}
+              </span>
+            </Tooltip>
+          )
+        },
+      },
+      {
+        title: '卸货备注',
+        dataIndex: ['unloadBill', 'remarks'],
+        key: 'unload_remarks',
+        width: 200,
+        ellipsis: {
+          showTitle: false,
+        },
+        filters: [
+          { text: '有备注', value: 'has_remarks' },
+          { text: '无备注', value: 'no_remarks' },
+        ],
+        onFilter: (value, record) => {
+          const hasRemarks = !!(record.unloadBill?.remarks && record.unloadBill.remarks.trim() !== '')
+          if (value === 'has_remarks') return hasRemarks
+          if (value === 'no_remarks') return !hasRemarks
+          return true
+        },
+        render: (value: string | null) => {
+          if (!value || value.trim() === '') {
+            return <span style={{ color: '#999' }}>-</span>
+          }
+          return (
+            <Tooltip title={value} placement="topLeft">
+              <span style={{ 
+                display: 'inline-block',
+                maxWidth: '180px',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap'
+              }}>
+                {value}
+              </span>
+            </Tooltip>
+          )
+        },
+      },
+      {
         title: '装料单图片',
         dataIndex: ['loadBill', 'thumb_url'],
         key: 'loadBill_thumb_url',
@@ -2176,7 +2655,7 @@ const ReceiptsPage = () => {
       },
       {
         title: '操作',
-        width: 120,
+        width: 150,  // 增加宽度以容纳新按钮
         fixed: 'right',
         render: (_, record) => {
           const showRestoreOnly = filters.deletedStatus === 'deleted'
@@ -2209,6 +2688,15 @@ const ReceiptsPage = () => {
                   <Button
                     type="link"
                     size="small"
+                    icon={<FormOutlined />}
+                    onClick={() => handleEditRemarks(record)}
+                    style={{ padding: 0, height: 'auto' }}
+                  >
+                    备注
+                  </Button>
+                  <Button
+                    type="link"
+                    size="small"
                     danger
                     icon={<DeleteOutlined />}
                     onClick={() => handleDeleteMatched(record)}
@@ -2234,7 +2722,7 @@ const ReceiptsPage = () => {
         },
       },
     ],
-    [matchedReceipts, isSuperAdmin, user, filters.deletedStatus, canRestoreMatched, handleRestoreMatched, handleEditMatched, handleDeleteMatched],
+    [matchedReceipts, isSuperAdmin, user, filters.deletedStatus, canRestoreMatched, handleRestoreMatched, handleEditMatched, handleDeleteMatched, handleEditRemarks],
   )
 
   // 出厂单列定义（罐车业务）
@@ -2343,12 +2831,22 @@ const ReceiptsPage = () => {
         title: '强度等级',
         dataIndex: 'concrete_strength',
         width: 100,
+        filters: generateFiltersWithEmpty(receipts || [], 'concrete_strength' as any),
+        onFilter: (value, record) => {
+          if (value === EMPTY_VALUE_FLAG) return !(record as any).concrete_strength
+          return (record as any).concrete_strength === value
+        },
         render: (value: string) => value || '-',
       },
       {
         title: '坍落度',
         dataIndex: 'slump',
         width: 80,
+        filters: generateFiltersWithEmpty(receipts || [], 'slump' as any),
+        onFilter: (value, record) => {
+          if (value === EMPTY_VALUE_FLAG) return !(record as any).slump
+          return (record as any).slump === value
+        },
         render: (value: string) => value || '-',
       },
       {
@@ -2385,6 +2883,11 @@ const ReceiptsPage = () => {
         title: '提单号',
         dataIndex: 'bill_no',
         width: 120,
+        filters: generateFiltersWithEmpty(receipts || [], 'bill_no' as any),
+        onFilter: (value, record) => {
+          if (value === EMPTY_VALUE_FLAG) return !(record as any).bill_no
+          return (record as any).bill_no === value
+        },
         render: (value: string) => value || '-',
       },
       {
@@ -2494,6 +2997,43 @@ const ReceiptsPage = () => {
           return aTime.localeCompare(bTime)
         },
         render: (value: string) => (value ? dayjs(value).format('YYYY-MM-DD HH:mm:ss') : '-'),
+      },
+      {
+        title: '备注',
+        dataIndex: 'remarks',
+        key: 'remarks',
+        width: 200,
+        ellipsis: {
+          showTitle: false,
+        },
+        filters: [
+          { text: '有备注', value: 'has_remarks' },
+          { text: '无备注', value: 'no_remarks' },
+        ],
+        onFilter: (value, record) => {
+          const hasRemarks = !!(record.remarks && record.remarks.trim() !== '')
+          if (value === 'has_remarks') return hasRemarks
+          if (value === 'no_remarks') return !hasRemarks
+          return true
+        },
+        render: (value: string | null) => {
+          if (!value || value.trim() === '') {
+            return <span style={{ color: '#999' }}>-</span>
+          }
+          return (
+            <Tooltip title={value} placement="topLeft">
+              <span style={{ 
+                display: 'inline-block',
+                maxWidth: '180px',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap'
+              }}>
+                {value}
+              </span>
+            </Tooltip>
+          )
+        },
       },
       {
         title: '出厂单图片',
@@ -2638,6 +3178,19 @@ const ReceiptsPage = () => {
                     {dayjs((receipt as any).finished_at).format('YYYY-MM-DD HH:mm:ss')}
                   </Descriptions.Item>
                 )}
+                {(receipt as any).remarks && (
+                  <Descriptions.Item label="备注">
+                    <div style={{ 
+                      padding: '8px 12px',
+                      background: '#f5f5f5',
+                      borderRadius: '4px',
+                      whiteSpace: 'pre-wrap',
+                      wordBreak: 'break-word'
+                    }}>
+                      {(receipt as any).remarks}
+                    </div>
+                  </Descriptions.Item>
+                )}
               </Descriptions>
             </Card>
             
@@ -2685,6 +3238,19 @@ const ReceiptsPage = () => {
                     ? dayjs((receipt as any).loadBill.created_at).format('YYYY-MM-DD HH:mm:ss')
                     : '-'}
                 </Descriptions.Item>
+                {(receipt as any).loadBill.remarks && (
+                  <Descriptions.Item label="装料备注">
+                    <div style={{ 
+                      padding: '8px 12px',
+                      background: '#f5f5f5',
+                      borderRadius: '4px',
+                      whiteSpace: 'pre-wrap',
+                      wordBreak: 'break-word'
+                    }}>
+                      {(receipt as any).loadBill.remarks}
+                    </div>
+                  </Descriptions.Item>
+                )}
               </Descriptions>
             </Card>
             
@@ -2732,6 +3298,19 @@ const ReceiptsPage = () => {
                     ? dayjs((receipt as any).unloadBill.created_at).format('YYYY-MM-DD HH:mm:ss')
                     : '-'}
                 </Descriptions.Item>
+                {(receipt as any).unloadBill.remarks && (
+                  <Descriptions.Item label="卸货备注">
+                    <div style={{ 
+                      padding: '8px 12px',
+                      background: '#f5f5f5',
+                      borderRadius: '4px',
+                      whiteSpace: 'pre-wrap',
+                      wordBreak: 'break-word'
+                    }}>
+                      {(receipt as any).unloadBill.remarks}
+                    </div>
+                  </Descriptions.Item>
+                )}
               </Descriptions>
             </Card>
           </>
@@ -2780,6 +3359,19 @@ const ReceiptsPage = () => {
                 <Descriptions.Item label="创建时间">
                   {receipt.created_at ? dayjs(receipt.created_at).format('YYYY-MM-DD HH:mm:ss') : '-'}
                 </Descriptions.Item>
+                {receipt.remarks && (
+                  <Descriptions.Item label="备注">
+                    <div style={{ 
+                      padding: '8px 12px',
+                      background: '#f5f5f5',
+                      borderRadius: '4px',
+                      whiteSpace: 'pre-wrap',
+                      wordBreak: 'break-word'
+                    }}>
+                      {receipt.remarks}
+                    </div>
+                  </Descriptions.Item>
+                )}
               </>
             )}
 
@@ -2825,6 +3417,22 @@ const ReceiptsPage = () => {
                   {receipt.unloading_time ? dayjs(receipt.unloading_time).format('YYYY-MM-DD HH:mm:ss') : '-'}
                 </Descriptions.Item>
                 <Descriptions.Item label="任务ID">{receipt.task_id || '-'}</Descriptions.Item>
+                <Descriptions.Item label="创建时间">
+                  {receipt.created_at ? dayjs(receipt.created_at).format('YYYY-MM-DD HH:mm:ss') : '-'}
+                </Descriptions.Item>
+                {receipt.remarks && (
+                  <Descriptions.Item label="备注">
+                    <div style={{ 
+                      padding: '8px 12px',
+                      background: '#f5f5f5',
+                      borderRadius: '4px',
+                      whiteSpace: 'pre-wrap',
+                      wordBreak: 'break-word'
+                    }}>
+                      {receipt.remarks}
+                    </div>
+                  </Descriptions.Item>
+                )}
               </>
             )}
 
@@ -2863,6 +3471,19 @@ const ReceiptsPage = () => {
                 <Descriptions.Item label="创建时间">
                   {receipt.created_at ? dayjs(receipt.created_at).format('YYYY-MM-DD HH:mm:ss') : '-'}
                 </Descriptions.Item>
+                {receipt.remarks && (
+                  <Descriptions.Item label="备注">
+                    <div style={{ 
+                      padding: '8px 12px',
+                      background: '#f5f5f5',
+                      borderRadius: '4px',
+                      whiteSpace: 'pre-wrap',
+                      wordBreak: 'break-word'
+                    }}>
+                      {receipt.remarks}
+                    </div>
+                  </Descriptions.Item>
+                )}
               </>
             )}
 
@@ -2890,6 +3511,19 @@ const ReceiptsPage = () => {
                 <Descriptions.Item label="创建时间">
                   {receipt.created_at ? dayjs(receipt.created_at).format('YYYY-MM-DD HH:mm:ss') : '-'}
                 </Descriptions.Item>
+                {receipt.remarks && (
+                  <Descriptions.Item label="备注">
+                    <div style={{ 
+                      padding: '8px 12px',
+                      background: '#f5f5f5',
+                      borderRadius: '4px',
+                      whiteSpace: 'pre-wrap',
+                      wordBreak: 'break-word'
+                    }}>
+                      {receipt.remarks}
+                    </div>
+                  </Descriptions.Item>
+                )}
               </>
             )}
 
@@ -2960,6 +3594,19 @@ const ReceiptsPage = () => {
                 <Descriptions.Item label="创建时间">
                   {receipt.created_at ? dayjs(receipt.created_at).format('YYYY-MM-DD HH:mm:ss') : '-'}
                 </Descriptions.Item>
+                {receipt.remarks && (
+                  <Descriptions.Item label="备注">
+                    <div style={{ 
+                      padding: '8px 12px',
+                      background: '#f5f5f5',
+                      borderRadius: '4px',
+                      whiteSpace: 'pre-wrap',
+                      wordBreak: 'break-word'
+                    }}>
+                      {receipt.remarks}
+                    </div>
+                  </Descriptions.Item>
+                )}
               </>
             )}
             
@@ -3625,13 +4272,13 @@ const ReceiptsPage = () => {
         </Row>
       )}
 
-      {activeTab === 'matched' && matchedStatistics && (
+      {activeTab === 'matched' && filteredMatchedStats && (
         <Row gutter={16} style={{ marginBottom: 16 }}>
           <Col span={8}>
             <Card bordered style={{ textAlign: 'center', borderRadius: 8, boxShadow: '0 1px 2px rgba(0,0,0,0.03)', border: '1px solid #f0f0f0' }}>
               <div style={{ color: '#8c8c8c', fontSize: 14, marginBottom: 8 }}>总任务数</div>
               <div style={{ fontSize: 30, fontWeight: 600, color: '#000' }}>
-                {matchedStatistics.total_count}
+                {filteredMatchedStats.total_count}
                 <span style={{ fontSize: 16, color: '#8c8c8c', marginLeft: 4 }}>个</span>
               </div>
             </Card>
@@ -3640,7 +4287,7 @@ const ReceiptsPage = () => {
             <Card bordered style={{ textAlign: 'center', borderRadius: 8, boxShadow: '0 1px 2px rgba(0,0,0,0.03)', border: '1px solid #f0f0f0' }}>
               <div style={{ color: '#8c8c8c', fontSize: 14, marginBottom: 8 }}>正常任务</div>
               <div style={{ fontSize: 30, fontWeight: 600, color: '#000' }}>
-                {matchedStatistics.normal_count}
+                {filteredMatchedStats.normal_count}
                 <span style={{ fontSize: 16, color: '#8c8c8c', marginLeft: 4 }}>个</span>
               </div>
             </Card>
@@ -3649,7 +4296,7 @@ const ReceiptsPage = () => {
             <Card bordered style={{ textAlign: 'center', borderRadius: 8, boxShadow: '0 1px 2px rgba(0,0,0,0.03)', border: '1px solid #f0f0f0' }}>
               <div style={{ color: '#8c8c8c', fontSize: 14, marginBottom: 8 }}>已删除任务</div>
               <div style={{ fontSize: 30, fontWeight: 600, color: '#000' }}>
-                {matchedStatistics.deleted_count}
+                {filteredMatchedStats.deleted_count}
                 <span style={{ fontSize: 16, color: '#8c8c8c', marginLeft: 4 }}>个</span>
               </div>
             </Card>
@@ -3902,8 +4549,9 @@ const ReceiptsPage = () => {
                           onChange: setSelectedRowKeys,
                         }
                   }
+                  onChange={handleTableChange}
                   pagination={{
-                    total: activeTab === 'matched' ? matchedReceipts.length : filteredReceipts.length,
+                    total: tableFilteredData.length,
                     pageSize: pageSize,
                     showSizeChanger: true,
                     showTotal: (total) => `共 ${total} 条`,
@@ -4768,6 +5416,73 @@ const ReceiptsPage = () => {
             )}
           </Form>
         </Space>
+      </Modal>
+
+      {/* 备注编辑 Modal */}
+      <Modal
+        title="编辑备注"
+        open={remarksModalOpen}
+        onOk={handleSaveRemarks}
+        onCancel={() => {
+          setRemarksModalOpen(false)
+          remarksForm.resetFields()
+          setEditingTaskId(null)
+          setEditingLoadBillId(null)
+          setEditingUnloadBillId(null)
+        }}
+        width={700}
+        okText="保存"
+        cancelText="取消"
+      >
+        <Form
+          form={remarksForm}
+          layout="vertical"
+        >
+          <Form.Item
+            label="运输任务备注"
+            name="task_remarks"
+            rules={[
+              { max: 5000, message: '备注内容不能超过5000字' }
+            ]}
+          >
+            <Input.TextArea
+              rows={4}
+              placeholder="请输入运输任务备注（选填，最多5000字）"
+              showCount
+              maxLength={5000}
+            />
+          </Form.Item>
+          
+          <Form.Item
+            label="装料单备注"
+            name="load_remarks"
+            rules={[
+              { max: 5000, message: '备注内容不能超过5000字' }
+            ]}
+          >
+            <Input.TextArea
+              rows={4}
+              placeholder="请输入装料单备注（选填，最多5000字）"
+              showCount
+              maxLength={5000}
+            />
+          </Form.Item>
+          
+          <Form.Item
+            label="卸货单备注"
+            name="unload_remarks"
+            rules={[
+              { max: 5000, message: '备注内容不能超过5000字' }
+            ]}
+          >
+            <Input.TextArea
+              rows={4}
+              placeholder="请输入卸货单备注（选填，最多5000字）"
+              showCount
+              maxLength={5000}
+            />
+          </Form.Item>
+        </Form>
       </Modal>
     </Space>
   )

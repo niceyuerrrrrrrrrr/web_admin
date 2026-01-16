@@ -210,6 +210,7 @@ export const updateLoadingReceipt = (
     loading_time?: string
     unloading_time?: string
     thumb_url?: string
+    remarks?: string
   },
 ) => unwrap<LoadingReceipt>(client.put(`/receipts/loading/${receiptId}`, data))
 
@@ -236,6 +237,7 @@ export const updateUnloadingReceipt = (
     loading_time?: string
     unloading_time?: string
     thumb_url?: string
+    remarks?: string
   },
 ) => unwrap<UnloadingReceipt>(client.put(`/receipts/unloading/${receiptId}`, data))
 
@@ -376,3 +378,9 @@ export const batchUpdateReceiptField = (data: {
   company_id?: number
 }) =>
   unwrap(client.post('/receipts/batch-update-field', data))
+
+/**
+ * 更新运输任务备注
+ */
+export const updateTransportTaskRemarks = (taskId: string, remarks: string) =>
+  unwrap(client.put(`/receipts/transport-tasks/${taskId}`, { remarks }))

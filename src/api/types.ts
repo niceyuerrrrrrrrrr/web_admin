@@ -32,6 +32,7 @@ export interface LoadingReceipt {
   submitted_to_finance?: string
   submitted_at?: string | null
   submitted_by?: number | null
+  remarks?: string | null  // 备注字段
 }
 
 export interface UnloadingReceipt {
@@ -58,6 +59,7 @@ export interface UnloadingReceipt {
   submitted_to_finance?: string
   submitted_at?: string | null
   submitted_by?: number | null
+  remarks?: string | null  // 备注字段
 }
 
 export interface ChargingReceipt {
@@ -85,6 +87,7 @@ export interface ChargingReceipt {
   submitted_to_finance?: string
   submitted_at?: string | null
   submitted_by?: number | null
+  remarks?: string | null  // 备注字段
 }
 
 export interface WaterTicket {
@@ -107,6 +110,7 @@ export interface WaterTicket {
   submitted_to_finance?: string
   submitted_at?: string | null
   submitted_by?: number | null
+  remarks?: string | null  // 备注字段
 }
 
 export interface DepartureReceipt {
@@ -149,6 +153,7 @@ export interface DepartureReceipt {
   submitted_to_finance?: string
   submitted_at?: string | null
   submitted_by?: number | null
+  remarks?: string | null  // 备注字段
 }
 
 export type Receipt = LoadingReceipt | UnloadingReceipt | ChargingReceipt | WaterTicket | DepartureReceipt
@@ -1023,4 +1028,39 @@ export interface LoginUserInfo {
 export interface LoginResponse {
   token: string
   user: LoginUserInfo
+}
+
+// 运输任务相关类型
+export interface TransportTask {
+  id: number
+  task_id: string
+  user_id: number
+  status: string
+  load_bill_id?: number
+  unload_bill_id?: number
+  distance?: number
+  plate_number?: string
+  department_id?: number
+  department_name?: string
+  created_at?: string
+  finished_at?: string
+  updated_at?: string
+  deleted_at?: string | null
+  deleted_by?: number | null
+  remarks?: string | null  // 备注字段
+}
+
+// 装卸匹配记录
+export interface MatchedReceipt {
+  id: number
+  task_id: string
+  status: string
+  loadBill: LoadingReceipt
+  unloadBill: UnloadingReceipt
+  created_at?: string
+  finished_at?: string
+  updated_at?: string
+  deleted_at?: string | null
+  deleted_by?: number | null
+  remarks?: string | null  // 备注字段
 }
