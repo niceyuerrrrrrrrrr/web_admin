@@ -85,6 +85,7 @@ import LoginPage from './pages/Login'
 import WorkWechatCallback from './pages/WorkWechatCallback'
 import NotFoundPage from './pages/NotFound'
 import AttendanceConfigPage from './pages/AttendanceConfig'
+import AttendanceAnomalyPage from './pages/AttendanceAnomaly'
 import DriverSalaryPage from './pages/DriverSalary'
 import StaffSalaryPage from './pages/StaffSalary'
 import './App.css'
@@ -267,7 +268,7 @@ const routeDefinitions = [
         path: '/attendance',
         icon: <ClockCircleOutlined />,
         element: <AttendancePage />,
-      },
+        children: [
           {
             key: 'attendance-config',
             label: '考勤配置',
@@ -275,6 +276,15 @@ const routeDefinitions = [
             icon: <SettingOutlined />,
             element: <AttendanceConfigPage />,
           },
+          {
+            key: 'attendance-anomaly',
+            label: '考勤异常监控',
+            path: '/attendance-anomaly',
+            icon: <WarningOutlined />,
+            element: <AttendanceAnomalyPage />,
+          },
+        ],
+      },
       {
         key: 'notices',
         label: '公告管理',
