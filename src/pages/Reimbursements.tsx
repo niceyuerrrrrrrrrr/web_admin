@@ -259,22 +259,32 @@ const ReimbursementsPage = () => {
         title: '编号',
         dataIndex: 'id',
         width: 80,
+        sorter: (a, b) => a.id - b.id,
       },
       {
         title: '报销人',
         dataIndex: 'applicant_name',
         width: 140,
+        filters: Array.from(new Set(reimbursements.map(r => r.applicant_name).filter(Boolean)))
+          .sort((a, b) => a.localeCompare(b, 'zh-CN'))
+          .map(name => ({ text: name, value: name })),
+        onFilter: (value, record) => record.applicant_name === value,
       },
       {
         title: '金额（元）',
         dataIndex: 'amount',
         width: 120,
+        sorter: (a, b) => a.amount - b.amount,
         render: (value: number) => <Text strong>¥ {value?.toFixed(2)}</Text>,
       },
       {
         title: '类别',
         dataIndex: 'category',
         width: 160,
+        filters: Array.from(new Set(reimbursements.map(r => r.category).filter(Boolean)))
+          .sort((a, b) => a.localeCompare(b, 'zh-CN'))
+          .map(cat => ({ text: cat, value: cat })),
+        onFilter: (value, record) => record.category === value,
         render: (_: any, record) =>
           record.subcategory ? `${record.category} / ${record.subcategory}` : record.category,
       },
@@ -288,6 +298,7 @@ const ReimbursementsPage = () => {
         title: '日期',
         dataIndex: 'date',
         width: 120,
+        sorter: (a, b) => (a.date || '').localeCompare(b.date || ''),
       },
       {
         title: '凭证',
@@ -366,12 +377,23 @@ const ReimbursementsPage = () => {
         title: '当前审批人',
         dataIndex: 'current_approver',
         width: 120,
+        filters: Array.from(new Set(reimbursements.map(r => r.current_approver).filter(Boolean)))
+          .sort((a, b) => a.localeCompare(b, 'zh-CN'))
+          .map(name => ({ text: name, value: name })),
+        onFilter: (value, record) => record.current_approver === value,
         render: (value: string) => value || '-',
       },
       {
         title: '状态',
         dataIndex: 'status',
         width: 110,
+        filters: [
+          { text: '已提交', value: 'submitted' },
+          { text: '审核中', value: 'reviewing' },
+          { text: '已通过', value: 'approved' },
+          { text: '已拒绝', value: 'rejected' },
+        ],
+        onFilter: (value, record) => record.status === value,
         render: (value: string) => {
           const map: Record<string, { color: string; label: string }> = {
             submitted: { color: 'default', label: '已提交' },
@@ -441,7 +463,7 @@ const ReimbursementsPage = () => {
         },
       },
     ],
-    [canApprove, submitMutation, user],
+    [canApprove, submitMutation, user, reimbursements],
   )
 
   const summaryCards = useMemo(() => {
