@@ -266,8 +266,8 @@ const ReimbursementsPage = () => {
         dataIndex: 'applicant_name',
         width: 140,
         filters: Array.from(new Set(reimbursements.map(r => r.applicant_name).filter(Boolean)))
-          .sort((a, b) => a.localeCompare(b, 'zh-CN'))
-          .map(name => ({ text: name, value: name })),
+          .sort((a, b) => (a || '').localeCompare(b || '', 'zh-CN'))
+          .map(name => ({ text: name || '', value: name || '' })),
         onFilter: (value, record) => record.applicant_name === value,
       },
       {
@@ -282,8 +282,8 @@ const ReimbursementsPage = () => {
         dataIndex: 'category',
         width: 160,
         filters: Array.from(new Set(reimbursements.map(r => r.category).filter(Boolean)))
-          .sort((a, b) => a.localeCompare(b, 'zh-CN'))
-          .map(cat => ({ text: cat, value: cat })),
+          .sort((a, b) => (a || '').localeCompare(b || '', 'zh-CN'))
+          .map(cat => ({ text: cat || '', value: cat || '' })),
         onFilter: (value, record) => record.category === value,
         render: (_: any, record) =>
           record.subcategory ? `${record.category} / ${record.subcategory}` : record.category,
@@ -378,8 +378,8 @@ const ReimbursementsPage = () => {
         dataIndex: 'current_approver',
         width: 120,
         filters: Array.from(new Set(reimbursements.map(r => r.current_approver).filter(Boolean)))
-          .sort((a, b) => a.localeCompare(b, 'zh-CN'))
-          .map(name => ({ text: name, value: name })),
+          .sort((a, b) => (a || '').localeCompare(b || '', 'zh-CN'))
+          .map(name => ({ text: name || '', value: name || '' })),
         onFilter: (value, record) => record.current_approver === value,
         render: (value: string) => value || '-',
       },
