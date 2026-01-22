@@ -104,13 +104,14 @@ export const uploadReimbursementImage = (file: File) => {
   )
 }
 
-export const fetchReimbursementStats = (params?: { beginDate?: string; endDate?: string; userId?: number; companyId?: number }) =>
+export const fetchReimbursementStats = (params?: { beginDate?: string; endDate?: string; userId?: number; status?: string; companyId?: number }) =>
   unwrap<ReimbursementStats>(
     client.get('/reimbursement/stats/overview', {
       params: {
         begin_date: params?.beginDate,
         end_date: params?.endDate,
         user_id: params?.userId,
+        status: params?.status,
         company_id: params?.companyId,
       },
     }),

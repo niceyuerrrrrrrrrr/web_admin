@@ -96,6 +96,7 @@ const ReimbursementsPage = () => {
     subcategory?: string
     dateRange?: [dayjs.Dayjs, dayjs.Dayjs]
   }>({
+    status: 'approved', // 默认只统计已通过的报销
     dateRange: [dayjs().subtract(29, 'day'), dayjs()],
   })
   const [selectedRecord, setSelectedRecord] = useState<ReimbursementRecord | null>(null)
@@ -138,6 +139,7 @@ const ReimbursementsPage = () => {
         beginDate: filters.dateRange ? filters.dateRange[0]?.format('YYYY-MM-DD') : undefined,
         endDate: filters.dateRange ? filters.dateRange[1]?.format('YYYY-MM-DD') : undefined,
         userId: filters.applicantId,
+        status: filters.status, // 添加状态筛选
         companyId: effectiveCompanyId,
       }),
   })
