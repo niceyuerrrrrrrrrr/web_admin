@@ -684,10 +684,6 @@ const ApprovalsPage = () => {
       {
         title: '审批类型',
         dataIndex: 'type_name',
-        filters: Array.from(new Set((pendingQuery.data?.records || []).map(item => item.type_name).filter(Boolean)))
-          .sort()
-          .map(val => ({ text: val, value: val })),
-        onFilter: (value, record) => record.type_name === value,
         width: 140,
       },
       {
@@ -698,10 +694,6 @@ const ApprovalsPage = () => {
       {
         title: '申请人',
         dataIndex: 'user_name',
-        filters: Array.from(new Set((pendingQuery.data?.records || []).map(item => item.user_name).filter(Boolean)))
-          .sort()
-          .map(val => ({ text: val, value: val })),
-        onFilter: (value, record) => record.user_name === value,
         width: 120,
       },
       {
@@ -793,25 +785,18 @@ const ApprovalsPage = () => {
       {
         title: '申请时间',
         dataIndex: 'created_at',
-        sorter: (a, b) => dayjs(a.created_at || '').unix() - dayjs(b.created_at || '').unix(),
         width: 180,
         render: (value: string | undefined) => (value ? dayjs(value).format('YYYY-MM-DD HH:mm') : '-'),
       },
       {
         title: '当前节点审批人',
         dataIndex: 'current_approver',
-        filters: Array.from(new Set((pendingQuery.data?.records || []).map(item => item.current_approver).filter(Boolean)))
-          .sort()
-          .map(val => ({ text: val as string, value: val as string })),
-        onFilter: (value, record) => record.current_approver === value,
         width: 150,
         render: (value: string) => value || '-',
       },
       {
         title: '状态',
         dataIndex: 'status',
-        filters: statusOptions.filter(opt => opt.value !== 'all').map(opt => ({ text: opt.label, value: opt.value })),
-        onFilter: (value, record) => record.status === value,
         width: 120,
         render: (value: string) => {
           const meta = statusColorMap[value] || { label: value, color: 'default' }
@@ -850,7 +835,7 @@ const ApprovalsPage = () => {
         },
       },
     ],
-    [openActionModal, openDetail, handleSingleDelete, pendingQuery.data?.records],
+    [openActionModal, openDetail, handleSingleDelete],
   )
 
   const historyColumns: ColumnsType<ApprovalCoreFields> = useMemo(
@@ -858,10 +843,6 @@ const ApprovalsPage = () => {
       {
         title: '审批类型',
         dataIndex: 'type_name',
-        filters: Array.from(new Set((historyQuery.data?.records || []).map(item => item.type_name).filter(Boolean)))
-          .sort()
-          .map(val => ({ text: val, value: val })),
-        onFilter: (value, record) => record.type_name === value,
         width: 140,
       },
       {
@@ -872,10 +853,6 @@ const ApprovalsPage = () => {
       {
         title: '申请人',
         dataIndex: 'user_name',
-        filters: Array.from(new Set((historyQuery.data?.records || []).map(item => item.user_name).filter(Boolean)))
-          .sort()
-          .map(val => ({ text: val, value: val })),
-        onFilter: (value, record) => record.user_name === value,
         width: 120,
       },
       {
@@ -956,18 +933,12 @@ const ApprovalsPage = () => {
       {
         title: '当前节点审批人',
         dataIndex: 'current_approver',
-        filters: Array.from(new Set((historyQuery.data?.records || []).map(item => item.current_approver).filter(Boolean)))
-          .sort()
-          .map(val => ({ text: val as string, value: val as string })),
-        onFilter: (value, record) => record.current_approver === value,
         width: 150,
         render: (value: string) => value || '-',
       },
       {
         title: '状态',
         dataIndex: 'status',
-        filters: statusOptions.filter(opt => opt.value !== 'all').map(opt => ({ text: opt.label, value: opt.value })),
-        onFilter: (value, record) => record.status === value,
         width: 120,
         render: (value: string) => {
           const meta = statusColorMap[value] || { label: value, color: 'default' }
@@ -977,7 +948,6 @@ const ApprovalsPage = () => {
       {
         title: '更新时间',
         dataIndex: 'updated_at',
-        sorter: (a, b) => dayjs(a.updated_at || '').unix() - dayjs(b.updated_at || '').unix(),
         width: 180,
         render: (value: string | undefined) => (value ? dayjs(value).format('YYYY-MM-DD HH:mm') : '-'),
       },
@@ -1017,7 +987,7 @@ const ApprovalsPage = () => {
         },
       },
     ],
-    [openDetail, handleSingleDelete, authUser?.role, authUser?.positionType, historyQuery.data?.records],
+    [openDetail, handleSingleDelete, authUser?.role, authUser?.positionType],
   )
 
   const handlePendingFilterChange = (_: unknown, allValues: { approvalType?: string }) => {

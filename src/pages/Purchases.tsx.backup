@@ -225,35 +225,22 @@ const PurchasesPage = () => {
       {
         title: '申请人',
         dataIndex: 'applicant_name',
-        filters: Array.from(new Set(records.map(r => r.applicant_name).filter(Boolean)))
-          .sort((a, b) => (a || '').localeCompare(b || '', 'zh-CN'))
-          .map(name => ({ text: name || '', value: name || '' })),
-        onFilter: (value, record) => record.applicant_name === value,
         width: 140,
       },
       {
         title: '金额（元）',
         dataIndex: 'amount',
-        sorter: (a, b) => (a.amount || 0) - (b.amount || 0),
         width: 120,
         render: (value: number) => <Text strong>¥ {value?.toFixed(2)}</Text>,
       },
       {
         title: '类别',
         dataIndex: 'category',
-        filters: Array.from(new Set(records.map(r => r.category).filter(Boolean)))
-          .sort()
-          .map(val => ({ text: val, value: val })),
-        onFilter: (value, record) => record.category === value,
         width: 120,
       },
       {
         title: '供应商',
         dataIndex: 'supplier',
-        filters: Array.from(new Set(records.map(r => r.supplier).filter(Boolean)))
-          .sort()
-          .map(val => ({ text: val as string, value: val as string })),
-        onFilter: (value, record) => record.supplier === value,
         width: 150,
       },
       {
@@ -265,7 +252,6 @@ const PurchasesPage = () => {
       {
         title: '日期',
         dataIndex: 'date',
-        sorter: (a, b) => (a.date || '').localeCompare(b.date || ''),
         width: 120,
       },
       {
@@ -344,23 +330,12 @@ const PurchasesPage = () => {
       {
         title: '当前审批人',
         dataIndex: 'current_approver',
-        filters: Array.from(new Set(records.map(r => r.current_approver).filter(Boolean)))
-          .sort()
-          .map(val => ({ text: val as string, value: val as string })),
-        onFilter: (value, record) => record.current_approver === value,
         width: 120,
         render: (value: string) => value || '-',
       },
       {
         title: '状态',
         dataIndex: 'status',
-        filters: [
-          { text: '已提交', value: 'submitted' },
-          { text: '审核中', value: 'reviewing' },
-          { text: '已通过', value: 'approved' },
-          { text: '已拒绝', value: 'rejected' },
-        ],
-        onFilter: (value, record) => record.status === value,
         width: 110,
         render: (value: string) => {
           const map: Record<string, { color: string; label: string }> = {
@@ -431,7 +406,7 @@ const PurchasesPage = () => {
         },
       },
     ],
-    [submitMutation, user, records],
+    [submitMutation, user],
   )
 
   const handleCreate = () => {

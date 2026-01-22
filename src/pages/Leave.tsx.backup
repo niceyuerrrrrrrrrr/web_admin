@@ -283,19 +283,11 @@ const LeavePage = () => {
       title: '申请人',
       dataIndex: 'applicant_name',
       key: 'applicant_name',
-      filters: Array.from(new Set((leavesQuery.data?.records || []).map(r => r.applicant_name).filter(Boolean)))
-        .sort()
-        .map(val => ({ text: val as string, value: val as string })),
-      onFilter: (value, record) => record.applicant_name === value,
       render: (text: string) => text || '-',
     },
     {
       title: '请假类型',
       dataIndex: 'leave_type',
-      filters: Array.from(new Set((leavesQuery.data?.records || []).map(r => r.leave_type).filter(Boolean)))
-        .sort()
-        .map(val => ({ text: val, value: val })),
-      onFilter: (value, record) => record.leave_type === value,
     },
     {
       title: '起止时间',
@@ -304,7 +296,6 @@ const LeavePage = () => {
     {
       title: '天数',
       dataIndex: 'days',
-      sorter: (a, b) => (a.days || 0) - (b.days || 0),
       width: 90,
     },
     {
@@ -383,23 +374,12 @@ const LeavePage = () => {
     {
       title: '当前审批人',
       dataIndex: 'current_approver',
-      filters: Array.from(new Set((leavesQuery.data?.records || []).map(r => r.current_approver).filter(Boolean)))
-        .sort()
-        .map(val => ({ text: val as string, value: val as string })),
-      onFilter: (value, record) => record.current_approver === value,
       width: 120,
       render: (value: string) => value || '-',
     },
     {
       title: '状态',
       dataIndex: 'status',
-      filters: [
-        { text: '已提交', value: 'submitted' },
-        { text: '审批中', value: 'reviewing' },
-        { text: '已通过', value: 'approved' },
-        { text: '已驳回', value: 'rejected' },
-      ],
-      onFilter: (value, record) => record.status === value,
       render: (value: LeaveStatus) => <Tag color={statusColorMap[value]}>{value}</Tag>,
     },
     {

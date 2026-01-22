@@ -324,10 +324,6 @@ const ReportsPage = () => {
     {
       title: '标题',
       dataIndex: 'title',
-      filters: Array.from(new Set((reportsQuery.data?.records || []).map(r => r.title).filter(Boolean)))
-        .sort()
-        .map(val => ({ text: val, value: val })),
-      onFilter: (value, record) => record.title === value,
       render: (text, record) => (
         <Space>
           <Tag color={record.priority === 'urgent' ? 'red' : record.priority === 'high' ? 'orange' : 'blue'}>
@@ -340,10 +336,6 @@ const ReportsPage = () => {
     {
       title: '类型',
       dataIndex: 'type',
-      filters: Array.from(new Set((reportsQuery.data?.records || []).map(r => r.type).filter(Boolean)))
-        .sort()
-        .map(val => ({ text: val, value: val })),
-      onFilter: (value, record) => record.type === value,
     },
     {
       title: '位置',
@@ -425,40 +417,21 @@ const ReportsPage = () => {
     {
       title: '当前审批人',
       dataIndex: 'current_approver',
-      filters: Array.from(new Set((reportsQuery.data?.records || []).map(r => r.current_approver).filter(Boolean)))
-        .sort()
-        .map(val => ({ text: val as string, value: val as string })),
-      onFilter: (value, record) => record.current_approver === value,
       width: 120,
       render: (value: string) => value || '-',
     },
     {
       title: '状态',
       dataIndex: 'status',
-      filters: [
-        { text: '草稿', value: 'draft' },
-        { text: '已提交', value: 'submitted' },
-        { text: '审批中', value: 'reviewing' },
-        { text: '处理中', value: 'processing' },
-        { text: '已解决', value: 'resolved' },
-        { text: '已拒绝', value: 'rejected' },
-        { text: '已关闭', value: 'closed' },
-      ],
-      onFilter: (value, record) => record.status === value,
       render: (value: ReportStatus) => <Tag color={statusColors[value]}>{statusLabels[value] || value}</Tag>,
     },
     {
       title: '提交人',
-      dataIndex: 'applicant_name',
-      filters: Array.from(new Set((reportsQuery.data?.records || []).map(r => r.applicant_name).filter(Boolean)))
-        .sort()
-        .map(val => ({ text: val as string, value: val as string })),
-      onFilter: (value, record) => record.applicant_name === value,
+      dataIndex: 'user_name',
     },
     {
       title: '提交时间',
       dataIndex: 'submit_time',
-      sorter: (a, b) => (a.submit_time || '').localeCompare(b.submit_time || ''),
     },
     {
       title: '操作',

@@ -192,11 +192,28 @@ const MaterialRequestsPage = () => {
   const listColumns: ColumnsType<MaterialRequestRecord> = useMemo(
     () => [
       { title: '编号', dataIndex: 'id', width: 80 },
-      { title: '申请人', dataIndex: 'applicant_name', width: 140 },
-      { title: '物品名称', dataIndex: 'material_name', width: 180 },
+      {
+        title: '申请人',
+        dataIndex: 'applicant_name',
+        filters: Array.from(new Set((listQuery.data?.records || []).map(r => r.applicant_name).filter(Boolean)))
+          .sort()
+          .map(val => ({ text: val as string, value: val as string })),
+        onFilter: (value, record) => record.applicant_name === value,
+        width: 140,
+      },
+      {
+        title: '物品名称',
+        dataIndex: 'material_name',
+        filters: Array.from(new Set((listQuery.data?.records || []).map(r => r.material_name).filter(Boolean)))
+          .sort()
+          .map(val => ({ text: val as string, value: val as string })),
+        onFilter: (value, record) => record.material_name === value,
+        width: 180,
+      },
       {
         title: '数量',
         dataIndex: 'quantity',
+        sorter: (a, b) => (a.quantity || 0) - (b.quantity || 0),
         width: 140,
         render: (_, record) => (
           <>
@@ -204,7 +221,15 @@ const MaterialRequestsPage = () => {
           </>
         ),
       },
-      { title: '用途', dataIndex: 'purpose', ellipsis: true },
+      {
+        title: '用途',
+        dataIndex: 'purpose',
+        filters: Array.from(new Set((listQuery.data?.records || []).map(r => r.purpose).filter(Boolean)))
+          .sort()
+          .map(val => ({ text: val as string, value: val as string })),
+        onFilter: (value, record) => record.purpose === value,
+        ellipsis: true,
+      },
       {
         title: '凭证',
         dataIndex: 'images',
@@ -281,12 +306,23 @@ const MaterialRequestsPage = () => {
       {
         title: '当前审批人',
         dataIndex: 'current_approver',
+        filters: Array.from(new Set((listQuery.data?.records || []).map(r => r.current_approver).filter(Boolean)))
+          .sort()
+          .map(val => ({ text: val as string, value: val as string })),
+        onFilter: (value, record) => record.current_approver === value,
         width: 120,
         render: (value: string) => value || '-',
       },
       {
         title: '状态',
         dataIndex: 'status',
+        filters: [
+          { text: '已提交', value: 'submitted' },
+          { text: '审核中', value: 'reviewing' },
+          { text: '已通过', value: 'approved' },
+          { text: '已拒绝', value: 'rejected' },
+        ],
+        onFilter: (value, record) => record.status === value,
         width: 130,
         render: (value) => {
           const map: Record<string, { color: string; label: string }> = {
@@ -357,7 +393,7 @@ const MaterialRequestsPage = () => {
         },
       },
     ],
-    [canApprove, submitMutation, user],
+    [canApprove, submitMutation, user, listQuery.data?.records],
   )
 
   useEffect(() => {
