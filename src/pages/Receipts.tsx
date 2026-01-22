@@ -4002,6 +4002,37 @@ const ReceiptsPage = () => {
           />
           {canEditDelete && (
             <>
+              {/* 全选/取消全选按钮 */}
+              {(activeTab === 'matched' ? matchedReceipts : filteredReceipts).length > 0 && (
+                <>
+                  <Button
+                    onClick={() => {
+                      const allKeys = (activeTab === 'matched' ? matchedReceipts : filteredReceipts).map((record: any) => {
+                        if (activeTab === 'matched') {
+                          return `matched-${record.task_id || record.id}`
+                        }
+                        return `${record.type}-${record.id}`
+                      })
+                      setSelectedRowKeys(allKeys)
+                      message.success(`已全选 ${allKeys.length} 条数据`)
+                    }}
+                  >
+                    全选所有 ({(activeTab === 'matched' ? matchedReceipts : filteredReceipts).length})
+                  </Button>
+                  {selectedRowKeys.length > 0 && (
+                    <Button
+                      onClick={() => {
+                        setSelectedRowKeys([])
+                        message.info('已取消全选')
+                      }}
+                    >
+                      取消全选
+                    </Button>
+                  )}
+                </>
+              )}
+              
+              {/* 批量操作按钮 */}
               {selectedRowKeys.length > 0 && activeTab !== 'matched' && (
                 <>
                   <Button icon={<DownloadOutlined />} onClick={handleBatchExport}>
@@ -4026,6 +4057,16 @@ const ReceiptsPage = () => {
                   </Button>
                 </>
               )}
+              
+              {/* 装卸匹配的批量操作 */}
+              {selectedRowKeys.length > 0 && activeTab === 'matched' && (
+                <>
+                  <Button icon={<DownloadOutlined />} onClick={handleBatchExport}>
+                    批量导出 ({selectedRowKeys.length})
+                  </Button>
+                </>
+              )}
+              
               <Button type="primary" icon={<DownloadOutlined />} onClick={handleExport}>
                 导出全部
               </Button>
