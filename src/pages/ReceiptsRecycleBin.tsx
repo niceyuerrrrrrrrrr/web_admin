@@ -184,7 +184,11 @@ export default function ReceiptsRecycleBin() {
           const company = Array.isArray(companies) ? companies[0] : companies
           if (company) {
             const businessType = company.business_type || company.businessType
-            setCompanyBusinessType(businessType === '挂车' ? 'truck' : businessType === '罐车' ? 'tanker' : null)
+            // 侧翻和水泥罐车使用挂车逻辑
+            const normalizedType = (businessType === '挂车' || businessType === '侧翻' || businessType === '水泥罐车') ? 'truck' 
+                                 : businessType === '罐车' ? 'tanker' 
+                                 : null
+            setCompanyBusinessType(normalizedType)
           }
         }
 

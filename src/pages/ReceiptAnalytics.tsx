@@ -37,7 +37,7 @@ const { RangePicker } = DatePicker
 
 const normalizeBusinessType = (raw: any): '挂车' | '罐车' => {
   if (!raw) return '挂车'
-  if (raw === 'truck' || raw === '挂车') return '挂车'
+  if (raw === 'truck' || raw === '挂车' || raw === '侧翻' || raw === '水泥罐车') return '挂车'
   if (raw === 'tanker' || raw === '罐车') return '罐车'
   return '挂车'
 }

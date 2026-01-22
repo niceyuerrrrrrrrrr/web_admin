@@ -37,8 +37,10 @@ export const createChargingStation = (data: {
 export const updateChargingStation = (stationId: number, data: Partial<ChargingStation>) =>
   unwrap(client.put(`/charging-pricing/stations/${stationId}`, data))
 
-export const deleteChargingStation = (stationId: number) =>
-  unwrap(client.delete(`/charging-pricing/stations/${stationId}`))
+export const deleteChargingStation = (stationId: number, force: boolean = true) =>
+  unwrap(client.delete(`/charging-pricing/stations/${stationId}`, {
+    params: { force }
+  }))
 
 export const fetchChargingRules = (stationId: number) =>
   unwrap<ChargingPriceRule[]>(client.get(`/charging-pricing/stations/${stationId}/rules`))
@@ -65,7 +67,10 @@ export const updateChargingRule = (ruleId: number, data: Partial<{
   is_active: boolean
 }>) => unwrap(client.put(`/charging-pricing/rules/${ruleId}`, data))
 
-export const deleteChargingRule = (ruleId: number) => unwrap(client.delete(`/charging-pricing/rules/${ruleId}`))
+export const deleteChargingRule = (ruleId: number, hardDelete: boolean = false) => 
+  unwrap(client.delete(`/charging-pricing/rules/${ruleId}`, {
+    params: { hard_delete: hardDelete }
+  }))
 
 export const fetchChargingRuleHistory = (ruleId: number) =>
   unwrap<
@@ -105,6 +110,7 @@ export const fetchChargingStatistics = (params?: {
   stationId?: number
   beginDate?: string
   endDate?: string
+  companyId?: number
 }) =>
   unwrap<ChargingStatistics>(
     client.get('/charging-pricing/statistics/overview', {
@@ -112,6 +118,7 @@ export const fetchChargingStatistics = (params?: {
         station_id: params?.stationId,
         begin_date: params?.beginDate,
         end_date: params?.endDate,
+        company_id: params?.companyId,
       },
     }),
   )

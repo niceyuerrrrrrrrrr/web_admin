@@ -301,6 +301,9 @@ export const BatchUpdateUserModal = ({
   departments,
 }: BatchUpdateModalProps) => {
   const [form] = Form.useForm()
+  const [mode, setMode] = useState<'simple' | 'advanced'>('simple')
+  const [textInput, setTextInput] = useState('')
+  const [parsedData, setParsedData] = useState<Array<{ name: string; id_card?: string; bank_card?: string; bank_name?: string }>>([])
 
   const POSITION_TYPES = [
     { value: '司机', label: '司机' },
@@ -311,7 +314,52 @@ export const BatchUpdateUserModal = ({
     { value: '总经理', label: '总经理' },
   ]
 
+  const handleParseText = () => {
+    if (!textInput.trim()) {
+      message.warning('请输入数据')
+      return
+    }
+
+    const lines = textInput.trim().split('\n')
+    const parsed: Array<{ name: string; id_card?: string; bank_card?: string; bank_name?: string }> = []
+
+    lines.forEach((line) => {
+      const parts = line.split(/[\t,，]+/).map(p => p.trim()).filter(p => p)
+      if (parts.length >= 2) {
+        const item: any = {
+          name: parts[0],
+        }
+        
+        // 根据列数判断数据类型
+        if (parts.length === 2) {
+          // 姓名 + 身份证号
+          item.id_card = parts[1]
+        } else if (parts.length === 3) {
+          // 姓名 + 身份证号 + 银行卡号
+          item.id_card = parts[1]
+          item.bank_card = parts[2]
+        } else if (parts.length >= 4) {
+          // 姓名 + 身份证号 + 银行卡号 + 开户行
+          item.id_card = parts[1]
+          item.bank_card = parts[2]
+          item.bank_name = parts[3]
+        }
+        
+        parsed.push(item)
+      }
+    })
+
+    if (parsed.length === 0) {
+      message.warning('未能解析出有效数据')
+      return
+    }
+
+    setParsedData(parsed)
+    message.success(`已解析 ${parsed.length} 条数据`)
+  }
+
   const handleSubmit = async () => {
+    if (mode === 'simple') {
     try {
       const values = await form.validateFields()
       
@@ -329,11 +377,65 @@ export const BatchUpdateUserModal = ({
       onSubmit(updates)
     } catch (error) {
       // 表单验证失败
+      }
+    } else {
+      // 高级模式：根据姓名匹配用户
+      if (parsedData.length === 0) {
+        message.warning('请先解析数据')
+        return
+      }
+
+      const updates: BatchUpdateUserItem[] = []
+      const notFoundUsers: string[] = []
+
+      parsedData.forEach((data) => {
+        // 根据姓名查找用户
+        const user = selectedUsers.find(
+          (u) => u.nickname === data.name || (u as any).name === data.name
+        )
+
+        if (user) {
+          const update: BatchUpdateUserItem = { id: user.id }
+          if (data.id_card) (update as any).id_card = data.id_card
+          if (data.bank_card) update.bank_card = data.bank_card
+          if (data.bank_name) update.bank_name = data.bank_name
+          updates.push(update)
+        } else {
+          notFoundUsers.push(data.name)
+        }
+      })
+
+      if (notFoundUsers.length > 0) {
+        Modal.warning({
+          title: '部分用户未找到',
+          content: (
+            <div>
+              <p>以下用户在选中列表中未找到，将被跳过：</p>
+              <ul>
+                {notFoundUsers.map((name, idx) => (
+                  <li key={idx}>{name}</li>
+                ))}
+              </ul>
+              <p>匹配成功：{updates.length} 个用户</p>
+            </div>
+          ),
+          onOk: () => {
+            if (updates.length > 0) {
+              onSubmit(updates)
+            }
+          },
+        })
+      } else {
+        onSubmit(updates)
+      }
     }
   }
 
   const handleCancel = () => {
     form.resetFields()
+    setTextInput('')
+    setParsedData([])
+    setMode('simple')
     onCancel()
   }
 
@@ -343,12 +445,27 @@ export const BatchUpdateUserModal = ({
       open={open}
       onCancel={handleCancel}
       onOk={handleSubmit}
-      width={600}
+      width={800}
       confirmLoading={loading}
       okText="提交"
       cancelText="取消"
     >
       <Space direction="vertical" style={{ width: '100%' }} size="large">
+        <div>
+          <Text strong>修改模式：</Text>
+          <Select
+            value={mode}
+            onChange={setMode}
+            style={{ width: 200, marginLeft: 8 }}
+            options={[
+              { value: 'simple', label: '简单模式（统一修改）' },
+              { value: 'advanced', label: '高级模式（批量导入）' },
+            ]}
+          />
+        </div>
+
+        {mode === 'simple' ? (
+          <>
         <div>
           <Text type="secondary">
             提示：只填写需要修改的字段，未填写的字段将保持原值不变
@@ -357,7 +474,7 @@ export const BatchUpdateUserModal = ({
 
         <div>
           <Text strong>已选择的用户：</Text>
-          <div style={{ marginTop: 8, maxHeight: 200, overflow: 'auto' }}>
+              <div style={{ marginTop: 8, maxHeight: 200, overflow: 'auto', border: '1px solid #d9d9d9', padding: 8, borderRadius: 4 }}>
             {selectedUsers.map((user) => (
               <div key={user.id}>
                 <Text>
@@ -396,6 +513,80 @@ export const BatchUpdateUserModal = ({
             />
           </Form.Item>
         </Form>
+          </>
+        ) : (
+          <>
+            <div>
+              <Text strong>批量导入数据</Text>
+              <Text type="secondary" style={{ marginLeft: 8 }}>
+                （每行一个用户，格式：姓名 身份证号 [银行卡号] [开户行]，用Tab或逗号分隔）
+              </Text>
+              <TextArea
+                rows={8}
+                value={textInput}
+                onChange={(e) => setTextInput(e.target.value)}
+                placeholder="示例：&#10;张三	110101199001011234	6222021234567890123	中国工商银行&#10;李四	110101199002021234	6222021234567890124	中国建设银行&#10;&#10;或简化格式：&#10;张三	110101199001011234&#10;李四	110101199002021234"
+                style={{ marginTop: 8, fontFamily: 'monospace' }}
+              />
+              <Space style={{ marginTop: 8 }}>
+                <Button onClick={handleParseText}>解析数据</Button>
+                <Button onClick={() => { setTextInput(''); setParsedData([]) }}>清空</Button>
+              </Space>
+            </div>
+
+            {parsedData.length > 0 && (
+              <div>
+                <Text strong>解析结果（共 {parsedData.length} 条）：</Text>
+                <div style={{ marginTop: 8, maxHeight: 300, overflow: 'auto', border: '1px solid #d9d9d9', borderRadius: 4 }}>
+                  <Table
+                    size="small"
+                    pagination={false}
+                    dataSource={parsedData}
+                    rowKey={(_, index) => index!}
+                    columns={[
+                      { title: '序号', width: 60, render: (_, __, index) => index + 1 },
+                      { title: '姓名', dataIndex: 'name', width: 100 },
+                      { 
+                        title: '身份证号', 
+                        dataIndex: 'id_card',
+                        render: (val) => val || <Text type="secondary">-</Text>
+                      },
+                      { 
+                        title: '银行卡号', 
+                        dataIndex: 'bank_card',
+                        render: (val) => val || <Text type="secondary">-</Text>
+                      },
+                      { 
+                        title: '开户行', 
+                        dataIndex: 'bank_name',
+                        render: (val) => val || <Text type="secondary">-</Text>
+                      },
+                      {
+                        title: '匹配状态',
+                        render: (_, record) => {
+                          const found = selectedUsers.find(
+                            (u) => u.nickname === record.name || (u as any).name === record.name
+                          )
+                          return found ? (
+                            <Text type="success">✓ 已匹配</Text>
+                          ) : (
+                            <Text type="danger">✗ 未找到</Text>
+                          )
+                        },
+                      },
+                    ]}
+                  />
+                </div>
+              </div>
+            )}
+
+            <div>
+              <Text type="warning" strong>
+                注意：系统将根据姓名自动匹配已选择的用户，未匹配的数据将被跳过
+              </Text>
+            </div>
+          </>
+        )}
       </Space>
     </Modal>
   )

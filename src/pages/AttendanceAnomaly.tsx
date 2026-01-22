@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { Table, Card, Select, DatePicker, Button, Tag, Space, message, Modal, Descriptions } from 'antd';
+import { Table, Card, Select, DatePicker, Button, Tag, Space, message, Modal, Descriptions, Alert } from 'antd';
 import { WarningOutlined, ExclamationCircleOutlined, SearchOutlined, ReloadOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
-import client from '../utils/client';
+import client from '../api/client';
+import useAuthStore from '../store/auth';
+import useCompanyStore from '../store/company';
 
 const { RangePicker } = DatePicker;
 const { Option } = Select;
@@ -32,6 +34,12 @@ const ANOMALY_STATUS_CONFIG = {
 };
 
 const AttendanceAnomaly: React.FC = () => {
+  const { user } = useAuthStore();
+  const { selectedCompanyId } = useCompanyStore();
+  const isSuperAdmin = user?.role === 'super_admin' || user?.positionType === '超级管理员';
+  const effectiveCompanyId = isSuperAdmin ? selectedCompanyId : undefined;
+  const showCompanyWarning = isSuperAdmin && !effectiveCompanyId;
+
   const [loading, setLoading] = useState(false);
   const [data, setData] = useState<any[]>([]);
   const [total, setTotal] = useState(0);
@@ -51,6 +59,12 @@ const AttendanceAnomaly: React.FC = () => {
 
   // 加载数据
   const loadData = async () => {
+    if (isSuperAdmin && !effectiveCompanyId) {
+      setData([]);
+      setTotal(0);
+      return;
+    }
+
     setLoading(true);
     try {
       const params: any = {
@@ -67,10 +81,13 @@ const AttendanceAnomaly: React.FC = () => {
       if (filters.end_date) {
         params.end_date = filters.end_date;
       }
+      if (effectiveCompanyId) {
+        params.company_id = effectiveCompanyId;
+      }
 
       const res = await client.get('/attendance/anomaly-shifts', { params });
       
-      if (res.data.code === 0) {
+      if (res.data.success || res.data.code === 200) {
         setData(res.data.data.records || []);
         setTotal(res.data.data.total || 0);
       } else {
@@ -86,7 +103,7 @@ const AttendanceAnomaly: React.FC = () => {
 
   useEffect(() => {
     loadData();
-  }, [page, pageSize]);
+  }, [page, pageSize, effectiveCompanyId]);
 
   // 查询
   const handleSearch = () => {
@@ -199,6 +216,14 @@ const AttendanceAnomaly: React.FC = () => {
 
   return (
     <div style={{ padding: 24 }}>
+      {showCompanyWarning && (
+        <Alert 
+          type="warning" 
+          message="请选择要查看的公司后再查看考勤异常数据" 
+          showIcon 
+          style={{ marginBottom: 16 }}
+        />
+      )}
       <Card title="考勤异常监控" extra={
         <Space>
           <Tag color="orange">可疑: 跨2天打卡</Tag>

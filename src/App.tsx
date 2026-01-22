@@ -26,6 +26,7 @@ import {
   ShopOutlined,
   SolutionOutlined,
   TeamOutlined,
+  WarningOutlined,
 } from '@ant-design/icons'
 import type { MenuProps } from 'antd'
 import {
@@ -265,22 +266,24 @@ const routeDefinitions = [
       {
         key: 'attendance',
         label: '考勤管理',
-        path: '/attendance',
         icon: <ClockCircleOutlined />,
-        element: <AttendancePage />,
         children: [
+          {
+            key: 'attendance-records',
+            label: '考勤明细',
+            path: '/attendance',
+            element: <AttendancePage />,
+          },
           {
             key: 'attendance-config',
             label: '考勤配置',
             path: '/attendance-config',
-            icon: <SettingOutlined />,
             element: <AttendanceConfigPage />,
           },
           {
             key: 'attendance-anomaly',
             label: '考勤异常监控',
             path: '/attendance-anomaly',
-            icon: <WarningOutlined />,
             element: <AttendanceAnomalyPage />,
           },
         ],

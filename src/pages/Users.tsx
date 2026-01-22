@@ -600,7 +600,9 @@ const UsersPage = () => {
         width: 100,
         render: (value) => {
           if (!value) return <Text type="secondary">-</Text>
-          return <Tag color={value === '罐车' ? 'blue' : 'green'}>{value}</Tag>
+          // 罐车显示蓝色，挂车、侧翻、水泥罐车显示绿色
+          const color = value === '罐车' ? 'blue' : 'green'
+          return <Tag color={color}>{value}</Tag>
         },
       },
       {
@@ -1001,6 +1003,11 @@ const UsersPage = () => {
             rowSelection={{
               selectedRowKeys,
               onChange: setSelectedRowKeys,
+              selections: [
+                Table.SELECTION_ALL,
+                Table.SELECTION_INVERT,
+                Table.SELECTION_NONE,
+              ],
             }}
             pagination={{
               total: usersQuery.data?.total || 0,
@@ -1342,8 +1349,10 @@ const UsersPage = () => {
               </Form.Item>
               <Form.Item name="company_business_type" label="业务类型">
                 <Select placeholder="请选择业务类型" options={[
-                  { value: '罐车', label: '罐车' },
                   { value: '挂车', label: '挂车' },
+                  { value: '侧翻', label: '侧翻' },
+                  { value: '水泥罐车', label: '水泥罐车' },
+                  { value: '罐车', label: '罐车' },
                 ]} />
               </Form.Item>
             </Card>

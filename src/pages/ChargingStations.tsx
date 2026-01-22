@@ -66,7 +66,7 @@ const { Dragger } = Upload
 
 const ChargingStationsPage = () => {
   const queryClient = useQueryClient()
-  const { message } = AntdApp.useApp()
+  const { message, modal } = AntdApp.useApp()
   const { user } = useAuthStore()
   const { selectedCompanyId } = useCompanyStore()
 
@@ -97,13 +97,15 @@ const ChargingStationsPage = () => {
   })
 
   const statsQuery = useQuery({
-    queryKey: ['charging', 'stats', statsFilters],
+    queryKey: ['charging', 'stats', statsFilters, effectiveCompanyId],
     queryFn: () =>
       fetchChargingStatistics({
         stationId: statsFilters.stationId,
         beginDate: statsFilters.dateRange ? statsFilters.dateRange[0]?.format('YYYY-MM-DD') : undefined,
         endDate: statsFilters.dateRange ? statsFilters.dateRange[1]?.format('YYYY-MM-DD') : undefined,
+        companyId: effectiveCompanyId,
       }),
+    enabled: !isSuperAdmin || !!effectiveCompanyId,
   })
 
   const rulesQuery = useQuery({
@@ -137,7 +139,7 @@ const ChargingStationsPage = () => {
   })
 
   const deleteStationMutation = useMutation({
-    mutationFn: deleteChargingStation,
+    mutationFn: (stationId: number) => deleteChargingStation(stationId, true),
     onSuccess: () => {
       message.success('已禁用该充电站')
       queryClient.invalidateQueries({ queryKey: ['charging', 'stations'] })
@@ -171,7 +173,7 @@ const ChargingStationsPage = () => {
   })
 
   const deleteRuleMutation = useMutation({
-    mutationFn: deleteChargingRule,
+    mutationFn: (ruleId: number) => deleteChargingRule(ruleId, false),
     onSuccess: () => {
       message.success('已禁用该规则')
       queryClient.invalidateQueries({ queryKey: ['charging', 'rules', selectedStation?.id] })
@@ -263,44 +265,81 @@ const ChargingStationsPage = () => {
     },
     {
       title: '操作',
-      width: 220,
+      width: 240,
       fixed: 'right',
       render: (_, record) => (
-        <Space>
-          <Button
-            type="link"
-            onClick={() => {
-              setSelectedStation(record)
-              setDetailDrawerOpen(true)
-            }}
-          >
-            查看
-          </Button>
-          <Button
-            type="link"
-            icon={<EditOutlined />}
-            onClick={() => {
-              setEditingStation(record)
-              stationForm.setFieldsValue(record)
-              setStationModalOpen(true)
-            }}
-          >
-            编辑
-          </Button>
-          <Button
-            type="link"
-            danger
-            icon={<DeleteOutlined />}
-            onClick={() =>
-              Modal.confirm({
-                title: '禁用充电站',
-                content: `确认禁用 ${record.station_name} 吗？`,
-                onOk: () => deleteStationMutation.mutate(record.id),
-              })
-            }
-          >
-            禁用
-          </Button>
+        <Space direction="vertical" size={4} style={{ width: '100%' }}>
+          <Space size={8}>
+            <Button
+              type="link"
+              size="small"
+              onClick={() => {
+                setSelectedStation(record)
+                setDetailDrawerOpen(true)
+              }}
+              style={{ padding: '0 8px' }}
+            >
+              查看
+            </Button>
+            <Button
+              type="link"
+              size="small"
+              icon={<EditOutlined />}
+              onClick={() => {
+                setEditingStation(record)
+                stationForm.setFieldsValue(record)
+                setStationModalOpen(true)
+              }}
+              style={{ padding: '0 8px' }}
+            >
+              编辑
+            </Button>
+          </Space>
+          <Space size={8}>
+            <Button
+              type="link"
+              danger
+              size="small"
+              icon={<DeleteOutlined />}
+              onClick={() =>
+                modal.confirm({
+                  title: '删除充电站',
+                  content: (
+                    <div>
+                      <p>确认删除 <strong>{record.station_name}</strong> 吗？</p>
+                      <p style={{ color: '#ff4d4f', marginTop: 8 }}>
+                        ⚠️ 此操作将同时删除该充电站的所有价格规则、历史记录和成本记录，且不可恢复！
+                      </p>
+                    </div>
+                  ),
+                  okText: '确认删除',
+                  okType: 'danger',
+                  cancelText: '取消',
+                  onOk: () => deleteStationMutation.mutate(record.id),
+                })
+              }
+              style={{ padding: '0 8px' }}
+            >
+              删除
+            </Button>
+            <Button
+              type="link"
+              size="small"
+              onClick={() =>
+                modal.confirm({
+                  title: record.is_active ? '禁用充电站' : '启用充电站',
+                  content: `确认${record.is_active ? '禁用' : '启用'} ${record.station_name} 吗？`,
+                  onOk: () => updateStationMutation.mutate({ 
+                    id: record.id, 
+                    data: { is_active: !record.is_active } 
+                  }),
+                })
+              }
+              style={{ padding: '0 8px' }}
+            >
+              {record.is_active ? '禁用' : '启用'}
+            </Button>
+          </Space>
         </Space>
       ),
     },
@@ -339,11 +378,12 @@ const ChargingStationsPage = () => {
     },
     {
       title: '操作',
-      width: 180,
+      width: 240,
       render: (_, record) => (
         <Space>
           <Button
             type="link"
+            size="small"
             onClick={() => {
               setEditingRule(record)
               ruleForm.setFieldsValue({
@@ -360,17 +400,53 @@ const ChargingStationsPage = () => {
           >
             编辑
           </Button>
+          {record.is_active && (
+            <Button
+              type="link"
+              onClick={() =>
+                modal.confirm({
+                  title: '禁用规则',
+                  content: '确认禁用该规则吗？禁用后可以重新启用。',
+                  okText: '确认禁用',
+                  cancelText: '取消',
+                  onOk: () => deleteRuleMutation.mutate(record.id),
+                })
+              }
+            >
+              禁用
+            </Button>
+          )}
           <Button
             type="link"
             danger
+            size="small"
             onClick={() =>
-              Modal.confirm({
-                title: '禁用该规则？',
-                onOk: () => deleteRuleMutation.mutate(record.id),
+              modal.confirm({
+                title: '删除规则',
+                content: (
+                  <div>
+                    <p>确认永久删除该规则吗？</p>
+                    <p style={{ color: '#ff4d4f', marginTop: 8 }}>
+                      ⚠️ 此操作将删除规则及其所有历史记录，且不可恢复！
+                    </p>
+                  </div>
+                ),
+                okText: '确认删除',
+                okType: 'danger',
+                cancelText: '取消',
+                onOk: async () => {
+                  try {
+                    await deleteChargingRule(record.id, true)
+                    message.success('规则已永久删除')
+                    queryClient.invalidateQueries({ queryKey: ['charging', 'rules', selectedStation?.id] })
+                  } catch (error) {
+                    message.error((error as Error).message || '删除失败')
+                  }
+                },
               })
             }
           >
-            禁用
+            删除
           </Button>
         </Space>
       ),

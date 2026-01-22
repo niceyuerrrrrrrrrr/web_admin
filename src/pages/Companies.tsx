@@ -231,7 +231,9 @@ const CompaniesPage = () => {
         width: 120,
         render: (value) => {
           if (!value) return <Text type="secondary">-</Text>
-          return <Tag color={value === '罐车' ? 'blue' : 'green'}>{value}</Tag>
+          // 罐车显示蓝色，挂车、侧翻、水泥罐车显示绿色
+          const color = value === '罐车' ? 'blue' : 'green'
+          return <Tag color={color}>{value}</Tag>
         },
       },
       {
@@ -512,8 +514,10 @@ const CompaniesPage = () => {
               <Select
                 placeholder="请选择业务类型"
                 options={[
-                  { value: '罐车', label: '罐车' },
                   { value: '挂车', label: '挂车' },
+                  { value: '侧翻', label: '侧翻' },
+                  { value: '水泥罐车', label: '水泥罐车' },
+                  { value: '罐车', label: '罐车' },
                 ]}
               />
             </Form.Item>

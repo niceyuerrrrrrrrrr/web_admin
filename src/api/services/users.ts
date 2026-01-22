@@ -215,6 +215,13 @@ export interface BatchUpdateUserItem {
   bank_card?: string
   bank_name?: string
   card_holder?: string
+  id_card?: string
+  gender?: string
+  birth_date?: string
+  address?: string
+  emergency_contact?: string
+  emergency_phone?: string
+  work_location?: string
 }
 
 export const batchUpdateUsers = (params: {

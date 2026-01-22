@@ -58,16 +58,17 @@ const ChargingList = () => {
       not_submitted_count: number
     }
   }>({
-    queryKey: ['receipts', 'charging', filters, effectiveCompanyId],
+    queryKey: ['receipts', 'charging', filters, effectiveCompanyId, user?.companyId],
     queryFn: () =>
       fetchReceipts({
         receiptType: 'charging',
         startDate: filters.startDate,
         endDate: filters.endDate,
-        companyId: effectiveCompanyId,
+        companyId: isSuperAdmin ? effectiveCompanyId : user?.companyId,
         vehicleNo: filters.vehicleNo,
+        scope: 'all', // 获取公司所有数据
       }),
-    enabled: !isSuperAdmin || !!effectiveCompanyId,
+    enabled: isSuperAdmin ? !!effectiveCompanyId : true, // 非超管直接查询，超管需要选择公司
   })
 
   const receipts = receiptsQuery.data?.receipts || []
@@ -78,18 +79,24 @@ const ChargingList = () => {
       return
     }
 
-    const exportData = receipts.map((r: any) => ({
-      '单据编号': r.receipt_number || '',
-      '车牌号': r.vehicle_no || '',
-      '充电站': r.charging_station || '',
-      '充电桩': r.charging_pile || '',
-      '电量(kWh)': r.energy_kwh || 0,
-      '金额(元)': r.amount || 0,
-      '开始充电时间': r.start_time ? dayjs(r.start_time).format('YYYY-MM-DD HH:mm') : '',
-      '结束充电时间': r.end_time ? dayjs(r.end_time).format('YYYY-MM-DD HH:mm') : '',
-      '充电时长(分钟)': r.duration_min || '',
-      '创建时间': r.created_at ? dayjs(r.created_at).format('YYYY-MM-DD HH:mm') : '',
-    }))
+    const exportData = receipts.map((r: any) => {
+      const diff = (r.amount && r.calculated_amount) ? (r.amount - r.calculated_amount) : null
+      return {
+        '单据编号': r.receipt_number || '',
+        '车牌号': r.vehicle_no || '',
+        '充电站': r.charging_station || '',
+        '充电桩': r.charging_pile || '',
+        '电量(kWh)': r.energy_kwh || 0,
+        '识别金额(元)': r.amount || 0,
+        '计算金额(元)': r.calculated_amount || '',
+        '计算单价(元/kWh)': r.calculated_unit_price || '',
+        '金额差异(元)': diff !== null ? diff.toFixed(2) : '',
+        '开始充电时间': r.start_time ? dayjs(r.start_time).format('YYYY-MM-DD HH:mm') : '',
+        '结束充电时间': r.end_time ? dayjs(r.end_time).format('YYYY-MM-DD HH:mm') : '',
+        '充电时长(分钟)': r.duration_min || '',
+        '创建时间': r.created_at ? dayjs(r.created_at).format('YYYY-MM-DD HH:mm') : '',
+      }
+    })
 
     const ws = XLSX.utils.json_to_sheet(exportData)
     const wb = XLSX.utils.book_new()
@@ -142,6 +149,8 @@ const ChargingList = () => {
       charging_pile: r.charging_pile,
       energy_kwh: r.energy_kwh,
       amount: r.amount,
+      calculated_amount: r.calculated_amount,
+      calculated_unit_price: r.calculated_unit_price,
       start_time: r.start_time ? dayjs(r.start_time) : undefined,
       end_time: r.end_time ? dayjs(r.end_time) : undefined,
       duration_min: r.duration_min,
@@ -156,11 +165,51 @@ const ChargingList = () => {
       { title: '车牌号', dataIndex: 'vehicle_no', key: 'vehicle_no', width: 120 },
       { title: '充电站', dataIndex: 'charging_station', key: 'charging_station', width: 150 },
       { title: '充电桩', dataIndex: 'charging_pile', key: 'charging_pile', width: 120 },
-      { title: '电量(kWh)', dataIndex: 'energy_kwh', key: 'energy_kwh', width: 120, render: (v) => v?.toFixed(2) || '-' },
-      { title: '金额(元)', dataIndex: 'amount', key: 'amount', width: 120, render: (v) => v?.toFixed(2) || '-' },
-      { title: '开始充电时间', dataIndex: 'start_time', key: 'start_time', width: 180, render: (v: string) => v ? dayjs(v).format('YYYY-MM-DD HH:mm') : '-' },
-      { title: '结束充电时间', dataIndex: 'end_time', key: 'end_time', width: 180, render: (v: string) => v ? dayjs(v).format('YYYY-MM-DD HH:mm') : '-' },
-      { title: '充电时长(分钟)', dataIndex: 'duration_min', key: 'duration_min', width: 120, render: (v) => v || '-' },
+      { title: '电量(kWh)', dataIndex: 'energy_kwh', key: 'energy_kwh', width: 120, sorter: (a: any, b: any) => (a.energy_kwh || 0) - (b.energy_kwh || 0), render: (v) => v?.toFixed(2) || '-' },
+      { 
+        title: '识别金额(元)', 
+        dataIndex: 'amount', 
+        key: 'amount', 
+        width: 130, 
+        sorter: (a: any, b: any) => (a.amount || 0) - (b.amount || 0),
+        render: (v) => v?.toFixed(2) || '-' 
+      },
+      { 
+        title: '计算金额(元)', 
+        dataIndex: 'calculated_amount', 
+        key: 'calculated_amount', 
+        width: 130, 
+        sorter: (a: any, b: any) => (a.calculated_amount || 0) - (b.calculated_amount || 0),
+        render: (v) => v ? <span style={{ color: '#FFD700', fontWeight: 'bold' }}>￥{v.toFixed(2)}</span> : '-' 
+      },
+      { 
+        title: '计算单价(元/kWh)', 
+        dataIndex: 'calculated_unit_price', 
+        key: 'calculated_unit_price', 
+        width: 150, 
+        sorter: (a: any, b: any) => (a.calculated_unit_price || 0) - (b.calculated_unit_price || 0),
+        render: (v) => v ? <span style={{ color: '#52c41a' }}>￥{v.toFixed(4)}</span> : '-' 
+      },
+      { 
+        title: '金额差异(元)', 
+        key: 'amount_diff', 
+        width: 130, 
+        sorter: (a: any, b: any) => {
+          const diffA = (a.amount || 0) - (a.calculated_amount || 0)
+          const diffB = (b.amount || 0) - (b.calculated_amount || 0)
+          return diffA - diffB
+        },
+        render: (_, record: any) => {
+          if (!record.calculated_amount || !record.amount) return '-'
+          const diff = record.amount - record.calculated_amount
+          const color = diff > 0 ? '#ff4d4f' : '#52c41a'
+          const prefix = diff > 0 ? '+' : ''
+          return <span style={{ color, fontWeight: 'bold' }}>{prefix}￥{diff.toFixed(2)}</span>
+        }
+      },
+      { title: '开始充电时间', dataIndex: 'start_time', key: 'start_time', width: 180, sorter: (a: any, b: any) => dayjs(a.start_time).unix() - dayjs(b.start_time).unix(), render: (v: string) => v ? dayjs(v).format('YYYY-MM-DD HH:mm') : '-' },
+      { title: '结束充电时间', dataIndex: 'end_time', key: 'end_time', width: 180, sorter: (a: any, b: any) => dayjs(a.end_time).unix() - dayjs(b.end_time).unix(), render: (v: string) => v ? dayjs(v).format('YYYY-MM-DD HH:mm') : '-' },
+      { title: '充电时长(分钟)', dataIndex: 'duration_min', key: 'duration_min', width: 120, sorter: (a: any, b: any) => (a.duration_min || 0) - (b.duration_min || 0), render: (v) => v || '-' },
       {
         title: '充电单图片',
         dataIndex: 'thumb_url',
@@ -274,7 +323,7 @@ const ChargingList = () => {
           columns={columns}
           dataSource={receipts}
           loading={receiptsQuery.isLoading}
-          scroll={{ x: 1600 }}
+          scroll={{ x: 2200 }}
           pagination={{ pageSize: 20 }}
         />
       </Card>
@@ -287,7 +336,37 @@ const ChargingList = () => {
                  <Descriptions.Item label="充电站">{(selectedReceipt as any).charging_station}</Descriptions.Item>
                  <Descriptions.Item label="充电桩">{(selectedReceipt as any).charging_pile}</Descriptions.Item>
                  <Descriptions.Item label="电量">{(selectedReceipt as any).energy_kwh} kWh</Descriptions.Item>
-                 <Descriptions.Item label="金额">{(selectedReceipt as any).amount} 元</Descriptions.Item>
+                 <Descriptions.Item label="识别金额">
+                   <span style={{ fontSize: '16px', fontWeight: 'bold' }}>
+                     ￥{(selectedReceipt as any).amount?.toFixed(2) || '0.00'}
+                   </span>
+                 </Descriptions.Item>
+                 <Descriptions.Item label="计算金额">
+                   {(selectedReceipt as any).calculated_amount ? (
+                     <span style={{ fontSize: '16px', fontWeight: 'bold', color: '#FFD700' }}>
+                       ￥{(selectedReceipt as any).calculated_amount.toFixed(2)}
+                     </span>
+                   ) : '-'}
+                 </Descriptions.Item>
+                 <Descriptions.Item label="计算单价">
+                   {(selectedReceipt as any).calculated_unit_price ? (
+                     <span style={{ color: '#52c41a', fontWeight: 'bold' }}>
+                       ￥{(selectedReceipt as any).calculated_unit_price.toFixed(4)}/kWh
+                     </span>
+                   ) : '-'}
+                 </Descriptions.Item>
+                 <Descriptions.Item label="金额差异">
+                   {(selectedReceipt as any).calculated_amount && (selectedReceipt as any).amount ? (() => {
+                     const diff = (selectedReceipt as any).amount - (selectedReceipt as any).calculated_amount
+                     const color = diff > 0 ? '#ff4d4f' : '#52c41a'
+                     const prefix = diff > 0 ? '+' : ''
+                     return (
+                       <span style={{ fontSize: '16px', fontWeight: 'bold', color }}>
+                         {prefix}￥{diff.toFixed(2)}
+                       </span>
+                     )
+                   })() : '-'}
+                 </Descriptions.Item>
                  <Descriptions.Item label="开始时间">{(selectedReceipt as any).start_time ? dayjs((selectedReceipt as any).start_time).format('YYYY-MM-DD HH:mm:ss') : '-'}</Descriptions.Item>
                  <Descriptions.Item label="结束时间">{(selectedReceipt as any).end_time ? dayjs((selectedReceipt as any).end_time).format('YYYY-MM-DD HH:mm:ss') : '-'}</Descriptions.Item>
                  <Descriptions.Item label="创建时间">{selectedReceipt.created_at ? dayjs(selectedReceipt.created_at).format('YYYY-MM-DD HH:mm:ss') : '-'}</Descriptions.Item>
@@ -310,8 +389,14 @@ const ChargingList = () => {
             <Form.Item name="vehicle_no" label="车牌号"><Input /></Form.Item>
             <Form.Item name="charging_station" label="充电站"><Input /></Form.Item>
             <Form.Item name="charging_pile" label="充电桩"><Input /></Form.Item>
-            <Form.Item name="energy_kwh" label="电量"><InputNumber style={{width: '100%'}} /></Form.Item>
-            <Form.Item name="amount" label="金额"><InputNumber style={{width: '100%'}} /></Form.Item>
+            <Form.Item name="energy_kwh" label="电量(kWh)"><InputNumber style={{width: '100%'}} step={0.01} precision={2} /></Form.Item>
+            <Form.Item name="amount" label="识别金额(元)"><InputNumber style={{width: '100%'}} step={0.01} precision={2} /></Form.Item>
+            <Form.Item name="calculated_amount" label="计算金额(元)">
+              <InputNumber style={{width: '100%'}} step={0.01} precision={2} placeholder="系统计算的金额" />
+            </Form.Item>
+            <Form.Item name="calculated_unit_price" label="计算单价(元/kWh)">
+              <InputNumber style={{width: '100%'}} step={0.0001} precision={4} placeholder="系统计算的单价" />
+            </Form.Item>
             <Form.Item name="start_time" label="开始时间"><DatePicker showTime style={{width: '100%'}} /></Form.Item>
             <Form.Item name="end_time" label="结束时间"><DatePicker showTime style={{width: '100%'}} /></Form.Item>
             <Button type="primary" htmlType="submit" loading={updateMutation.isPending} block>保存</Button>
