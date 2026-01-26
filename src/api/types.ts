@@ -339,6 +339,9 @@ export interface ChargingStatistics {
 export interface ChargingCostResult {
   price_per_kwh: number
   amount: number
+  rule_effective_date?: string
+  rule_expiry_date?: string
+  time_period?: string
 }
 
 // 报销相关类型

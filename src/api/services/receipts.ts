@@ -178,6 +178,8 @@ export const updateChargingReceipt = (
     end_time?: string
     duration_min?: number
     thumb_url?: string
+    calculated_amount?: number
+    calculated_unit_price?: number
   },
 ) => unwrap<ChargingReceipt>(client.put(`/receipts/charging/${receiptId}`, data))
 
