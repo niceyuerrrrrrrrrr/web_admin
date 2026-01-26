@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react'
 import {
   Alert,
+  App as AntdApp,
   Button,
   Card,
   Checkbox,
@@ -11,7 +12,6 @@ import {
   Flex,
   Form,
   Input,
-  message,
   Modal,
   Row,
   Select,
@@ -54,6 +54,7 @@ const getPermissionName = (code: string, permissions: Permission[]): string => {
 
 const PermissionsPage = () => {
   const queryClient = useQueryClient()
+  const { message, modal } = AntdApp.useApp()
   const [activeTab, setActiveTab] = useState('roles')
   const [roleModalVisible, setRoleModalVisible] = useState(false)
   const [editingRole, setEditingRole] = useState<Role | null>(null)
@@ -241,7 +242,7 @@ const PermissionsPage = () => {
                 danger
                 icon={<DeleteOutlined />}
                 onClick={() => {
-                  Modal.confirm({
+                  modal.confirm({
                     title: '确认删除',
                     content: `确定要删除角色"${record.name}"吗？`,
                     okText: '确定',

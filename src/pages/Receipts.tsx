@@ -199,6 +199,9 @@ const ReceiptsPage = () => {
   const [selectedDepartmentId, setSelectedDepartmentId] = useState<number | undefined>(undefined)
   const [selectedUserId, setSelectedUserId] = useState<number | undefined>(undefined)
   const [pageSize, setPageSize] = useState(10)
+  const [currentPage, setCurrentPage] = useState(1)
+  const [filteredInfo, setFilteredInfo] = useState<Record<string, any>>({})
+  const [sortedInfo, setSortedInfo] = useState<any>({})
   
   // 数据清洗相关状态
   const [dataCleanModalOpen, setDataCleanModalOpen] = useState(false)
@@ -290,6 +293,15 @@ const ReceiptsPage = () => {
       setActiveTab(availableTabs[0].value)
     }
   }, [availableTabs, activeTab])
+
+  // 切换标签页时重置选择状态和页码
+  useEffect(() => {
+    setSelectedRowKeys([])
+    setCurrentPage(1)
+    setDisplayDataForStats([]) // 重置筛选数据
+    setFilteredInfo({}) // 重置筛选条件
+    setSortedInfo({}) // 重置排序信息
+  }, [activeTab])
 
   // 获取部门列表
   const departmentsQuery = useQuery({
@@ -424,6 +436,45 @@ const ReceiptsPage = () => {
       return true
     })
   }, [receipts, activeTab, filters.volumeFilter])
+
+  // 计算当前显示的数据（只包含顶部筛选，列筛选由 Table 自己处理）
+  const currentDisplayData = useMemo(() => {
+    return activeTab === 'matched' ? matchedReceipts : filteredReceipts
+  }, [activeTab, matchedReceipts, filteredReceipts])
+  
+  // 用于统计的筛选后数据（包含列筛选）
+  const [displayDataForStats, setDisplayDataForStats] = useState<any[]>([])
+  
+  // 实际用于统计和全选的数据（如果有列筛选则使用筛选后的数据）
+  const dataForOperations = useMemo(() => {
+    return displayDataForStats.length > 0 ? displayDataForStats : currentDisplayData
+  }, [displayDataForStats, currentDisplayData])
+
+  const cleanSourceRecords = useMemo(() => {
+    return activeTab === 'matched' ? (matchedReceipts as any[]) : (filteredReceipts as any[])
+  }, [activeTab, matchedReceipts, filteredReceipts])
+
+  const getCleanStandardKey = useCallback((field: string) => {
+    if (activeTab === 'matched') {
+      if (field === 'load_company' || field === 'unload_company') return 'company'
+      if (field === 'load_material_name' || field === 'unload_material_name') return 'material_name'
+      if (field === 'load_material_spec' || field === 'unload_material_spec') return 'material_spec'
+    }
+    return field
+  }, [activeTab])
+
+  const getCleanFieldValue = useCallback((record: any, field: string) => {
+    if (activeTab === 'matched') {
+      if (field === 'load_company') return record?.loadBill?.company
+      if (field === 'unload_company') return record?.unloadBill?.company
+      if (field === 'load_material_name') return record?.loadBill?.material_name
+      if (field === 'unload_material_name') return record?.unloadBill?.material_name
+      if (field === 'load_material_spec') return record?.loadBill?.material_spec
+      if (field === 'unload_material_spec') return record?.unloadBill?.material_spec
+      return undefined
+    }
+    return record?.[field]
+  }, [activeTab])
 
   // 计算当前表格显示数据的KPI统计
   const kpiStats = useMemo(() => {
@@ -712,6 +763,13 @@ const ReceiptsPage = () => {
     searchForm.setFieldValue('deletedStatus', 'normal')
     searchForm.setFieldValue('submittedStatus', 'all')
     searchForm.setFieldValue('volumeFilter', 'all')
+    // 重置列筛选
+    setDisplayDataForStats([])
+    setFilteredInfo({})
+    setSortedInfo({})
+    setCurrentPage(1)
+    setSelectedRowKeys([])
+    message.success('已重置所有筛选条件')
   }
 
   const openDetail = useCallback((receipt: Receipt) => {
@@ -1384,7 +1442,7 @@ const ReceiptsPage = () => {
         render: (_, record) => renderActions(record),
       },
     ],
-    [businessType, renderActions, matchedReceipts],
+    [businessType, renderActions, matchedReceipts, filteredReceipts],
   )
 
   // 卸货单列定义
@@ -1628,7 +1686,7 @@ const ReceiptsPage = () => {
         render: (_, record) => renderActions(record),
       },
     ],
-    [businessType, renderActions],
+    [businessType, renderActions, filteredReceipts],
   )
 
   // 充电单列定义
@@ -1724,6 +1782,47 @@ const ReceiptsPage = () => {
           return aAmount - bAmount
         },
         render: (value: any) => (value != null && value !== '' ? Number(value).toFixed(2) : '-'),
+      },
+      {
+        title: '计算金额(元)',
+        dataIndex: 'calculated_amount',
+        width: 120,
+        sorter: (a: any, b: any) => {
+          const aAmount = a.calculated_amount || 0
+          const bAmount = b.calculated_amount || 0
+          return aAmount - bAmount
+        },
+        render: (value: any) => (value != null && value !== '' ? Number(value).toFixed(2) : '-'),
+      },
+      {
+        title: '计算单价(元/kWh)',
+        dataIndex: 'calculated_price',
+        width: 140,
+        sorter: (a: any, b: any) => {
+          const aPrice = a.calculated_price ?? 0
+          const bPrice = b.calculated_price ?? 0
+          return aPrice - bPrice
+        },
+        render: (value: any) => {
+          if (value === null || value === undefined) return '-'
+          return Number(value).toFixed(4)
+        },
+      },
+      {
+        title: '金额差异(元)',
+        dataIndex: 'amount_difference',
+        width: 120,
+        sorter: (a: any, b: any) => {
+          const aDiff = a.amount_difference ?? 0
+          const bDiff = b.amount_difference ?? 0
+          return aDiff - bDiff
+        },
+        render: (value: any) => {
+          if (value === null || value === undefined) return '-'
+          const numValue = Number(value)
+          const color = numValue > 0 ? 'red' : numValue < 0 ? 'green' : undefined
+          return <span style={{ color }}>{numValue.toFixed(2)}</span>
+        },
       },
       {
         title: '开始时间',
@@ -3265,7 +3364,7 @@ const ReceiptsPage = () => {
             提单号: r.bill_no || '',
             进厂时间: r.loading_time ? dayjs(r.loading_time).format('YYYY-MM-DD HH:mm:ss') : '',
             出厂时间: r.exit_time ? dayjs(r.exit_time).format('YYYY-MM-DD HH:mm:ss') : '',
-            交票状态: receipt.submitted_to_finance === 'Y' ? '已交票' : '未交票',
+            交票状态: (receipt as any).submitted_to_finance === 'Y' ? '已交票' : '未交票',
           }
         } else if (receipt.type === 'water') {
           const r = receipt as Receipt & {
@@ -3292,30 +3391,15 @@ const ReceiptsPage = () => {
             图片路径: r.image_path || r.thumb_url || '',
             交票状态: r.submitted_to_finance === 'Y' ? '已交票' : '未交票',
             交票时间: r.submitted_at ? dayjs(r.submitted_at).format('YYYY-MM-DD HH:mm:ss') : '',
+            删除状态: r.deleted_at ? '已删除' : '正常',
+            删除时间: r.deleted_at ? dayjs(r.deleted_at).format('YYYY-MM-DD HH:mm:ss') : '',
           }
         }
         return base
       })
 
-      // 创建工作簿
+      // 使用数据中的字段名作为表头，确保数据不为空
       const header = (() => {
-        if (activeTab === 'water') {
-          return [
-            '类型',
-            'ID',
-            '创建时间',
-            '业务单号',
-            '司机',
-            '公司',
-            '车牌号',
-            '自编车号',
-            '日期',
-            '交票状态',
-            '交票时间',
-            '图片路径',
-          ]
-        }
-
         const set = new Set<string>()
         exportData.forEach((row) => {
           Object.keys(row).forEach((k) => set.add(k))
@@ -3349,9 +3433,14 @@ const ReceiptsPage = () => {
       return
     }
 
-    const selectedReceipts = receipts.filter((receipt) =>
-      selectedRowKeys.includes(`${receipt.type}-${receipt.id}`),
-    )
+    // 使用 dataForOperations（包含列筛选后的数据）
+    const selectedReceipts = dataForOperations.filter((record: any) => {
+      const rowKey = activeTab === 'matched' 
+        ? `matched-${record.task_id || record.id}`
+        : `${record.type}-${record.id}`
+      return selectedRowKeys.includes(rowKey)
+    })
+    
     if (selectedReceipts.length === 0) {
       message.warning('没有选中的数据')
       return
@@ -3359,7 +3448,60 @@ const ReceiptsPage = () => {
 
     // 使用选中的数据进行导出
     try {
-      const exportData = selectedReceipts.map((receipt) => {
+      const exportData = selectedReceipts.map((record: any) => {
+        // 检查是否是装卸匹配数据
+        if (activeTab === 'matched' && record.task_id) {
+          // 装卸匹配数据的导出格式 - 包含完整字段
+          const loadBill = record.loadBill || {}
+          const unloadBill = record.unloadBill || {}
+          
+          return {
+            类型: '装卸匹配',
+            任务ID: record.task_id,
+            状态: record.status,
+            创建时间: record.created_at ? dayjs(record.created_at).format('YYYY-MM-DD HH:mm:ss') : '',
+            完成时间: record.finished_at ? dayjs(record.finished_at).format('YYYY-MM-DD HH:mm:ss') : '',
+            更新时间: record.updated_at ? dayjs(record.updated_at).format('YYYY-MM-DD HH:mm:ss') : '',
+            
+            // 装料单信息
+            装料单ID: loadBill.id || '',
+            装料公司: loadBill.company || '',
+            装料材料名称: loadBill.material_name || '',
+            装料规格型号: loadBill.material_spec || '',
+            装料毛重: toNumber(loadBill.gross_weight),
+            装料净重: toNumber(loadBill.net_weight),
+            装料皮重: toNumber(loadBill.tare_weight),
+            装料进厂时间: loadBill.loading_time ? dayjs(loadBill.loading_time).format('YYYY-MM-DD HH:mm:ss') : '',
+            装料出厂时间: loadBill.unloading_time ? dayjs(loadBill.unloading_time).format('YYYY-MM-DD HH:mm:ss') : '',
+            装料交票状态: loadBill.submitted_to_finance === 'Y' ? '已交票' : '未交票',
+            装料交票时间: loadBill.submitted_at ? dayjs(loadBill.submitted_at).format('YYYY-MM-DD HH:mm:ss') : '',
+            
+            // 卸货单信息
+            卸货单ID: unloadBill.id || '',
+            卸货公司: unloadBill.company || '',
+            卸货材料名称: unloadBill.material_name || '',
+            卸货规格型号: unloadBill.material_spec || '',
+            卸货毛重: toNumber(unloadBill.gross_weight),
+            卸货净重: toNumber(unloadBill.net_weight),
+            卸货皮重: toNumber(unloadBill.tare_weight),
+            卸货进厂时间: unloadBill.loading_time ? dayjs(unloadBill.loading_time).format('YYYY-MM-DD HH:mm:ss') : '',
+            卸货出厂时间: unloadBill.unloading_time ? dayjs(unloadBill.unloading_time).format('YYYY-MM-DD HH:mm:ss') : '',
+            卸货交票状态: unloadBill.submitted_to_finance === 'Y' ? '已交票' : '未交票',
+            卸货交票时间: unloadBill.submitted_at ? dayjs(unloadBill.submitted_at).format('YYYY-MM-DD HH:mm:ss') : '',
+            
+            // 通用信息
+            车牌号: loadBill.vehicle_no || unloadBill.vehicle_no || '',
+            司机姓名: loadBill.driver_name || unloadBill.driver_name || '',
+            用户车牌: loadBill.user_plate || unloadBill.user_plate || '',
+            
+            // 图片信息
+            装料单图片: loadBill.image_path || loadBill.thumb_url || '',
+            卸货单图片: unloadBill.image_path || unloadBill.thumb_url || '',
+          }
+        }
+        
+        // 普通票据数据
+        const receipt = record as Receipt
         const base: Record<string, any> = {
           类型: getReceiptTypeLabel(receipt.type),
           ID: receipt.id,
@@ -3371,6 +3513,7 @@ const ReceiptsPage = () => {
             company?: string
             driver_name?: string
             vehicle_no?: string
+            user_plate?: string
             material_name?: string
             material_spec?: string
             gross_weight?: number
@@ -3378,12 +3521,18 @@ const ReceiptsPage = () => {
             tare_weight?: number
             loading_time?: string
             unloading_time?: string
+            image_path?: string
+            thumb_url?: string
+            submitted_to_finance?: string
+            submitted_at?: string
+            deleted_at?: string
           }
           return {
             ...base,
             公司: r.company || '',
             司机: r.driver_name || '',
             车牌号: r.vehicle_no || '',
+            用户车牌: r.user_plate || '',
             材料名称: r.material_name || '',
             规格型号: r.material_spec || '',
             毛重: toNumber(r.gross_weight),
@@ -3391,11 +3540,18 @@ const ReceiptsPage = () => {
             皮重: toNumber(r.tare_weight),
             进厂时间: r.loading_time ? dayjs(r.loading_time).format('YYYY-MM-DD HH:mm:ss') : '',
             出厂时间: r.unloading_time ? dayjs(r.unloading_time).format('YYYY-MM-DD HH:mm:ss') : '',
+            交票状态: r.submitted_to_finance === 'Y' ? '已交票' : '未交票',
+            交票时间: r.submitted_at ? dayjs(r.submitted_at).format('YYYY-MM-DD HH:mm:ss') : '',
+            删除状态: r.deleted_at ? '已删除' : '正常',
+            删除时间: r.deleted_at ? dayjs(r.deleted_at).format('YYYY-MM-DD HH:mm:ss') : '',
+            图片路径: r.image_path || r.thumb_url || '',
           }
         } else if (receipt.type === 'charging') {
           const r = receipt as Receipt & {
             receipt_number?: string
             vehicle_no?: string
+            user_plate?: string
+            driver_name?: string
             charging_station?: string
             charging_pile?: string
             energy_kwh?: number
@@ -3403,18 +3559,30 @@ const ReceiptsPage = () => {
             start_time?: string
             end_time?: string
             duration_min?: number
+            image_path?: string
+            thumb_url?: string
+            submitted_to_finance?: string
+            submitted_at?: string
+            deleted_at?: string
           }
           return {
             ...base,
             单据编号: r.receipt_number || '',
             车牌号: r.vehicle_no || '',
+            用户车牌: r.user_plate || '',
+            司机姓名: r.driver_name || '',
             充电站: r.charging_station || '',
             充电桩: r.charging_pile || '',
             电量: toNumber(r.energy_kwh),
             金额: toNumber(r.amount),
-            开始时间: r.start_time ? dayjs(r.start_time).format('YYYY-MM-DD HH:mm') : '',
-            结束时间: r.end_time ? dayjs(r.end_time).format('YYYY-MM-DD HH:mm') : '',
+            开始时间: r.start_time ? dayjs(r.start_time).format('YYYY-MM-DD HH:mm:ss') : '',
+            结束时间: r.end_time ? dayjs(r.end_time).format('YYYY-MM-DD HH:mm:ss') : '',
             时长: toNumber(r.duration_min),
+            交票状态: r.submitted_to_finance === 'Y' ? '已交票' : '未交票',
+            交票时间: r.submitted_at ? dayjs(r.submitted_at).format('YYYY-MM-DD HH:mm:ss') : '',
+            删除状态: r.deleted_at ? '已删除' : '正常',
+            删除时间: r.deleted_at ? dayjs(r.deleted_at).format('YYYY-MM-DD HH:mm:ss') : '',
+            图片路径: r.image_path || r.thumb_url || '',
           }
         } else if (receipt.type === 'departure') {
           const r = receipt as Receipt & {
@@ -3436,6 +3604,11 @@ const ReceiptsPage = () => {
             bill_no?: string
             loading_time?: string
             exit_time?: string
+            image_path?: string
+            thumb_url?: string
+            submitted_to_finance?: string
+            submitted_at?: string
+            deleted_at?: string
           }
           return {
             ...base,
@@ -3457,7 +3630,11 @@ const ReceiptsPage = () => {
             提单号: r.bill_no || '',
             进厂时间: r.loading_time ? dayjs(r.loading_time).format('YYYY-MM-DD HH:mm:ss') : '',
             出厂时间: r.exit_time ? dayjs(r.exit_time).format('YYYY-MM-DD HH:mm:ss') : '',
-            交票状态: receipt.submitted_to_finance === 'Y' ? '已交票' : '未交票'
+            交票状态: r.submitted_to_finance === 'Y' ? '已交票' : '未交票',
+            交票时间: r.submitted_at ? dayjs(r.submitted_at).format('YYYY-MM-DD HH:mm:ss') : '',
+            删除状态: r.deleted_at ? '已删除' : '正常',
+            删除时间: r.deleted_at ? dayjs(r.deleted_at).format('YYYY-MM-DD HH:mm:ss') : '',
+            图片路径: r.image_path || r.thumb_url || '',
           }
         } else if (receipt.type === 'water') {
           const r = receipt as Receipt & {
@@ -3472,6 +3649,7 @@ const ReceiptsPage = () => {
             thumb_url?: string
             submitted_to_finance?: string
             submitted_at?: string
+            deleted_at?: string
           }
           return {
             ...base,
@@ -3484,29 +3662,15 @@ const ReceiptsPage = () => {
             图片路径: r.image_path || r.thumb_url || '',
             交票状态: r.submitted_to_finance === 'Y' ? '已交票' : '未交票',
             交票时间: r.submitted_at ? dayjs(r.submitted_at).format('YYYY-MM-DD HH:mm:ss') : '',
+            删除状态: r.deleted_at ? '已删除' : '正常',
+            删除时间: r.deleted_at ? dayjs(r.deleted_at).format('YYYY-MM-DD HH:mm:ss') : '',
           }
         }
         return base
       })
 
+      // 使用数据中的字段名作为表头，确保数据不为空
       const header = (() => {
-        if (activeTab === 'water') {
-          return [
-            '类型',
-            'ID',
-            '创建时间',
-            '业务单号',
-            '司机',
-            '公司',
-            '车牌号',
-            '自编车号',
-            '日期',
-            '交票状态',
-            '交票时间',
-            '图片路径',
-          ]
-        }
-
         const set = new Set<string>()
         exportData.forEach((row) => {
           Object.keys(row).forEach((k) => set.add(k))
@@ -3524,7 +3688,7 @@ const ReceiptsPage = () => {
     } catch (error) {
       message.error('导出失败：' + (error as Error).message)
     }
-  }, [selectedRowKeys, receipts])
+  }, [selectedRowKeys, activeTab, dataForOperations, message])
 
   // 批量删除（支持所有票据类型）
   const handleBatchDelete = useCallback(() => {
@@ -4002,34 +4166,51 @@ const ReceiptsPage = () => {
           />
           {canEditDelete && (
             <>
-              {/* 全选/取消全选按钮 */}
-              {(activeTab === 'matched' ? matchedReceipts : filteredReceipts).length > 0 && (
-                <>
+              {/* 全选/取消全选按钮 - 简洁设计 */}
+              {dataForOperations.length > 0 && (
+                <Space.Compact>
                   <Button
+                    type={selectedRowKeys.length === dataForOperations.length && selectedRowKeys.length > 0 ? 'primary' : 'default'}
                     onClick={() => {
-                      const allKeys = (activeTab === 'matched' ? matchedReceipts : filteredReceipts).map((record: any) => {
-                        if (activeTab === 'matched') {
-                          return `matched-${record.task_id || record.id}`
-                        }
-                        return `${record.type}-${record.id}`
-                      })
-                      setSelectedRowKeys(allKeys)
-                      message.success(`已全选 ${allKeys.length} 条数据`)
+                      if (selectedRowKeys.length === dataForOperations.length && selectedRowKeys.length > 0) {
+                        // 已全选，点击取消
+                        setSelectedRowKeys([])
+                        message.info('已取消全选')
+                      } else {
+                        // 未全选，点击全选
+                        const allKeys = dataForOperations.map((record: any) => {
+                          if (activeTab === 'matched') {
+                            return `matched-${record.task_id || record.id}`
+                          }
+                          return `${record.type}-${record.id}`
+                        })
+                        setSelectedRowKeys(allKeys)
+                        message.success(`已全选 ${allKeys.length} 条数据`)
+                      }
+                    }}
+                    style={{
+                      fontWeight: selectedRowKeys.length > 0 ? 600 : 400,
+                      transition: 'all 0.3s ease'
                     }}
                   >
-                    全选所有 ({(activeTab === 'matched' ? matchedReceipts : filteredReceipts).length})
+                    {selectedRowKeys.length === dataForOperations.length && selectedRowKeys.length > 0 
+                      ? `✓ 已全选 (${selectedRowKeys.length})` 
+                      : selectedRowKeys.length > 0
+                        ? `已选 ${selectedRowKeys.length}/${dataForOperations.length}`
+                        : `全选 (${dataForOperations.length})`
+                    }
                   </Button>
-                  {selectedRowKeys.length > 0 && (
+                  {selectedRowKeys.length > 0 && selectedRowKeys.length < dataForOperations.length && (
                     <Button
                       onClick={() => {
                         setSelectedRowKeys([])
-                        message.info('已取消全选')
+                        message.info('已清空选择')
                       }}
                     >
-                      取消全选
+                      清空
                     </Button>
                   )}
-                </>
+                </Space.Compact>
               )}
               
               {/* 批量操作按钮 */}
@@ -4113,19 +4294,131 @@ const ReceiptsPage = () => {
                     return `${record.type}-${record.id}`
                   }}
                   columns={getColumns(activeTab)}
-                  dataSource={(activeTab === 'matched' ? matchedReceipts : filteredReceipts) as any}
+                  dataSource={currentDisplayData as any}
                   loading={activeTab === 'matched' ? matchedReceiptsQuery.isLoading : receiptsQuery.isLoading}
                   rowSelection={{
                     selectedRowKeys,
                     onChange: setSelectedRowKeys,
+                    columnWidth: 48,
+                    selections: [
+                      {
+                        key: 'select-all-data',
+                        text: '全选所有数据',
+                        onSelect: () => {
+                          const allKeys = dataForOperations.map((record: any) => 
+                            activeTab === 'matched' 
+                              ? `matched-${record.task_id || record.id}`
+                              : `${record.type}-${record.id}`
+                          )
+                          setSelectedRowKeys(allKeys)
+                          message.success(`已全选 ${allKeys.length} 条数据`)
+                        },
+                      },
+                      {
+                        key: 'select-current-page',
+                        text: '选择当前页',
+                        onSelect: () => {
+                          const startIndex = (currentPage - 1) * pageSize
+                          const endIndex = Math.min(startIndex + pageSize, dataForOperations.length)
+                          const pageKeys = dataForOperations
+                            .slice(startIndex, endIndex)
+                            .map((record: any) => 
+                              activeTab === 'matched' 
+                                ? `matched-${record.task_id || record.id}`
+                                : `${record.type}-${record.id}`
+                            )
+                          setSelectedRowKeys(pageKeys)
+                          message.success(`已选中当前页 ${pageKeys.length} 条数据`)
+                        },
+                      },
+                      {
+                        key: 'invert-selection',
+                        text: '反选当前页',
+                        onSelect: () => {
+                          const startIndex = (currentPage - 1) * pageSize
+                          const endIndex = Math.min(startIndex + pageSize, dataForOperations.length)
+                          const pageData = dataForOperations.slice(startIndex, endIndex)
+                          const pageKeys = pageData.map((record: any) => 
+                            activeTab === 'matched' 
+                              ? `matched-${record.task_id || record.id}`
+                              : `${record.type}-${record.id}`
+                          )
+                          
+                          // 反选：当前页未选中的变为选中，已选中的取消选中
+                          const newSelectedKeys = [...selectedRowKeys]
+                          pageKeys.forEach(key => {
+                            const index = newSelectedKeys.indexOf(key)
+                            if (index > -1) {
+                              newSelectedKeys.splice(index, 1)
+                            } else {
+                              newSelectedKeys.push(key)
+                            }
+                          })
+                          setSelectedRowKeys(newSelectedKeys)
+                          message.success('已反选当前页')
+                        },
+                      },
+                      {
+                        key: 'clear-all',
+                        text: '清空所有选择',
+                        onSelect: () => {
+                          setSelectedRowKeys([])
+                          message.success('已清空所有选择')
+                        },
+                      },
+                    ],
+                  }}
+                  onChange={(_pagination, filters, sorter, extra) => {
+                    console.log('Table onChange:', { 
+                      action: extra.action,
+                      filters, 
+                      currentDataSource: extra.currentDataSource?.length 
+                    })
+                    
+                    // 更新筛选信息
+                    setFilteredInfo(filters || {})
+                    
+                    // 更新排序信息
+                    setSortedInfo(sorter || {})
+                    
+                    // 检查是否有活跃的筛选条件
+                    const hasActiveFilters = Object.keys(filters || {}).some(key => {
+                      const filterValue = filters?.[key]
+                      return filterValue && (Array.isArray(filterValue) ? filterValue.length > 0 : true)
+                    })
+                    
+                    // 更新用于统计的筛选后数据
+                    if (extra.action === 'filter' || extra.action === 'sort') {
+                      console.log('筛选/排序操作:', { 
+                        hasActiveFilters, 
+                        dataLength: extra.currentDataSource?.length 
+                      })
+                      
+                      // 如果有筛选条件，保存筛选后的数据用于统计；否则清空
+                      if (hasActiveFilters) {
+                        setDisplayDataForStats(extra.currentDataSource || [])
+                      } else {
+                        setDisplayDataForStats([])
+                      }
+                      
+                      if (extra.action === 'filter') {
+                        setCurrentPage(1) // 筛选后重置到第一页
+                        setSelectedRowKeys([]) // 筛选后清空选择
+                      }
+                    }
                   }}
                   pagination={{
-                    total: activeTab === 'matched' ? matchedReceipts.length : filteredReceipts.length,
+                    current: currentPage,
+                    total: dataForOperations.length,
                     pageSize: pageSize,
                     showSizeChanger: true,
                     showTotal: (total) => `共 ${total} 条`,
                     pageSizeOptions: ['10', '20', '50', '100'],
-                    onShowSizeChange: (_current, size) => setPageSize(size),
+                    onChange: (page) => setCurrentPage(page),
+                    onShowSizeChange: (_current, size) => {
+                      setPageSize(size)
+                      setCurrentPage(1) // 改变页面大小时重置到第一页
+                    },
                   }}
                   scroll={{ x: 1500, y: 600 }}
                   sticky={{ offsetHeader: 0 }}
@@ -4611,10 +4904,27 @@ const ReceiptsPage = () => {
           }
           
           try {
-            // 调用后端API进行批量更新
+            const matchedFieldMap: Record<string, { receipt_type: string; field_name: string }> = {
+              load_company: { receipt_type: 'loading', field_name: 'company' },
+              unload_company: { receipt_type: 'unloading', field_name: 'company' },
+              load_material_name: { receipt_type: 'loading', field_name: 'material_name' },
+              unload_material_name: { receipt_type: 'unloading', field_name: 'material_name' },
+              load_material_spec: { receipt_type: 'loading', field_name: 'material_spec' },
+              unload_material_spec: { receipt_type: 'unloading', field_name: 'material_spec' },
+            }
+
+            const { receipt_type, field_name } = activeTab === 'matched'
+              ? (matchedFieldMap[cleanField] || {})
+              : ({ receipt_type: activeTab, field_name: cleanField } as any)
+
+            if (!receipt_type || !field_name) {
+              message.warning('该字段暂不支持清洗')
+              return
+            }
+
             const result = await batchUpdateReceiptField({
-              receipt_type: activeTab,
-              field_name: cleanField,
+              receipt_type,
+              field_name,
               old_values: selectedOldValues,
               new_value: newValue,
               company_id: effectiveCompanyId,
@@ -4625,6 +4935,7 @@ const ReceiptsPage = () => {
             setSelectedOldValues([])
             setNewValue('')
             queryClient.invalidateQueries({ queryKey: ['receipts'] })
+            queryClient.invalidateQueries({ queryKey: ['matched-receipts'] })
           } catch (error: any) {
             message.error(error.message || '批量修改失败')
           }
@@ -4665,6 +4976,15 @@ const ReceiptsPage = () => {
                       { label: '材料名称', value: 'material_name' },
                       { label: '规格型号', value: 'material_spec' },
                     ]
+                  } else if (activeTab === 'matched') {
+                    return [
+                      { label: '装料公司', value: 'load_company' },
+                      { label: '卸货公司', value: 'unload_company' },
+                      { label: '装料材料名称', value: 'load_material_name' },
+                      { label: '卸货材料名称', value: 'unload_material_name' },
+                      { label: '装料规格型号', value: 'load_material_spec' },
+                      { label: '卸货规格型号', value: 'unload_material_spec' },
+                    ]
                   } else if (activeTab === 'departure') {
                     return [
                       { label: '装料公司', value: 'loading_company' },
@@ -4697,16 +5017,14 @@ const ReceiptsPage = () => {
                       placeholder="请选择要替换的值（支持模糊搜索）"
                       style={{ width: '100%' }}
                       onSearch={(value) => setOldValueSearchText(value)}
-                      options={Array.from(
-                        new Set(
-                          filteredReceipts
-                            .map((r: any) => r[cleanField])
-                            .filter(Boolean)
-                        )
-                      )
+                      options={Array.from(new Set(
+                        cleanSourceRecords
+                          .map((r: any) => getCleanFieldValue(r, cleanField))
+                          .filter(Boolean)
+                      ))
                         .sort((a, b) => String(a).localeCompare(String(b), 'zh-CN'))
                         .map((value) => ({
-                          label: `${value} (${filteredReceipts.filter((r: any) => r[cleanField] === value).length} 条)`,
+                          label: `${value} (${cleanSourceRecords.filter((r: any) => getCleanFieldValue(r, cleanField) === value).length} 条)`,
                           value: String(value),
                         }))}
                       filterOption={(input, option) =>
@@ -4722,8 +5040,8 @@ const ReceiptsPage = () => {
                                 // 获取所有可选项
                                 const allOptions = Array.from(
                                   new Set(
-                                    filteredReceipts
-                                      .map((r: any) => r[cleanField])
+                                    cleanSourceRecords
+                                      .map((r: any) => getCleanFieldValue(r, cleanField))
                                       .filter(Boolean)
                                   )
                                 )
@@ -4759,7 +5077,7 @@ const ReceiptsPage = () => {
                     placeholder="请输入或选择正确的值"
                     options={(() => {
                       // 只显示配置的标准值
-                      const values = standardValues[cleanField] || []
+                      const values = standardValues[getCleanStandardKey(cleanField)] || []
                       return values.map(v => ({ label: v, value: v }))
                     })()}
                     filterOption={(input, option) =>
@@ -4806,7 +5124,7 @@ const ReceiptsPage = () => {
                           <Tag color="green">{newValue}</Tag>
                         </div>
                         <div style={{ marginTop: 8, color: '#999' }}>
-                          影响记录数：{filteredReceipts.filter((r: any) => selectedOldValues.includes(String(r[cleanField]))).length} 条
+                          影响记录数：{cleanSourceRecords.filter((r: any) => selectedOldValues.includes(String(getCleanFieldValue(r, cleanField)))).length} 条
                         </div>
                       </div>
                     }

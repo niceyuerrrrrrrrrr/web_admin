@@ -9,28 +9,23 @@ import useCompanyStore from '../store/company';
 const { RangePicker } = DatePicker;
 const { Option } = Select;
 
-// 异常状态配置
-const ANOMALY_STATUS_CONFIG = {
-  suspicious: {
-    label: '可疑',
-    color: 'orange',
-    icon: <ExclamationCircleOutlined />
-  },
-  cross_day_checkout: {
-    label: '跨天补打卡',
-    color: 'red',
-    icon: <WarningOutlined />
-  },
-  long_no_checkout: {
-    label: '长时间未打卡',
-    color: 'red',
-    icon: <WarningOutlined />
-  },
-  rapid_consecutive: {
-    label: '连续快速打卡',
-    color: 'red',
-    icon: <WarningOutlined />
-  }
+// 违规事件类型配置
+const ALERT_TYPE_CONFIG: Record<string, { label: string; color: string; icon?: React.ReactNode }> = {
+  late: { label: '迟到', color: 'orange', icon: <ExclamationCircleOutlined /> },
+  early_leave: { label: '早退', color: 'orange', icon: <ExclamationCircleOutlined /> },
+  absent: { label: '缺勤', color: 'red', icon: <WarningOutlined /> },
+  location_abnormal: { label: '位置异常', color: 'orange', icon: <ExclamationCircleOutlined /> },
+  time_abnormal: { label: '时长异常', color: 'orange', icon: <ExclamationCircleOutlined /> },
+  cross_day_checkout_suspicious: { label: '跨天打卡(可疑)', color: 'orange', icon: <ExclamationCircleOutlined /> },
+  cross_day_checkout: { label: '跨天补打卡(严重)', color: 'red', icon: <WarningOutlined /> },
+  long_no_checkout: { label: '长时间未打下班卡', color: 'red', icon: <WarningOutlined /> },
+  rapid_consecutive: { label: '连续快速打卡', color: 'red', icon: <WarningOutlined /> },
+};
+
+const SEVERITY_CONFIG: Record<string, { label: string; color: string }> = {
+  low: { label: '低', color: 'blue' },
+  medium: { label: '中', color: 'orange' },
+  high: { label: '高', color: 'red' },
 };
 
 const AttendanceAnomaly: React.FC = () => {
@@ -48,7 +43,8 @@ const AttendanceAnomaly: React.FC = () => {
   
   // 筛选条件
   const [filters, setFilters] = useState({
-    anomaly_status: undefined as string | undefined,
+    alert_type: undefined as string | undefined,
+    is_resolved: undefined as boolean | undefined,
     start_date: undefined as string | undefined,
     end_date: undefined as string | undefined,
   });
@@ -72,8 +68,11 @@ const AttendanceAnomaly: React.FC = () => {
         page_size: pageSize,
       };
       
-      if (filters.anomaly_status) {
-        params.anomaly_status = filters.anomaly_status;
+      if (filters.alert_type) {
+        params.alert_type = filters.alert_type;
+      }
+      if (filters.is_resolved !== undefined) {
+        params.is_resolved = filters.is_resolved;
       }
       if (filters.start_date) {
         params.start_date = filters.start_date;
@@ -85,11 +84,11 @@ const AttendanceAnomaly: React.FC = () => {
         params.company_id = effectiveCompanyId;
       }
 
-      const res = await client.get('/attendance/anomaly-shifts', { params });
+      const res = await client.get('/attendance/alerts', { params });
       
       if (res.data.success || res.data.code === 200) {
-        setData(res.data.data.records || []);
-        setTotal(res.data.data.total || 0);
+        setData(res.data.data.alerts || []);
+        setTotal(res.data.data.total || (res.data.data.alerts ? res.data.data.alerts.length : 0));
       } else {
         message.error(res.data.message || '加载失败');
       }
@@ -114,7 +113,8 @@ const AttendanceAnomaly: React.FC = () => {
   // 重置
   const handleReset = () => {
     setFilters({
-      anomaly_status: undefined,
+      alert_type: undefined,
+      is_resolved: undefined,
       start_date: undefined,
       end_date: undefined,
     });
@@ -147,41 +147,12 @@ const AttendanceAnomaly: React.FC = () => {
       ),
     },
     {
-      title: '工作日期',
-      dataIndex: 'work_date',
-      width: 120,
-      render: (date: string) => date || '-',
-    },
-    {
-      title: '上班时间',
-      dataIndex: 'check_in_time',
-      width: 160,
-      render: (time: string) => time ? dayjs(time).format('YYYY-MM-DD HH:mm') : '-',
-    },
-    {
-      title: '下班时间',
-      dataIndex: 'check_out_time',
-      width: 160,
-      render: (time: string) => time ? dayjs(time).format('YYYY-MM-DD HH:mm') : '-',
-    },
-    {
-      title: '工作时长',
-      dataIndex: 'work_duration_minutes',
-      width: 100,
-      render: (minutes: number) => {
-        if (!minutes) return '-';
-        const hours = Math.floor(minutes / 60);
-        const mins = minutes % 60;
-        return `${hours}小时${mins}分钟`;
-      },
-    },
-    {
-      title: '异常状态',
-      dataIndex: 'anomaly_status',
+      title: '违规类型',
+      dataIndex: 'alert_type',
       width: 140,
       render: (status: string) => {
-        const config = ANOMALY_STATUS_CONFIG[status as keyof typeof ANOMALY_STATUS_CONFIG];
-        if (!config) return '-';
+        const config = ALERT_TYPE_CONFIG[status];
+        if (!config) return <Tag>{status || '-'}</Tag>;
         return (
           <Tag color={config.color} icon={config.icon}>
             {config.label}
@@ -190,16 +161,31 @@ const AttendanceAnomaly: React.FC = () => {
       },
     },
     {
-      title: '异常描述',
-      dataIndex: 'anomaly_description',
+      title: '严重程度',
+      dataIndex: 'severity',
+      width: 100,
+      render: (sev: string) => {
+        const cfg = SEVERITY_CONFIG[sev] || { label: sev || '-', color: 'default' };
+        return <Tag color={cfg.color}>{cfg.label}</Tag>;
+      },
+    },
+    {
+      title: '违规描述',
+      dataIndex: 'message',
       ellipsis: true,
       render: (desc: string) => desc || '-',
     },
     {
-      title: '检测时间',
-      dataIndex: 'anomaly_detected_at',
+      title: '发生时间',
+      dataIndex: 'created_at',
       width: 160,
       render: (time: string) => time ? dayjs(time).format('YYYY-MM-DD HH:mm') : '-',
+    },
+    {
+      title: '处理状态',
+      dataIndex: 'is_resolved',
+      width: 100,
+      render: (v: boolean) => (v ? <Tag color="green">已处理</Tag> : <Tag color="red">未处理</Tag>),
     },
     {
       title: '操作',
@@ -226,23 +212,34 @@ const AttendanceAnomaly: React.FC = () => {
       )}
       <Card title="考勤异常监控" extra={
         <Space>
-          <Tag color="orange">可疑: 跨2天打卡</Tag>
-          <Tag color="red">异常: 跨3天+/长时间/快速打卡</Tag>
+          <Tag color="orange">展示每一条违规事件明细</Tag>
         </Space>
       }>
         {/* 筛选条件 */}
         <Space style={{ marginBottom: 16 }} wrap>
           <Select
-            placeholder="异常状态"
+            placeholder="违规类型"
             style={{ width: 160 }}
-            value={filters.anomaly_status}
-            onChange={(value) => setFilters({ ...filters, anomaly_status: value })}
+            value={filters.alert_type}
+            onChange={(value) => setFilters({ ...filters, alert_type: value })}
             allowClear
           >
-            <Option value="suspicious">可疑</Option>
-            <Option value="cross_day_checkout">跨天补打卡</Option>
-            <Option value="long_no_checkout">长时间未打卡</Option>
-            <Option value="rapid_consecutive">连续快速打卡</Option>
+            {Object.keys(ALERT_TYPE_CONFIG).map((k) => (
+              <Option key={k} value={k}>
+                {ALERT_TYPE_CONFIG[k].label}
+              </Option>
+            ))}
+          </Select>
+
+          <Select
+            placeholder="处理状态"
+            style={{ width: 140 }}
+            value={filters.is_resolved as any}
+            onChange={(value) => setFilters({ ...filters, is_resolved: value })}
+            allowClear
+          >
+            <Option value={false}>未处理</Option>
+            <Option value={true}>已处理</Option>
           </Select>
 
           <RangePicker
@@ -310,25 +307,17 @@ const AttendanceAnomaly: React.FC = () => {
           <Descriptions bordered column={2}>
             <Descriptions.Item label="用户姓名">{selectedRecord.user_name}</Descriptions.Item>
             <Descriptions.Item label="手机号">{selectedRecord.user_phone}</Descriptions.Item>
-            <Descriptions.Item label="工作日期">{selectedRecord.work_date}</Descriptions.Item>
-            <Descriptions.Item label="班次ID">{selectedRecord.shift_id}</Descriptions.Item>
-            <Descriptions.Item label="上班时间">
-              {selectedRecord.check_in_time ? dayjs(selectedRecord.check_in_time).format('YYYY-MM-DD HH:mm:ss') : '-'}
+            <Descriptions.Item label="违规类型">
+              {ALERT_TYPE_CONFIG[selectedRecord.alert_type]?.label || selectedRecord.alert_type || '-'}
             </Descriptions.Item>
-            <Descriptions.Item label="下班时间">
-              {selectedRecord.check_out_time ? dayjs(selectedRecord.check_out_time).format('YYYY-MM-DD HH:mm:ss') : '-'}
+            <Descriptions.Item label="严重程度">
+              {SEVERITY_CONFIG[selectedRecord.severity]?.label || selectedRecord.severity || '-'}
             </Descriptions.Item>
-            <Descriptions.Item label="工作时长">
-              {selectedRecord.work_duration_minutes ? `${Math.floor(selectedRecord.work_duration_minutes / 60)}小时${selectedRecord.work_duration_minutes % 60}分钟` : '-'}
+            <Descriptions.Item label="违规描述" span={2}>
+              <div style={{ color: '#ff4d4f' }}>{selectedRecord.message || '-'}</div>
             </Descriptions.Item>
-            <Descriptions.Item label="异常状态">
-              {ANOMALY_STATUS_CONFIG[selectedRecord.anomaly_status as keyof typeof ANOMALY_STATUS_CONFIG]?.label || '-'}
-            </Descriptions.Item>
-            <Descriptions.Item label="异常描述" span={2}>
-              <div style={{ color: '#ff4d4f' }}>{selectedRecord.anomaly_description || '-'}</div>
-            </Descriptions.Item>
-            <Descriptions.Item label="检测时间" span={2}>
-              {selectedRecord.anomaly_detected_at ? dayjs(selectedRecord.anomaly_detected_at).format('YYYY-MM-DD HH:mm:ss') : '-'}
+            <Descriptions.Item label="发生时间" span={2}>
+              {selectedRecord.created_at ? dayjs(selectedRecord.created_at).format('YYYY-MM-DD HH:mm:ss') : '-'}
             </Descriptions.Item>
           </Descriptions>
         )}

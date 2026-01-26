@@ -83,7 +83,7 @@ const getClockTypeColor = (type: string) => {
 
 const AttendancePage = () => {
   const queryClient = useQueryClient()
-  const { message } = AntdApp.useApp()
+  const { message, modal } = AntdApp.useApp()
   const { user } = useAuthStore()
   const { selectedCompanyId } = useCompanyStore()
 
@@ -839,7 +839,7 @@ const AttendancePage = () => {
             <Button
               type="link"
               onClick={() => {
-                Modal.confirm({
+                modal.confirm({
                   title: '确认解决',
                   content: '确定要标记该告警为已解决吗？',
                   onOk: () => resolveAlertMutation.mutate(record.id),
@@ -907,7 +907,7 @@ const AttendancePage = () => {
               danger
               icon={<DeleteOutlined />}
               onClick={() => {
-                Modal.confirm({
+                modal.confirm({
                   title: '确认删除',
                   content: `确定要删除围栏"${record.name}"吗？`,
                   onOk: () => deleteFenceMutation.mutate(record.id),
@@ -992,7 +992,7 @@ const AttendancePage = () => {
                 danger
                 icon={<CloseOutlined />}
                 onClick={() => {
-                  Modal.confirm({
+                  modal.confirm({
                     title: '拒绝补卡申请',
                     content: (
                       <Input.TextArea

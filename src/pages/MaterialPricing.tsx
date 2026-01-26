@@ -36,7 +36,7 @@ const { Title, Paragraph, Text } = Typography
 
 const MaterialPricingPage = () => {
   const queryClient = useQueryClient()
-  const { message } = AntdApp.useApp()
+  const { message, modal } = AntdApp.useApp()
   const { user } = useAuthStore()
   const { selectedCompanyId } = useCompanyStore()
 
@@ -146,7 +146,7 @@ const MaterialPricingPage = () => {
               danger
               icon={<CheckCircleOutlined />}
               onClick={() =>
-                Modal.confirm({
+                modal.confirm({
                   title: '禁用材料',
                   content: '确定要禁用该材料吗？',
                   onOk: () => deleteMutation.mutate(record.id),

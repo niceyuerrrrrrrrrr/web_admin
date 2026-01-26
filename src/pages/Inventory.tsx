@@ -35,6 +35,7 @@ import {
 import { Line } from '@ant-design/charts'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import dayjs from 'dayjs'
+import * as XLSX from 'xlsx'
 import {
   createInventoryItem,
   createStockOperation,
@@ -62,7 +63,7 @@ const { RangePicker } = DatePicker
 
 const InventoryPage = () => {
   const queryClient = useQueryClient()
-  const { message } = AntdApp.useApp()
+  const { message, modal } = AntdApp.useApp()
   const { user } = useAuthStore()
   const { selectedCompanyId } = useCompanyStore()
 
@@ -85,6 +86,10 @@ const InventoryPage = () => {
   const [inventoryModalOpen, setInventoryModalOpen] = useState(false)
   const [editingItemId, setEditingItemId] = useState<number | null>(null)
   const [operationModalOpen, setOperationModalOpen] = useState(false)
+  const [selectedInventoryKeys, setSelectedInventoryKeys] = useState<React.Key[]>([])
+  const [selectedOperationKeys, setSelectedOperationKeys] = useState<React.Key[]>([])
+  const [inventoryPagination, setInventoryPagination] = useState({ current: 1, pageSize: 20 })
+  const [operationPagination, setOperationPagination] = useState({ current: 1, pageSize: 20 })
 
   const [warehouseForm] = Form.useForm()
   const [inventoryForm] = Form.useForm()
@@ -184,13 +189,21 @@ const InventoryPage = () => {
   })
 
   const deleteInventoryMutation = useMutation({
-    mutationFn: deleteInventoryItem,
+    mutationFn: ({ itemId, force }: { itemId: number; force?: boolean }) => deleteInventoryItem(itemId, force),
     onSuccess: () => {
       message.success('物品删除成功')
       queryClient.invalidateQueries({ queryKey: ['inventory', 'items'] })
       queryClient.invalidateQueries({ queryKey: ['inventory', 'stats'] })
     },
-    onError: (error) => message.error((error as Error).message || '删除失败'),
+    onError: (error: any) => {
+      // 如果错误信息包含出入库记录提示，显示强制删除选项
+      const errorMsg = error?.message || '删除失败'
+      if (errorMsg.includes('出入库记录') && errorMsg.includes('强制删除')) {
+        // 这种情况会在删除确认对话框中处理
+        return
+      }
+      message.error(errorMsg)
+    },
   })
 
   const operationMutation = useMutation({
@@ -299,19 +312,111 @@ const InventoryPage = () => {
     })
   }
 
+  // 导出库存列表
+  const handleExportInventory = () => {
+    const records = inventoryQuery.data?.records || []
+    if (records.length === 0) {
+      message.warning('暂无数据可导出')
+      return
+    }
+
+    try {
+      const exportData = records.map((record) => {
+        const warehouse = warehousesQuery.data?.records?.find((w) => w.id === record.warehouse_id)
+        const isLowStock = record.min_stock !== undefined && record.quantity < (record.min_stock || 0)
+        
+        return {
+          '物品名称': record.material_name || '-',
+          '物品编码': record.material_code || '-',
+          '所属仓库': warehouse?.name || '-',
+          '库存数量': `${record.quantity} ${record.unit}`,
+          '库存状态': isLowStock ? '低库存' : '正常',
+          '最低库存': record.min_stock !== undefined ? `${record.min_stock} ${record.unit}` : '-',
+          '最高库存': record.max_stock !== undefined ? `${record.max_stock} ${record.unit}` : '-',
+          '安全库存范围': record.min_stock !== undefined 
+            ? `${record.min_stock} - ${record.max_stock ?? '∞'} ${record.unit}` 
+            : '-',
+          '存放位置': record.location || '-',
+          '备注': record.notes || '-',
+        }
+      })
+
+      const ws = XLSX.utils.json_to_sheet(exportData)
+      const wb = XLSX.utils.book_new()
+      XLSX.utils.book_append_sheet(wb, ws, '库存列表')
+      
+      const fileName = `库存列表_${dayjs().format('YYYY-MM-DD_HH-mm-ss')}.xlsx`
+      XLSX.writeFile(wb, fileName)
+      message.success('导出成功')
+    } catch (error) {
+      message.error('导出失败：' + (error as Error).message)
+    }
+  }
+
+  // 导出出入库记录
+  const handleExportOperations = () => {
+    const records = operationsQuery.data?.records || []
+    if (records.length === 0) {
+      message.warning('暂无数据可导出')
+      return
+    }
+
+    try {
+      const exportData = records.map((record) => ({
+        '编号': record.id,
+        '仓库': record.warehouse_name || '-',
+        '物品': record.material_name || '-',
+        '类型': record.operation_type === 'inbound' ? '入库' : '出库',
+        '数量': `${record.quantity} ${record.unit}`,
+        '操作时间': record.operation_date || '-',
+        '备注': record.reason || '-',
+      }))
+
+      const ws = XLSX.utils.json_to_sheet(exportData)
+      const wb = XLSX.utils.book_new()
+      XLSX.utils.book_append_sheet(wb, ws, '出入库记录')
+      
+      const fileName = `出入库记录_${dayjs().format('YYYY-MM-DD_HH-mm-ss')}.xlsx`
+      XLSX.writeFile(wb, fileName)
+      message.success('导出成功')
+    } catch (error) {
+      message.error('导出失败：' + (error as Error).message)
+    }
+  }
+
   const inventoryColumns: ColumnsType<InventoryItem> = [
-    { title: '物品名称', dataIndex: 'material_name', width: 160 },
-    { title: '物品编码', dataIndex: 'material_code', width: 140, render: (v) => v || '-' },
+    { 
+      title: '物品名称', 
+      dataIndex: 'material_name', 
+      width: 160,
+      filters: Array.from(new Set((inventoryQuery.data?.records || []).map(r => r.material_name).filter(Boolean)))
+        .sort()
+        .map(val => ({ text: val as string, value: val as string })),
+      onFilter: (value, record) => record.material_name === value,
+    },
+    { 
+      title: '物品编码', 
+      dataIndex: 'material_code', 
+      width: 140, 
+      render: (v) => v || '-',
+      filters: Array.from(new Set((inventoryQuery.data?.records || []).map(r => r.material_code).filter(Boolean)))
+        .sort()
+        .map(val => ({ text: val as string, value: val as string })),
+      onFilter: (value, record) => record.material_code === value,
+    },
     {
       title: '所属仓库',
       dataIndex: 'warehouse_id',
       width: 160,
       render: (value) => warehousesQuery.data?.records?.find((w) => w.id === value)?.name || '-',
+      filters: (warehousesQuery.data?.records || []).map(w => ({ text: w.name, value: w.id })),
+      onFilter: (value, record) => record.warehouse_id === value,
     },
     {
       title: '库存数量',
       dataIndex: 'quantity',
       width: 140,
+      sorter: (a, b) => a.quantity - b.quantity,
       render: (_, record) => (
         <span>
           {record.quantity} {record.unit}
@@ -331,11 +436,21 @@ const InventoryPage = () => {
           '-'
         ),
     },
-    { title: '存放位置', dataIndex: 'location', width: 140, render: (v) => v || '-' },
+    { 
+      title: '存放位置', 
+      dataIndex: 'location', 
+      width: 140, 
+      render: (v) => v || '-',
+      filters: Array.from(new Set((inventoryQuery.data?.records || []).map(r => r.location).filter(Boolean)))
+        .sort()
+        .map(val => ({ text: val as string, value: val as string })),
+      onFilter: (value, record) => record.location === value,
+    },
     { title: '备注', dataIndex: 'notes', ellipsis: true, render: (v) => v || '-' },
     {
       title: '操作',
       width: canManageWarehouse ? 240 : 150,
+      fixed: 'right',
       render: (_, record) => (
         <Space>
           <Button
@@ -376,10 +491,46 @@ const InventoryPage = () => {
               type="link"
               danger
               onClick={() => {
-                Modal.confirm({
+                // 先尝试普通删除，如果有关联记录则提示强制删除
+                const handleDelete = async (force = false) => {
+                  try {
+                    await deleteInventoryItem(record.id, force)
+                    message.success('物品删除成功')
+                    queryClient.invalidateQueries({ queryKey: ['inventory', 'items'] })
+                    queryClient.invalidateQueries({ queryKey: ['inventory', 'stats'] })
+                  } catch (error: any) {
+                    const errorMsg = error?.message || '删除失败'
+                    
+                    // 如果提示有关联记录，显示强制删除确认
+                    if (errorMsg.includes('出入库记录') && errorMsg.includes('强制删除')) {
+                      modal.confirm({
+                        title: '发现关联记录',
+                        content: (
+                          <div>
+                            <p>{errorMsg}</p>
+                            <p style={{ color: '#ff4d4f', marginTop: 8 }}>
+                              <strong>警告：</strong>强制删除将同时删除所有关联的出入库记录，此操作不可恢复！
+                            </p>
+                          </div>
+                        ),
+                        okText: '强制删除',
+                        okType: 'danger',
+                        cancelText: '取消',
+                        onOk: () => handleDelete(true),
+                      })
+                    } else {
+                      message.error(errorMsg)
+                    }
+                  }
+                }
+
+                modal.confirm({
                   title: '确认删除',
                   content: `确定要删除物品"${record.material_name}"吗？此操作不可恢复。`,
-                  onOk: () => deleteInventoryMutation.mutate(record.id),
+                  okText: '删除',
+                  okType: 'danger',
+                  cancelText: '取消',
+                  onOk: () => handleDelete(false),
                 })
               }}
             >
@@ -422,7 +573,7 @@ const InventoryPage = () => {
               type="link"
               danger
               onClick={() => {
-                Modal.confirm({
+                modal.confirm({
                   title: '确认删除',
                   content: `确定要删除仓库"${record.name}"吗？此操作不可恢复。`,
                   onOk: () => deleteWarehouseMutation.mutate(record.id),
@@ -439,25 +590,52 @@ const InventoryPage = () => {
 
   const operationColumns: ColumnsType<StockOperationRecord> = [
     { title: '编号', dataIndex: 'id', width: 80 },
-    { title: '仓库', dataIndex: 'warehouse_name', width: 160 },
-    { title: '物品', dataIndex: 'material_name', width: 160 },
+    { 
+      title: '仓库', 
+      dataIndex: 'warehouse_name', 
+      width: 160,
+      filters: Array.from(new Set((operationsQuery.data?.records || []).map(r => r.warehouse_name).filter(Boolean)))
+        .sort()
+        .map(val => ({ text: val as string, value: val as string })),
+      onFilter: (value, record) => record.warehouse_name === value,
+    },
+    { 
+      title: '物品', 
+      dataIndex: 'material_name', 
+      width: 160,
+      filters: Array.from(new Set((operationsQuery.data?.records || []).map(r => r.material_name).filter(Boolean)))
+        .sort()
+        .map(val => ({ text: val as string, value: val as string })),
+      onFilter: (value, record) => record.material_name === value,
+    },
     {
       title: '类型',
       dataIndex: 'operation_type',
       width: 120,
+      filters: [
+        { text: '入库', value: 'inbound' },
+        { text: '出库', value: 'outbound' },
+      ],
+      onFilter: (value, record) => record.operation_type === value,
       render: (value) => <Tag color={value === 'inbound' ? 'blue' : 'orange'}>{value === 'inbound' ? '入库' : '出库'}</Tag>,
     },
     {
       title: '数量',
       dataIndex: 'quantity',
       width: 120,
+      sorter: (a, b) => a.quantity - b.quantity,
       render: (_, record) => (
         <>
           {record.quantity} {record.unit}
         </>
       ),
     },
-    { title: '操作时间', dataIndex: 'operation_date', width: 140 },
+    { 
+      title: '操作时间', 
+      dataIndex: 'operation_date', 
+      width: 140,
+      sorter: (a, b) => (a.operation_date || '').localeCompare(b.operation_date || ''),
+    },
     { title: '备注', dataIndex: 'reason', ellipsis: true, render: (v) => v || '-' },
   ]
 
@@ -647,12 +825,101 @@ const InventoryPage = () => {
                   </Form>
                 </Card>
                 <Card>
+                  {selectedInventoryKeys.length > 0 && (
+                    <Alert
+                      message={`已选择 ${selectedInventoryKeys.length} 条记录`}
+                      type="info"
+                      showIcon
+                      style={{ marginBottom: 16 }}
+                      action={
+                        <Space>
+                          <Button size="small" icon={<DownloadOutlined />} onClick={handleExportInventory}>
+                            导出选中
+                          </Button>
+                          <Button size="small" onClick={() => setSelectedInventoryKeys([])}>
+                            清空选择
+                          </Button>
+                        </Space>
+                      }
+                    />
+                  )}
                   <Table
                     rowKey="id"
                     columns={inventoryColumns}
                     dataSource={inventoryQuery.data?.records || []}
                     loading={inventoryQuery.isLoading}
-                    pagination={{ pageSize: 20 }}
+                    rowSelection={{
+                      selectedRowKeys: selectedInventoryKeys,
+                      onChange: setSelectedInventoryKeys,
+                      columnWidth: 48,
+                      selections: [
+                        {
+                          key: 'select-all-data',
+                          text: '全选所有数据',
+                          onSelect: () => {
+                            const allKeys = (inventoryQuery.data?.records || []).map((record) => record.id)
+                            setSelectedInventoryKeys(allKeys)
+                            message.success(`已全选 ${allKeys.length} 条数据`)
+                          },
+                        },
+                        {
+                          key: 'select-current-page',
+                          text: '选择当前页',
+                          onSelect: () => {
+                            const records = inventoryQuery.data?.records || []
+                            const startIndex = (inventoryPagination.current - 1) * inventoryPagination.pageSize
+                            const endIndex = Math.min(startIndex + inventoryPagination.pageSize, records.length)
+                            const pageKeys = records
+                              .slice(startIndex, endIndex)
+                              .map((record) => record.id)
+                            setSelectedInventoryKeys(pageKeys)
+                            message.success(`已选中当前页 ${pageKeys.length} 条数据`)
+                          },
+                        },
+                        {
+                          key: 'invert-selection',
+                          text: '反选当前页',
+                          onSelect: () => {
+                            const records = inventoryQuery.data?.records || []
+                            const startIndex = (inventoryPagination.current - 1) * inventoryPagination.pageSize
+                            const endIndex = Math.min(startIndex + inventoryPagination.pageSize, records.length)
+                            const pageData = records.slice(startIndex, endIndex)
+                            const pageKeys = pageData.map((record) => record.id)
+                            
+                            const newSelectedKeys = [...selectedInventoryKeys]
+                            pageKeys.forEach(key => {
+                              const index = newSelectedKeys.indexOf(key)
+                              if (index > -1) {
+                                newSelectedKeys.splice(index, 1)
+                              } else {
+                                newSelectedKeys.push(key)
+                              }
+                            })
+                            setSelectedInventoryKeys(newSelectedKeys)
+                            message.success('已反选当前页')
+                          },
+                        },
+                        {
+                          key: 'clear-all',
+                          text: '清空所有选择',
+                          onSelect: () => {
+                            setSelectedInventoryKeys([])
+                            message.success('已清空所有选择')
+                          },
+                        },
+                      ],
+                    }}
+                    pagination={{
+                      current: inventoryPagination.current,
+                      pageSize: inventoryPagination.pageSize,
+                      total: (inventoryQuery.data?.records || []).length,
+                      showTotal: (total) => `共 ${total} 条`,
+                      showSizeChanger: true,
+                      pageSizeOptions: ['10', '20', '50', '100'],
+                      onChange: (page, pageSize) => {
+                        setInventoryPagination({ current: page, pageSize: pageSize || 20 })
+                      },
+                    }}
                     scroll={{ x: 1200 }}
                   />
                 </Card>
@@ -725,12 +992,101 @@ const InventoryPage = () => {
                   </Form>
                 </Card>
                 <Card>
+                  {selectedOperationKeys.length > 0 && (
+                    <Alert
+                      message={`已选择 ${selectedOperationKeys.length} 条记录`}
+                      type="info"
+                      showIcon
+                      style={{ marginBottom: 16 }}
+                      action={
+                        <Space>
+                          <Button size="small" icon={<DownloadOutlined />} onClick={handleExportOperations}>
+                            导出选中
+                          </Button>
+                          <Button size="small" onClick={() => setSelectedOperationKeys([])}>
+                            清空选择
+                          </Button>
+                        </Space>
+                      }
+                    />
+                  )}
                   <Table
                     rowKey="id"
                     columns={operationColumns}
                     dataSource={operationsQuery.data?.records || []}
                     loading={operationsQuery.isLoading}
-                    pagination={false}
+                    rowSelection={{
+                      selectedRowKeys: selectedOperationKeys,
+                      onChange: setSelectedOperationKeys,
+                      columnWidth: 48,
+                      selections: [
+                        {
+                          key: 'select-all-data',
+                          text: '全选所有数据',
+                          onSelect: () => {
+                            const allKeys = (operationsQuery.data?.records || []).map((record) => record.id)
+                            setSelectedOperationKeys(allKeys)
+                            message.success(`已全选 ${allKeys.length} 条数据`)
+                          },
+                        },
+                        {
+                          key: 'select-current-page',
+                          text: '选择当前页',
+                          onSelect: () => {
+                            const records = operationsQuery.data?.records || []
+                            const startIndex = (operationPagination.current - 1) * operationPagination.pageSize
+                            const endIndex = Math.min(startIndex + operationPagination.pageSize, records.length)
+                            const pageKeys = records
+                              .slice(startIndex, endIndex)
+                              .map((record) => record.id)
+                            setSelectedOperationKeys(pageKeys)
+                            message.success(`已选中当前页 ${pageKeys.length} 条数据`)
+                          },
+                        },
+                        {
+                          key: 'invert-selection',
+                          text: '反选当前页',
+                          onSelect: () => {
+                            const records = operationsQuery.data?.records || []
+                            const startIndex = (operationPagination.current - 1) * operationPagination.pageSize
+                            const endIndex = Math.min(startIndex + operationPagination.pageSize, records.length)
+                            const pageData = records.slice(startIndex, endIndex)
+                            const pageKeys = pageData.map((record) => record.id)
+                            
+                            const newSelectedKeys = [...selectedOperationKeys]
+                            pageKeys.forEach(key => {
+                              const index = newSelectedKeys.indexOf(key)
+                              if (index > -1) {
+                                newSelectedKeys.splice(index, 1)
+                              } else {
+                                newSelectedKeys.push(key)
+                              }
+                            })
+                            setSelectedOperationKeys(newSelectedKeys)
+                            message.success('已反选当前页')
+                          },
+                        },
+                        {
+                          key: 'clear-all',
+                          text: '清空所有选择',
+                          onSelect: () => {
+                            setSelectedOperationKeys([])
+                            message.success('已清空所有选择')
+                          },
+                        },
+                      ],
+                    }}
+                    pagination={{
+                      current: operationPagination.current,
+                      pageSize: operationPagination.pageSize,
+                      total: (operationsQuery.data?.records || []).length,
+                      showTotal: (total) => `共 ${total} 条`,
+                      showSizeChanger: true,
+                      pageSizeOptions: ['10', '20', '50', '100'],
+                      onChange: (page, pageSize) => {
+                        setOperationPagination({ current: page, pageSize: pageSize || 20 })
+                      },
+                    }}
                     scroll={{ x: 1000 }}
                   />
                 </Card>

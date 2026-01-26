@@ -26,6 +26,22 @@ export const RECEIPT_TYPES: Array<{ value: ReceiptType; label: string }> = [
 ]
 
 /**
+ * 获取充电单筛选选项
+ */
+export const fetchChargingFilterOptions = (params: { companyId?: number }) =>
+  unwrap<{
+    stations: string[]
+    drivers: string[]
+    vehicles: string[]
+  }>(
+    client.get('/receipts/charging/filter-options', {
+      params: {
+        company_id: params.companyId,
+      },
+    }),
+  )
+
+/**
  * 获取票据列表
  * user_id 可选，不传则查询所有票据（需要管理员权限）
  * scope: 'mine' 只获取当前用户数据，'all' 获取全部数据
@@ -49,6 +65,8 @@ export const fetchReceipts = (params: ReceiptListParams & { userId?: number; sco
         start_date: params.startDate,
         end_date: params.endDate,
         vehicle_no: params.vehicleNo,
+        charging_station: params.chargingStation,
+        driver_name: params.driverName,
         tanker_vehicle_code: params.tankerVehicleCode,
         company_id: params.companyId,
         department_id: params.departmentId,

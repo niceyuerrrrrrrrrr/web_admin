@@ -87,8 +87,11 @@ const ChargingStationsPage = () => {
   const [ruleModalOpen, setRuleModalOpen] = useState(false)
   const [editingRule, setEditingRule] = useState<ChargingPriceRule | null>(null)
   const [importModalOpen, setImportModalOpen] = useState(false)
+  const [pasteModalOpen, setPasteModalOpen] = useState(false)
+  const [pasteText, setPasteText] = useState('')
   const [ruleForm] = Form.useForm()
   const [calculatorForm] = Form.useForm()
+
 
   const stationsQuery = useQuery({
     queryKey: ['charging', 'stations', effectiveCompanyId],
@@ -386,16 +389,24 @@ const ChargingStationsPage = () => {
             size="small"
             onClick={() => {
               setEditingRule(record)
-              ruleForm.setFieldsValue({
-                time_range: [dayjs(record.time_period_start, 'HH:mm'), dayjs(record.time_period_end, 'HH:mm')],
-                price_per_kwh: record.price_per_kwh,
-                priority: record.priority,
-                description: record.description,
-                effective_date: record.effective_date ? dayjs(record.effective_date) : undefined,
-                expiry_date: record.expiry_date ? dayjs(record.expiry_date) : undefined,
-                is_active: record.is_active,
-              })
               setRuleModalOpen(true)
+
+              // 注意：Modal 未打开时 Form.Item 可能未挂载，直接 setFieldsValue 会丢值
+              setTimeout(() => {
+                const rawStart = _toHHmm(record.time_period_start)
+                const rawEnd = _toHHmm(record.time_period_end)
+                const endValue = rawEnd === '24:00' ? '00:00' : rawEnd
+                ruleForm.setFieldsValue({
+                  time_period_start: dayjs(`2000-01-01T${rawStart}:00`),
+                  time_period_end: dayjs(`2000-01-01T${endValue}:00`),
+                  price_per_kwh: record.price_per_kwh,
+                  priority: record.priority,
+                  description: record.description,
+                  effective_date: record.effective_date ? dayjs(record.effective_date) : undefined,
+                  expiry_date: record.expiry_date ? dayjs(record.expiry_date) : undefined,
+                  is_active: record.is_active,
+                })
+              }, 0)
             }}
           >
             编辑
@@ -468,24 +479,36 @@ const ChargingStationsPage = () => {
       message.warning('请先选择充电站')
       return
     }
-    ruleForm.validateFields().then((values) => {
-      const [start, end] = values.time_range || []
-      const payload = {
-        time_period_start: start?.format('HH:mm') || '',
-        time_period_end: end?.format('HH:mm') || '',
-        price_per_kwh: values.price_per_kwh,
-        priority: values.priority ?? 0,
-        description: values.description,
-        effective_date: values.effective_date?.format('YYYY-MM-DD'),
-        expiry_date: values.expiry_date?.format('YYYY-MM-DD'),
-        is_active: values.is_active ?? true,
-      }
-      if (editingRule) {
-        updateRuleMutation.mutate({ ruleId: editingRule.id, data: payload })
-      } else {
-        createRuleMutation.mutate({ stationId: selectedStation.id, data: payload })
-      }
-    })
+    ruleForm
+      .validateFields()
+      .then((values) => {
+        const startTime = values.time_period_start?.format('HH:mm') || ''
+        const endTime = values.time_period_end?.format('HH:mm') || ''
+
+        const payload = {
+          time_period_start: startTime,
+          time_period_end: endTime,
+          price_per_kwh: values.price_per_kwh,
+          priority: values.priority ?? 0,
+          description: values.description,
+          effective_date: values.effective_date?.format('YYYY-MM-DD'),
+          expiry_date: values.expiry_date?.format('YYYY-MM-DD'),
+          is_active: values.is_active ?? true,
+        }
+
+        if (editingRule) {
+          updateRuleMutation.mutate({ ruleId: editingRule.id, data: payload })
+        } else {
+          createRuleMutation.mutate({ stationId: selectedStation.id, data: payload })
+        }
+      })
+  }
+
+  const _toHHmm = (value?: string) => {
+    if (!value) return ''
+    const s = `${value}`.trim()
+    if (s.length >= 5) return s.slice(0, 5)
+    return s
   }
 
   const handleExportStats = () => {
@@ -535,9 +558,79 @@ const ChargingStationsPage = () => {
       ['开始时间', '结束时间', '单价(元/kWh)', '优先级', '描述', '生效日期', '失效日期', '启用(是/否)'],
       ['00:00', '06:00', 0.65, 1, '夜间优惠', '2025-01-01', '', '是'],
       ['06:00', '12:00', 0.95, 2, '早高峰', '', '', '是'],
+      ['12:00', '18:00', 1.25, 3, '日间标准', '', '', '是'],
+      ['18:00', '00:00', 1.15, 4, '晚间标准', '', '', '是'],
     ])
     XLSX.utils.book_append_sheet(workbook, sheet, '规则模板')
     XLSX.writeFile(workbook, 'charging-rule-template.xlsx')
+  }
+
+  // 时间格式标准化函数
+  const normalizeTimeFormat = (timeStr: string): string => {
+    if (!timeStr) return ''
+    
+    const str = timeStr.toString().trim()
+    
+    // 处理Excel时间格式（如0.5表示12:00，0.75表示18:00）
+    if (/^0\.[0-9]+$/.test(str)) {
+      const decimal = parseFloat(str)
+      const hours = Math.floor(decimal * 24)
+      const minutes = Math.round((decimal * 24 - hours) * 60)
+      return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`
+    }
+    
+    // 处理纯数字格式（如1200表示12:00）
+    if (/^\d{3,4}$/.test(str)) {
+      const padded = str.padStart(4, '0')
+      const hours = padded.substring(0, 2)
+      const minutes = padded.substring(2, 4)
+      return `${hours}:${minutes}`
+    }
+    
+    // 处理带冒号的时间格式
+    if (/^\d{1,2}:\d{2}$/.test(str)) {
+      const [hours, minutes] = str.split(':')
+      const h = parseInt(hours, 10)
+      const m = parseInt(minutes, 10)
+      if (h >= 0 && h <= 24 && m >= 0 && m < 60) {
+        if (h === 24 && m === 0) return '00:00'
+        if (h === 24) return str
+        return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`
+      }
+    }
+    
+    // 处理中文时间格式（如"上午8点"、"下午6点半"）
+    const chineseTimeMatch = str.match(/(上午|下午|晚上)?(\d{1,2})[点时]([半三]?[十]?[分]?)?/)
+    if (chineseTimeMatch) {
+      let hours = parseInt(chineseTimeMatch[2], 10)
+      const period = chineseTimeMatch[1]
+      const minutePart = chineseTimeMatch[3]
+      
+      if (period === '下午' || period === '晚上') {
+        if (hours !== 12) hours += 12
+      } else if (period === '上午' && hours === 12) {
+        hours = 0
+      }
+      
+      let minutes = 0
+      if (minutePart === '半') minutes = 30
+      
+      if (hours >= 0 && hours <= 24 && minutes >= 0 && minutes < 60) {
+        return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`
+      }
+    }
+    
+    // 处理"24点"、"0点"等格式
+    const hourOnlyMatch = str.match(/^(\d{1,2})[点时]?$/)
+    if (hourOnlyMatch) {
+      const hours = parseInt(hourOnlyMatch[1], 10)
+      if (hours >= 0 && hours <= 24) {
+        if (hours === 24) return '00:00'
+        return `${hours.toString().padStart(2, '0')}:00`
+      }
+    }
+    
+    return str // 如果无法解析，返回原字符串
   }
 
   const handleRuleImportFile = async (file: File) => {
@@ -552,14 +645,30 @@ const ChargingStationsPage = () => {
       if (!sheet) throw new Error('未读取到工作表')
       const rows = XLSX.utils.sheet_to_json<Record<string, any>>(sheet, { defval: '' })
       const formatted: ChargingRuleTableRow[] = []
-      rows.forEach((row) => {
-        const start = (row['开始时间'] || row['start'] || row['time_period_start'] || '').toString().trim()
-        const end = (row['结束时间'] || row['end'] || row['time_period_end'] || '').toString().trim()
+      const errors: string[] = []
+      
+      rows.forEach((row, index) => {
+        const startRaw = (row['开始时间'] || row['start'] || row['time_period_start'] || '').toString().trim()
+        const endRaw = (row['结束时间'] || row['end'] || row['time_period_end'] || '').toString().trim()
         const priceRaw = row['单价(元/kWh)'] ?? row['单价'] ?? row['price_per_kwh']
         const price = priceRaw !== undefined && priceRaw !== null ? parseFloat(priceRaw) : NaN
-        if (!start || !end || Number.isNaN(price)) {
+        
+        if (!startRaw || !endRaw || Number.isNaN(price)) {
+          if (startRaw || endRaw || !Number.isNaN(price)) {
+            errors.push(`第${index + 2}行数据不完整`)
+          }
           return
         }
+        
+        const start = normalizeTimeFormat(startRaw)
+        const end = normalizeTimeFormat(endRaw)
+        
+        // 验证时间格式
+        if (!/^\d{2}:\d{2}$/.test(start) || !/^\d{2}:\d{2}$/.test(end)) {
+          errors.push(`第${index + 2}行时间格式无效: ${startRaw} -> ${start}, ${endRaw} -> ${end}`)
+          return
+        }
+        
         formatted.push({
           time_period_start: start,
           time_period_end: end,
@@ -572,15 +681,113 @@ const ChargingStationsPage = () => {
         })
       })
 
+      if (errors.length > 0) {
+        modal.warning({
+          title: '导入警告',
+          content: (
+            <div>
+              <p>以下行存在问题，已跳过：</p>
+              <ul>
+                {errors.map((error, i) => <li key={i}>{error}</li>)}
+              </ul>
+            </div>
+          ),
+        })
+      }
+      
       if (!formatted.length) {
-        message.warning('未解析到任何有效规则，请检查文件列名')
+        message.warning('未解析到任何有效规则，请检查文件格式')
         return Upload.LIST_IGNORE
       }
+      
       saveRuleTableMutation.mutate({ stationId: selectedStation.id, rows: formatted })
     } catch (error) {
       message.error((error as Error).message || '解析文件失败')
     }
     return Upload.LIST_IGNORE
+  }
+
+  // 处理粘贴导入
+  const handlePasteImport = () => {
+    if (!selectedStation) {
+      message.warning('请先在列表中选择充电站')
+      return
+    }
+    
+    if (!pasteText.trim()) {
+      message.warning('请输入要导入的数据')
+      return
+    }
+    
+    try {
+      const lines = pasteText.trim().split('\n').filter(line => line.trim())
+      const formatted: ChargingRuleTableRow[] = []
+      const errors: string[] = []
+      
+      lines.forEach((line, index) => {
+        const parts = line.split(/[\t,，\s]+/).filter(part => part.trim())
+        
+        if (parts.length < 3) {
+          errors.push(`第${index + 1}行数据不足（至少需要：开始时间、结束时间、单价）`)
+          return
+        }
+        
+        const startRaw = parts[0]?.trim() || ''
+        const endRaw = parts[1]?.trim() || ''
+        const priceRaw = parts[2]?.trim() || ''
+        const price = parseFloat(priceRaw)
+        
+        if (!startRaw || !endRaw || Number.isNaN(price)) {
+          errors.push(`第${index + 1}行数据格式错误`)
+          return
+        }
+        
+        const start = normalizeTimeFormat(startRaw)
+        const end = normalizeTimeFormat(endRaw)
+        
+        // 验证时间格式
+        if (!/^\d{2}:\d{2}$/.test(start) || !/^\d{2}:\d{2}$/.test(end)) {
+          errors.push(`第${index + 1}行时间格式无效: ${startRaw} -> ${start}, ${endRaw} -> ${end}`)
+          return
+        }
+        
+        formatted.push({
+          time_period_start: start,
+          time_period_end: end,
+          price_per_kwh: price,
+          priority: Number(parts[3]) || 0,
+          description: parts[4] || '',
+          effective_date: parts[5] || '',
+          expiry_date: parts[6] || '',
+          is_active: (parts[7] || '是').trim() !== '否',
+        })
+      })
+      
+      if (errors.length > 0) {
+        modal.warning({
+          title: '导入警告',
+          content: (
+            <div>
+              <p>以下行存在问题，已跳过：</p>
+              <ul>
+                {errors.map((error, i) => <li key={i}>{error}</li>)}
+              </ul>
+            </div>
+          ),
+        })
+      }
+      
+      if (!formatted.length) {
+        message.warning('未解析到任何有效规则，请检查数据格式')
+        return
+      }
+      
+      saveRuleTableMutation.mutate({ stationId: selectedStation.id, rows: formatted })
+      setPasteModalOpen(false)
+      setPasteText('')
+    } catch (error) {
+      message.error((error as Error).message || '解析数据失败')
+    }
   }
 
   return (
@@ -771,7 +978,10 @@ const ChargingStationsPage = () => {
                 <Space>
                   <Button onClick={handleDownloadTemplate}>下载模板</Button>
                   <Button onClick={() => setImportModalOpen(true)} disabled={!selectedStation}>
-                    批量导入
+                    Excel导入
+                  </Button>
+                  <Button onClick={() => setPasteModalOpen(true)} disabled={!selectedStation}>
+                    粘贴导入
                   </Button>
                   <Button
                     type="primary"
@@ -893,8 +1103,25 @@ const ChargingStationsPage = () => {
         confirmLoading={editingRule ? updateRuleMutation.isPending : createRuleMutation.isPending}
       >
         <Form layout="vertical" form={ruleForm}>
-          <Form.Item label="时段" name="time_range" rules={[{ required: true, message: '请选择时段' }]}>
-            <TimePicker.RangePicker format="HH:mm" style={{ width: '100%' }} minuteStep={15} />
+          <Form.Item label="时段" required>
+            <Row gutter={8}>
+              <Col span={11}>
+                <Form.Item name="time_period_start" rules={[{ required: true, message: '请选择开始时间' }]} style={{ marginBottom: 0 }}>
+                  <TimePicker format="HH:mm" minuteStep={15} style={{ width: '100%' }} showNow={false} />
+                </Form.Item>
+              </Col>
+              <Col span={2} style={{ textAlign: 'center', lineHeight: '32px' }}>
+                <span>至</span>
+              </Col>
+              <Col span={11}>
+                <Form.Item name="time_period_end" rules={[{ required: true, message: '请选择结束时间' }]} style={{ marginBottom: 0 }}>
+                  <TimePicker format="HH:mm" minuteStep={15} style={{ width: '100%' }} showNow={false} />
+                </Form.Item>
+              </Col>
+            </Row>
+            <div style={{ fontSize: '12px', color: '#999', marginTop: '4px' }}>
+              提示：结束时间可选择00:00（表示次日凌晨跨夜时段）
+            </div>
           </Form.Item>
           <Form.Item label="单价 (元/kWh)" name="price_per_kwh" rules={[{ required: true }]}>
             <InputNumber min={0} precision={4} style={{ width: '100%' }} prefix="¥" />
@@ -918,7 +1145,7 @@ const ChargingStationsPage = () => {
       </Modal>
 
       <Modal
-        title="批量导入价格规则"
+        title="Excel批量导入价格规则"
         open={importModalOpen}
         onCancel={() => setImportModalOpen(false)}
         footer={null}
@@ -926,7 +1153,11 @@ const ChargingStationsPage = () => {
       >
         {selectedStation ? (
           <Space direction="vertical" size="large" style={{ width: '100%' }}>
-            <Alert message="请使用模板填写规则后上传，时间格式为 HH:MM。" type="info" showIcon />
+            <Alert 
+              message="支持多种时间格式：HH:MM、24点、上午8点、1200等。Excel中的时间也会自动识别。" 
+              type="info" 
+              showIcon 
+            />
             <Dragger beforeUpload={handleRuleImportFile} showUploadList={false} disabled={saveRuleTableMutation.isPending}>
               <p className="ant-upload-drag-icon">
                 <DownloadOutlined />
@@ -935,6 +1166,56 @@ const ChargingStationsPage = () => {
               <p className="ant-upload-hint">支持 .xlsx / .xls 文件，最多 24 条规则</p>
             </Dragger>
             <Button onClick={handleDownloadTemplate}>下载导入模板</Button>
+          </Space>
+        ) : (
+          <Alert type="warning" showIcon message="请先在列表中选择一个充电站" />
+        )}
+      </Modal>
+
+      <Modal
+        title="粘贴导入价格规则"
+        open={pasteModalOpen}
+        onCancel={() => {
+          setPasteModalOpen(false)
+          setPasteText('')
+        }}
+        onOk={handlePasteImport}
+        confirmLoading={saveRuleTableMutation.isPending}
+        destroyOnClose
+        width={600}
+      >
+        {selectedStation ? (
+          <Space direction="vertical" size="large" style={{ width: '100%' }}>
+            <Alert 
+              message="每行一条规则，用空格、制表符或逗号分隔字段。格式：开始时间 结束时间 单价 [优先级] [描述] [生效日期] [失效日期] [启用状态]" 
+              type="info" 
+              showIcon 
+            />
+            <div>
+              <Text strong>示例数据：</Text>
+              <pre style={{ 
+                background: '#f5f5f5', 
+                padding: '8px', 
+                borderRadius: '4px', 
+                fontSize: '12px',
+                marginTop: '4px'
+              }}>
+{`00:00 06:00 0.65 1 夜间优惠 2025-01-01  是
+06:00 12:00 0.95 2 早高峰
+12:00 18:00 1.25 3 日间标准
+18:00 24:00 1.15 4 晚间标准`}
+              </pre>
+            </div>
+            <Input.TextArea
+              value={pasteText}
+              onChange={(e) => setPasteText(e.target.value)}
+              placeholder="请粘贴要导入的数据..."
+              rows={8}
+              style={{ fontFamily: 'monospace' }}
+            />
+            <Text type="secondary" style={{ fontSize: '12px' }}>
+              支持多种时间格式：00:00、24点、上午8点、1200等
+            </Text>
           </Space>
         ) : (
           <Alert type="warning" showIcon message="请先在列表中选择一个充电站" />

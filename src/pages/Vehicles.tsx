@@ -1,6 +1,7 @@
 import { useCallback, useMemo, useState } from 'react'
 import {
   Alert,
+  App as AntdApp,
   Button,
   Card,
   Col,
@@ -11,7 +12,6 @@ import {
   Flex,
   Form,
   Input,
-  message,
   Modal,
   Row,
   Select,
@@ -65,6 +65,7 @@ const getStatusColor = (status: string) => {
 
 const VehiclesPage = () => {
   const queryClient = useQueryClient()
+  const { message, modal } = AntdApp.useApp()
   const { user } = useAuthStore()
   const { selectedCompanyId } = useCompanyStore()
 

@@ -47,7 +47,7 @@ const { Title, Paragraph, Text } = Typography
 
 const CompaniesPage = () => {
   const queryClient = useQueryClient()
-  const { message } = AntdApp.useApp()
+  const { message, modal } = AntdApp.useApp()
   const { user } = useAuthStore()
   
   // 检查是否为超级管理员
@@ -140,6 +140,7 @@ const CompaniesPage = () => {
     setEditingCompany(company)
     companyForm.setFieldsValue({
       name: company.name,
+      business_type: company.business_type,
       status: company.status,
     })
     setCompanyModalOpen(true)
@@ -267,7 +268,7 @@ const CompaniesPage = () => {
               type="link"
               onClick={() => {
                 const newStatus = record.status === 'active' ? 'inactive' : 'active'
-                Modal.confirm({
+                modal.confirm({
                   title: '确认操作',
                   content: `确定要${newStatus === 'active' ? '启用' : '禁用'}该公司吗？`,
                   onOk: () => updateStatusMutation.mutate({ companyId: record.id, status: newStatus }),
@@ -289,6 +290,7 @@ const CompaniesPage = () => {
       if (editingCompany) {
         saveCompanyMutation.mutate({
           name: values.name,
+          business_type: values.business_type,
           status: values.status,
         })
       } else {
@@ -505,28 +507,21 @@ const CompaniesPage = () => {
           <Form.Item name="name" label="公司名称" rules={[{ required: true, message: '请输入公司名称' }]}>
             <Input placeholder="请输入公司名称" />
           </Form.Item>
-          {!editingCompany && (
-            <Form.Item
-              name="business_type"
-              label="业务类型"
-              rules={[{ required: true, message: '请选择业务类型' }]}
-            >
-              <Select
-                placeholder="请选择业务类型"
-                options={[
-                  { value: '挂车', label: '挂车' },
-                  { value: '侧翻', label: '侧翻' },
-                  { value: '水泥罐车', label: '水泥罐车' },
-                  { value: '罐车', label: '罐车' },
-                ]}
-              />
-            </Form.Item>
-          )}
-          {editingCompany && (
-            <Form.Item label="业务类型">
-              <Text type="secondary">业务类型创建后不可修改</Text>
-            </Form.Item>
-          )}
+          <Form.Item
+            name="business_type"
+            label="业务类型"
+            rules={[{ required: true, message: '请选择业务类型' }]}
+          >
+            <Select
+              placeholder="请选择业务类型"
+              options={[
+                { value: '侧翻', label: '侧翻' },
+                { value: '水泥罐车', label: '水泥罐车' },
+                { value: '挂车', label: '挂车' },
+                { value: '罐车', label: '罐车' },
+              ]}
+            />
+          </Form.Item>
           <Form.Item name="status" label="状态" initialValue="active">
             <Select
               options={[

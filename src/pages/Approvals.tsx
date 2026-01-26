@@ -25,7 +25,8 @@ import {
   Typography,
   Segmented,
 } from 'antd'
-import { UnorderedListOutlined, AppstoreOutlined } from '@ant-design/icons'
+import { UnorderedListOutlined, AppstoreOutlined, DownloadOutlined } from '@ant-design/icons'
+import * as XLSX from 'xlsx'
 import ApprovalAnalytics from './ApprovalAnalytics'
 import useCompanyStore from '../store/company'
 import useAuthStore from '../store/auth'
@@ -1092,6 +1093,109 @@ const ApprovalsPage = () => {
     })
   }
 
+  // 导出待审批列表
+  const handleExportPending = useCallback(() => {
+    const records = pendingQuery.data?.records || []
+    if (records.length === 0) {
+      message.warning('暂无数据可导出')
+      return
+    }
+
+    try {
+      // 根据列配置生成导出数据
+      const exportData = records.map((record) => {
+        const row: Record<string, any> = {}
+        
+        // 按照列的顺序导出
+        pendingColumns.forEach((col: any) => {
+          if (col.title && col.dataIndex && !col.fixed) {
+            const key = String(col.dataIndex)
+            let value = record[key as keyof typeof record]
+            
+            // 特殊处理
+            if (key === 'images' || key === 'comment_images') {
+              const imgs = parseImages(value)
+              value = imgs.length > 0 ? imgs.join(', ') : '-'
+            } else if (key === 'amount') {
+              if (typeof record.amount === 'number') value = `${record.amount.toFixed(2)} 元`
+              else if (typeof record.days === 'number') value = `${record.days} 天`
+              else if (typeof record.quantity === 'number') value = `${record.quantity}`
+              else value = '-'
+            } else if (key === 'created_at' || key === 'updated_at') {
+              value = value ? dayjs(value as string).format('YYYY-MM-DD HH:mm') : '-'
+            } else if (key === 'status') {
+              const meta = statusColorMap[value as string] || { label: value as string }
+              value = meta.label
+            }
+            
+            row[String(col.title)] = value || '-'
+          }
+        })
+        
+        return row
+      })
+
+      const ws = XLSX.utils.json_to_sheet(exportData)
+      const wb = XLSX.utils.book_new()
+      XLSX.utils.book_append_sheet(wb, ws, '待审批列表')
+      
+      const fileName = `待审批列表_${dayjs().format('YYYY-MM-DD_HH-mm-ss')}.xlsx`
+      XLSX.writeFile(wb, fileName)
+      message.success('导出成功')
+    } catch (error) {
+      message.error('导出失败：' + (error as Error).message)
+    }
+  }, [pendingQuery.data?.records, pendingColumns, message])
+
+  // 导出审批记录列表
+  const handleExportHistory = useCallback(() => {
+    const records = historyQuery.data?.records || []
+    if (records.length === 0) {
+      message.warning('暂无数据可导出')
+      return
+    }
+
+    try {
+      // 根据列配置生成导出数据
+      const exportData = records.map((record) => {
+        const row: Record<string, any> = {}
+        
+        // 按照列的顺序导出
+        historyColumns.forEach((col: any) => {
+          if (col.title && col.dataIndex && !col.fixed) {
+            const key = String(col.dataIndex)
+            let value = record[key as keyof typeof record]
+            
+            // 特殊处理
+            if (key === 'images' || key === 'comment_images') {
+              const imgs = parseImages(value)
+              value = imgs.length > 0 ? imgs.join(', ') : '-'
+            } else if (key === 'created_at' || key === 'updated_at') {
+              value = value ? dayjs(value as string).format('YYYY-MM-DD HH:mm') : '-'
+            } else if (key === 'status') {
+              const meta = statusColorMap[value as string] || { label: value as string }
+              value = meta.label
+            }
+            
+            row[String(col.title)] = value || '-'
+          }
+        })
+        
+        return row
+      })
+
+      const ws = XLSX.utils.json_to_sheet(exportData)
+      const wb = XLSX.utils.book_new()
+      XLSX.utils.book_append_sheet(wb, ws, '审批记录')
+      
+      const fileName = `审批记录_${dayjs().format('YYYY-MM-DD_HH-mm-ss')}.xlsx`
+      XLSX.writeFile(wb, fileName)
+      message.success('导出成功')
+    } catch (error) {
+      message.error('导出失败：' + (error as Error).message)
+    }
+  }, [historyQuery.data?.records, historyColumns, message])
+
   const detailFields = detailContext ? detailFieldPresets[detailContext.approvalType] : undefined
   const detailData = detailQuery.data?.detail ?? {}
   const timelineInstance = timelineQuery.data?.instance
@@ -1202,6 +1306,17 @@ const ApprovalsPage = () => {
                     />
                   )}
 
+                  <Flex justify="space-between" align="center" style={{ marginBottom: 16 }}>
+                    <div />
+                    <Button
+                      icon={<DownloadOutlined />}
+                      onClick={handleExportPending}
+                      disabled={!pendingQuery.data?.records || pendingQuery.data.records.length === 0}
+                    >
+                      导出列表
+                    </Button>
+                  </Flex>
+
                   <Table
                     rowKey={(record) => `${record.approval_type}-${record.id}`}
                     columns={pendingColumns}
@@ -1225,6 +1340,65 @@ const ApprovalsPage = () => {
                       selectedRowKeys: selectedPendingKeys,
                       onChange: (keys) => setSelectedPendingKeys(keys),
                       preserveSelectedRowKeys: true,
+                      columnWidth: 48,
+                      selections: [
+                        {
+                          key: 'select-all-data',
+                          text: '全选所有数据',
+                          onSelect: () => {
+                            const allKeys = (pendingQuery.data?.records || []).map((record: any) => 
+                              `${record.approval_type}-${record.id}`
+                            )
+                            setSelectedPendingKeys(allKeys)
+                            message.success(`已全选 ${allKeys.length} 条数据`)
+                          },
+                        },
+                        {
+                          key: 'select-current-page',
+                          text: '选择当前页',
+                          onSelect: () => {
+                            const records = pendingQuery.data?.records || []
+                            const startIndex = (pendingPage - 1) * pendingPageSize
+                            const endIndex = Math.min(startIndex + pendingPageSize, records.length)
+                            const pageKeys = records
+                              .slice(startIndex, endIndex)
+                              .map((record: any) => `${record.approval_type}-${record.id}`)
+                            setSelectedPendingKeys(pageKeys)
+                            message.success(`已选中当前页 ${pageKeys.length} 条数据`)
+                          },
+                        },
+                        {
+                          key: 'invert-selection',
+                          text: '反选当前页',
+                          onSelect: () => {
+                            const records = pendingQuery.data?.records || []
+                            const startIndex = (pendingPage - 1) * pendingPageSize
+                            const endIndex = Math.min(startIndex + pendingPageSize, records.length)
+                            const pageData = records.slice(startIndex, endIndex)
+                            const pageKeys = pageData.map((record: any) => `${record.approval_type}-${record.id}`)
+                            
+                            const newSelectedKeys = [...selectedPendingKeys]
+                            pageKeys.forEach(key => {
+                              const index = newSelectedKeys.indexOf(key)
+                              if (index > -1) {
+                                newSelectedKeys.splice(index, 1)
+                              } else {
+                                newSelectedKeys.push(key)
+                              }
+                            })
+                            setSelectedPendingKeys(newSelectedKeys)
+                            message.success('已反选当前页')
+                          },
+                        },
+                        {
+                          key: 'clear-all',
+                          text: '清空所有选择',
+                          onSelect: () => {
+                            setSelectedPendingKeys([])
+                            message.success('已清空所有选择')
+                          },
+                        },
+                      ],
                     }}
                   />
                 </Space>
@@ -1294,6 +1468,17 @@ const ApprovalsPage = () => {
                     />
                   )}
 
+                  <Flex justify="space-between" align="center" style={{ marginBottom: 16 }}>
+                    <div />
+                    <Button
+                      icon={<DownloadOutlined />}
+                      onClick={handleExportHistory}
+                      disabled={!historyQuery.data?.records || historyQuery.data.records.length === 0}
+                    >
+                      导出列表
+                    </Button>
+                  </Flex>
+
                   <Table
                     rowKey={(record) => `${record.approval_type}-${record.id}`}
                     columns={historyColumns}
@@ -1311,6 +1496,65 @@ const ApprovalsPage = () => {
                       selectedRowKeys: selectedHistoryKeys,
                       onChange: (keys) => setSelectedHistoryKeys(keys),
                       preserveSelectedRowKeys: true,
+                      columnWidth: 48,
+                      selections: [
+                        {
+                          key: 'select-all-data',
+                          text: '全选所有数据',
+                          onSelect: () => {
+                            const allKeys = (historyQuery.data?.records || []).map((record: any) => 
+                              `${record.approval_type}-${record.id}`
+                            )
+                            setSelectedHistoryKeys(allKeys)
+                            message.success(`已全选 ${allKeys.length} 条数据`)
+                          },
+                        },
+                        {
+                          key: 'select-current-page',
+                          text: '选择当前页',
+                          onSelect: () => {
+                            const records = historyQuery.data?.records || []
+                            const startIndex = (historyPagination.current - 1) * historyPagination.pageSize
+                            const endIndex = Math.min(startIndex + historyPagination.pageSize, records.length)
+                            const pageKeys = records
+                              .slice(startIndex, endIndex)
+                              .map((record: any) => `${record.approval_type}-${record.id}`)
+                            setSelectedHistoryKeys(pageKeys)
+                            message.success(`已选中当前页 ${pageKeys.length} 条数据`)
+                          },
+                        },
+                        {
+                          key: 'invert-selection',
+                          text: '反选当前页',
+                          onSelect: () => {
+                            const records = historyQuery.data?.records || []
+                            const startIndex = (historyPagination.current - 1) * historyPagination.pageSize
+                            const endIndex = Math.min(startIndex + historyPagination.pageSize, records.length)
+                            const pageData = records.slice(startIndex, endIndex)
+                            const pageKeys = pageData.map((record: any) => `${record.approval_type}-${record.id}`)
+                            
+                            const newSelectedKeys = [...selectedHistoryKeys]
+                            pageKeys.forEach(key => {
+                              const index = newSelectedKeys.indexOf(key)
+                              if (index > -1) {
+                                newSelectedKeys.splice(index, 1)
+                              } else {
+                                newSelectedKeys.push(key)
+                              }
+                            })
+                            setSelectedHistoryKeys(newSelectedKeys)
+                            message.success('已反选当前页')
+                          },
+                        },
+                        {
+                          key: 'clear-all',
+                          text: '清空所有选择',
+                          onSelect: () => {
+                            setSelectedHistoryKeys([])
+                            message.success('已清空所有选择')
+                          },
+                        },
+                      ],
                     }}
                   />
                 </Space>

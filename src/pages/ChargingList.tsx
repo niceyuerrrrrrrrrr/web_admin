@@ -19,7 +19,7 @@ import dayjs from 'dayjs'
 import { DownloadOutlined, EditOutlined, EyeOutlined } from '@ant-design/icons'
 import * as XLSX from 'xlsx'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { fetchReceipts, updateChargingReceipt } from '../api/services/receipts'
+import { fetchReceipts, updateChargingReceipt, fetchChargingFilterOptions } from '../api/services/receipts'
 import type { Receipt } from '../api/types'
 import useAuthStore from '../store/auth'
 import useCompanyStore from '../store/company'
@@ -41,12 +41,19 @@ const ChargingList = () => {
     startDate?: string
     endDate?: string
     vehicleNo?: string
+    chargingStation?: string
+    driverName?: string
   }>({})
   const [selectedReceipt, setSelectedReceipt] = useState<Receipt | null>(null)
   const [detailDrawerOpen, setDetailDrawerOpen] = useState(false)
   const [editDrawerOpen, setEditDrawerOpen] = useState(false)
   const [editingReceipt, setEditingReceipt] = useState<Receipt | null>(null)
+  const [searchForm] = Form.useForm()
   const [editForm] = Form.useForm()
+
+  const updateFilters = useCallback((patch: Partial<typeof filters>) => {
+    setFilters((prev) => ({ ...prev, ...patch }))
+  }, [])
 
   const receiptsQuery = useQuery<{
     receipts: Receipt[]
@@ -66,12 +73,27 @@ const ChargingList = () => {
         endDate: filters.endDate,
         companyId: isSuperAdmin ? effectiveCompanyId : user?.companyId,
         vehicleNo: filters.vehicleNo,
+        chargingStation: filters.chargingStation,
+        driverName: filters.driverName,
         scope: 'all', // 获取公司所有数据
       }),
     enabled: isSuperAdmin ? !!effectiveCompanyId : true, // 非超管直接查询，超管需要选择公司
   })
 
   const receipts = receiptsQuery.data?.receipts || []
+
+  // 获取筛选选项
+  const filterOptionsQuery = useQuery({
+    queryKey: ['charging-filter-options', effectiveCompanyId, user?.companyId],
+    queryFn: () => fetchChargingFilterOptions({
+      companyId: isSuperAdmin ? effectiveCompanyId : user?.companyId,
+    }),
+    enabled: isSuperAdmin ? !!effectiveCompanyId : true,
+  })
+
+  const stationOptions = filterOptionsQuery.data?.stations || []
+  const driverOptions = filterOptionsQuery.data?.drivers || []
+  const vehicleOptions = filterOptionsQuery.data?.vehicles || []
 
   const handleExport = useCallback(() => {
     if (!receipts.length) {
@@ -80,7 +102,9 @@ const ChargingList = () => {
     }
 
     const exportData = receipts.map((r: any) => {
-      const diff = (r.amount && r.calculated_amount) ? (r.amount - r.calculated_amount) : null
+      const diff = (r.amount !== null && r.amount !== undefined && r.calculated_amount !== null && r.calculated_amount !== undefined)
+        ? (r.amount - r.calculated_amount)
+        : (r.amount_difference !== null && r.amount_difference !== undefined ? r.amount_difference : null)
       return {
         '单据编号': r.receipt_number || '',
         '车牌号': r.vehicle_no || '',
@@ -89,7 +113,7 @@ const ChargingList = () => {
         '电量(kWh)': r.energy_kwh || 0,
         '识别金额(元)': r.amount || 0,
         '计算金额(元)': r.calculated_amount || '',
-        '计算单价(元/kWh)': r.calculated_unit_price || '',
+        '计算单价(元/kWh)': (r.calculated_price ?? r.calculated_unit_price) ?? '',
         '金额差异(元)': diff !== null ? diff.toFixed(2) : '',
         '开始充电时间': r.start_time ? dayjs(r.start_time).format('YYYY-MM-DD HH:mm') : '',
         '结束充电时间': r.end_time ? dayjs(r.end_time).format('YYYY-MM-DD HH:mm') : '',
@@ -122,14 +146,14 @@ const ChargingList = () => {
   })
 
   const handleSearch = (values: any) => {
-    setFilters({
+    updateFilters({
       startDate: values.dateRange?.[0]?.format('YYYY-MM-DD'),
       endDate: values.dateRange?.[1]?.format('YYYY-MM-DD'),
-      vehicleNo: values.vehicleNo,
     })
   }
 
   const handleReset = () => {
+    searchForm.resetFields()
     setFilters({})
   }
 
@@ -150,7 +174,7 @@ const ChargingList = () => {
       energy_kwh: r.energy_kwh,
       amount: r.amount,
       calculated_amount: r.calculated_amount,
-      calculated_unit_price: r.calculated_unit_price,
+      calculated_unit_price: r.calculated_unit_price ?? r.calculated_price,
       start_time: r.start_time ? dayjs(r.start_time) : undefined,
       end_time: r.end_time ? dayjs(r.end_time) : undefined,
       duration_min: r.duration_min,
@@ -162,8 +186,33 @@ const ChargingList = () => {
 
   const originalColumns: ColumnsType<Receipt> = useMemo(() => [
       { title: '单据编号', dataIndex: 'receipt_number', key: 'receipt_number', width: 150 },
-      { title: '车牌号', dataIndex: 'vehicle_no', key: 'vehicle_no', width: 120 },
-      { title: '充电站', dataIndex: 'charging_station', key: 'charging_station', width: 150 },
+      {
+        title: '司机',
+        dataIndex: 'driver_name',
+        key: 'driver_name',
+        width: 120,
+        filters: driverOptions.map((v) => ({ text: v, value: v })),
+        filteredValue: filters.driverName ? [filters.driverName] : null,
+        filterSearch: true,
+      },
+      {
+        title: '车牌号',
+        dataIndex: 'vehicle_no',
+        key: 'vehicle_no',
+        width: 120,
+        filters: vehicleOptions.map((v) => ({ text: v, value: v })),
+        filteredValue: filters.vehicleNo ? [filters.vehicleNo] : null,
+        filterSearch: true,
+      },
+      {
+        title: '充电站',
+        dataIndex: 'charging_station',
+        key: 'charging_station',
+        width: 150,
+        filters: stationOptions.map((v) => ({ text: v, value: v })),
+        filteredValue: filters.chargingStation ? [filters.chargingStation] : null,
+        filterSearch: true,
+      },
       { title: '充电桩', dataIndex: 'charging_pile', key: 'charging_pile', width: 120 },
       { title: '电量(kWh)', dataIndex: 'energy_kwh', key: 'energy_kwh', width: 120, sorter: (a: any, b: any) => (a.energy_kwh || 0) - (b.energy_kwh || 0), render: (v) => v?.toFixed(2) || '-' },
       { 
@@ -180,31 +229,43 @@ const ChargingList = () => {
         key: 'calculated_amount', 
         width: 130, 
         sorter: (a: any, b: any) => (a.calculated_amount || 0) - (b.calculated_amount || 0),
-        render: (v) => v ? <span style={{ color: '#FFD700', fontWeight: 'bold' }}>￥{v.toFixed(2)}</span> : '-' 
+        render: (v) => (v === null || v === undefined) ? '-' : <span style={{ color: '#FFD700', fontWeight: 'bold' }}>￥{Number(v).toFixed(2)}</span>
       },
       { 
         title: '计算单价(元/kWh)', 
-        dataIndex: 'calculated_unit_price', 
-        key: 'calculated_unit_price', 
+        dataIndex: 'calculated_price', 
+        key: 'calculated_price', 
         width: 150, 
-        sorter: (a: any, b: any) => (a.calculated_unit_price || 0) - (b.calculated_unit_price || 0),
-        render: (v) => v ? <span style={{ color: '#52c41a' }}>￥{v.toFixed(4)}</span> : '-' 
+        sorter: (a: any, b: any) => ((a.calculated_price ?? a.calculated_unit_price) ?? 0) - ((b.calculated_price ?? b.calculated_unit_price) ?? 0),
+        render: (_: any, record: any) => {
+          const unitPrice = (record?.calculated_price ?? record?.calculated_unit_price)
+          if (unitPrice === null || unitPrice === undefined) return '-'
+          return <span style={{ color: '#52c41a' }}>￥{Number(unitPrice).toFixed(4)}</span>
+        }
       },
       { 
         title: '金额差异(元)', 
-        key: 'amount_diff', 
+        dataIndex: 'amount_difference',
+        key: 'amount_difference', 
         width: 130, 
         sorter: (a: any, b: any) => {
-          const diffA = (a.amount || 0) - (a.calculated_amount || 0)
-          const diffB = (b.amount || 0) - (b.calculated_amount || 0)
+          const diffA = (a.amount_difference ?? ((a.amount ?? 0) - (a.calculated_amount ?? 0)))
+          const diffB = (b.amount_difference ?? ((b.amount ?? 0) - (b.calculated_amount ?? 0)))
           return diffA - diffB
         },
-        render: (_, record: any) => {
-          if (!record.calculated_amount || !record.amount) return '-'
-          const diff = record.amount - record.calculated_amount
-          const color = diff > 0 ? '#ff4d4f' : '#52c41a'
-          const prefix = diff > 0 ? '+' : ''
-          return <span style={{ color, fontWeight: 'bold' }}>{prefix}￥{diff.toFixed(2)}</span>
+        render: (v, record: any) => {
+          const diff = (record.amount_difference ?? v)
+          if (diff === null || diff === undefined) {
+            if (record.amount === null || record.amount === undefined || record.calculated_amount === null || record.calculated_amount === undefined) return '-'
+            const computed = Number(record.amount) - Number(record.calculated_amount)
+            const color = computed > 0 ? '#ff4d4f' : computed < 0 ? '#52c41a' : undefined
+            const prefix = computed > 0 ? '+' : ''
+            return <span style={{ color, fontWeight: 'bold' }}>{prefix}￥{computed.toFixed(2)}</span>
+          }
+          const num = Number(diff)
+          const color = num > 0 ? '#ff4d4f' : num < 0 ? '#52c41a' : undefined
+          const prefix = num > 0 ? '+' : ''
+          return <span style={{ color, fontWeight: 'bold' }}>{prefix}￥{num.toFixed(2)}</span>
         }
       },
       { title: '开始充电时间', dataIndex: 'start_time', key: 'start_time', width: 180, sorter: (a: any, b: any) => dayjs(a.start_time).unix() - dayjs(b.start_time).unix(), render: (v: string) => v ? dayjs(v).format('YYYY-MM-DD HH:mm') : '-' },
@@ -245,7 +306,7 @@ const ChargingList = () => {
           </Space>
         ),
       },
-  ], [])
+  ], [driverOptions, stationOptions, vehicleOptions, filters])
 
   // 生成列配置
   const columnSettingsConfig = useMemo(() => {
@@ -292,10 +353,7 @@ const ChargingList = () => {
   return (
     <Space direction="vertical" size="large" style={{ width: '100%' }}>
       <Card>
-        <Form layout="inline" onFinish={handleSearch} onReset={handleReset}>
-          <Form.Item name="vehicleNo" label="车牌号">
-            <Input placeholder="请输入车牌号" allowClear />
-          </Form.Item>
+        <Form form={searchForm} layout="inline" onFinish={handleSearch} onReset={handleReset}>
           <Form.Item name="dateRange" label="日期范围">
             <RangePicker />
           </Form.Item>
@@ -325,6 +383,13 @@ const ChargingList = () => {
           loading={receiptsQuery.isLoading}
           scroll={{ x: 2200 }}
           pagination={{ pageSize: 20 }}
+          onChange={(_pagination, filters, _sorter) => {
+            updateFilters({
+              driverName: filters.driver_name?.[0] as string | undefined,
+              vehicleNo: filters.vehicle_no?.[0] as string | undefined,
+              chargingStation: filters.charging_station?.[0] as string | undefined,
+            })
+          }}
         />
       </Card>
       
@@ -342,30 +407,35 @@ const ChargingList = () => {
                    </span>
                  </Descriptions.Item>
                  <Descriptions.Item label="计算金额">
-                   {(selectedReceipt as any).calculated_amount ? (
+                   {((selectedReceipt as any).calculated_amount !== null && (selectedReceipt as any).calculated_amount !== undefined) ? (
                      <span style={{ fontSize: '16px', fontWeight: 'bold', color: '#FFD700' }}>
-                       ￥{(selectedReceipt as any).calculated_amount.toFixed(2)}
+                       ￥{Number((selectedReceipt as any).calculated_amount).toFixed(2)}
                      </span>
                    ) : '-'}
                  </Descriptions.Item>
                  <Descriptions.Item label="计算单价">
-                   {(selectedReceipt as any).calculated_unit_price ? (
+                   {(((selectedReceipt as any).calculated_price ?? (selectedReceipt as any).calculated_unit_price) !== null && ((selectedReceipt as any).calculated_price ?? (selectedReceipt as any).calculated_unit_price) !== undefined) ? (
                      <span style={{ color: '#52c41a', fontWeight: 'bold' }}>
-                       ￥{(selectedReceipt as any).calculated_unit_price.toFixed(4)}/kWh
+                       ￥{Number(((selectedReceipt as any).calculated_price ?? (selectedReceipt as any).calculated_unit_price)).toFixed(4)}/kWh
                      </span>
                    ) : '-'}
                  </Descriptions.Item>
                  <Descriptions.Item label="金额差异">
-                   {(selectedReceipt as any).calculated_amount && (selectedReceipt as any).amount ? (() => {
-                     const diff = (selectedReceipt as any).amount - (selectedReceipt as any).calculated_amount
-                     const color = diff > 0 ? '#ff4d4f' : '#52c41a'
-                     const prefix = diff > 0 ? '+' : ''
-                     return (
-                       <span style={{ fontSize: '16px', fontWeight: 'bold', color }}>
-                         {prefix}￥{diff.toFixed(2)}
-                       </span>
-                     )
-                   })() : '-'}
+                   {(() => {
+                     const r: any = selectedReceipt as any
+                     const diff = r.amount_difference
+                     if (diff !== null && diff !== undefined) {
+                       const num = Number(diff)
+                       const color = num > 0 ? '#ff4d4f' : num < 0 ? '#52c41a' : undefined
+                       const prefix = num > 0 ? '+' : ''
+                       return <span style={{ fontSize: '16px', fontWeight: 'bold', color }}>{prefix}￥{num.toFixed(2)}</span>
+                     }
+                     if (r.amount === null || r.amount === undefined || r.calculated_amount === null || r.calculated_amount === undefined) return '-'
+                     const computed = Number(r.amount) - Number(r.calculated_amount)
+                     const color = computed > 0 ? '#ff4d4f' : computed < 0 ? '#52c41a' : undefined
+                     const prefix = computed > 0 ? '+' : ''
+                     return <span style={{ fontSize: '16px', fontWeight: 'bold', color }}>{prefix}￥{computed.toFixed(2)}</span>
+                   })()}
                  </Descriptions.Item>
                  <Descriptions.Item label="开始时间">{(selectedReceipt as any).start_time ? dayjs((selectedReceipt as any).start_time).format('YYYY-MM-DD HH:mm:ss') : '-'}</Descriptions.Item>
                  <Descriptions.Item label="结束时间">{(selectedReceipt as any).end_time ? dayjs((selectedReceipt as any).end_time).format('YYYY-MM-DD HH:mm:ss') : '-'}</Descriptions.Item>

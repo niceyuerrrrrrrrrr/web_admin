@@ -59,6 +59,9 @@ import ReimbursementsPage from './pages/Reimbursements'
 import ChargingStationsPage from './pages/ChargingStations'
 import ChargingList from './pages/ChargingList'
 import ChargingStats from './pages/ChargingStats'
+import DistanceLoadingAddressesPage from './pages/DistanceLoadingAddresses'
+import DistanceUnloadingAddressesPage from './pages/DistanceUnloadingAddresses'
+import DistanceTableManagementPage from './pages/DistanceTableManagement'
 import InventoryPage from './pages/Inventory'
 import MaterialRequestsPage from './pages/MaterialRequests'
 import MaterialPricingPage from './pages/MaterialPricing'
@@ -225,6 +228,31 @@ const routeDefinitions = [
             label: '充电站管理',
             path: '/charging/stations',
             element: <ChargingStationsPage />,
+          },
+        ],
+      },
+      {
+        key: 'distance-management',
+        label: '运距管理',
+        icon: <BranchesOutlined />,
+        children: [
+          {
+            key: 'distance-loading-addresses',
+            label: '装料地址管理',
+            path: '/operations/distance/loading-addresses',
+            element: <DistanceLoadingAddressesPage />,
+          },
+          {
+            key: 'distance-unloading-addresses',
+            label: '卸货地址管理',
+            path: '/operations/distance/unloading-addresses',
+            element: <DistanceUnloadingAddressesPage />,
+          },
+          {
+            key: 'distance-table',
+            label: '运距表管理',
+            path: '/operations/distance/table',
+            element: <DistanceTableManagementPage />,
           },
         ],
       },

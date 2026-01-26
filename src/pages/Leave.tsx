@@ -37,12 +37,14 @@ import {
   CloudUploadOutlined,
   CloseCircleOutlined,
   DeleteOutlined,
+  DownloadOutlined,
   FileSearchOutlined,
   PlusOutlined,
   ReloadOutlined,
   StopOutlined,
 } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
+import * as XLSX from 'xlsx'
 import type { LeaveCommentRecord, LeaveRecord, LeaveStats, LeaveStatus } from '../api/types'
 import {
   addLeaveComment,
@@ -99,6 +101,7 @@ const LeavePage = () => {
   const [commentValue, setCommentValue] = useState('')
   const [commentImages, setCommentImages] = useState<string[]>([])
   const [createForm] = Form.useForm()
+  const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([])
 
   const handleDateRangeChange = (value: [dayjs.Dayjs | null, dayjs.Dayjs | null] | null, resetPage = true) => {
     const normalized =
@@ -278,11 +281,48 @@ const LeavePage = () => {
     })
   }
 
+  // 导出请假列表
+  const handleExport = () => {
+    const records = leavesQuery.data?.records || []
+    if (records.length === 0) {
+      message.warning('暂无数据可导出')
+      return
+    }
+
+    try {
+      const exportData = records.map((record) => ({
+        '申请人': record.applicant_name || '-',
+        '请假类型': record.leave_type || '-',
+        '开始日期': record.start_date || '-',
+        '结束日期': record.end_date || '-',
+        '天数': record.days || '-',
+        '最新评论': record.latest_comment || '-',
+        '评论人': (record as any).comment_user || '-',
+        '当前审批人': record.current_approver || '-',
+        '状态': record.status === 'submitted' ? '已提交' : 
+                record.status === 'reviewing' ? '审批中' : 
+                record.status === 'approved' ? '已通过' : 
+                record.status === 'rejected' ? '已驳回' : record.status,
+      }))
+
+      const ws = XLSX.utils.json_to_sheet(exportData)
+      const wb = XLSX.utils.book_new()
+      XLSX.utils.book_append_sheet(wb, ws, '请假列表')
+      
+      const fileName = `请假列表_${dayjs().format('YYYY-MM-DD_HH-mm-ss')}.xlsx`
+      XLSX.writeFile(wb, fileName)
+      message.success('导出成功')
+    } catch (error) {
+      message.error('导出失败：' + (error as Error).message)
+    }
+  }
+
   const columns: ColumnsType<LeaveRecord> = [
     {
       title: '申请人',
       dataIndex: 'applicant_name',
       key: 'applicant_name',
+      width: 120,
       filters: Array.from(new Set((leavesQuery.data?.records || []).map(r => r.applicant_name).filter(Boolean)))
         .sort()
         .map(val => ({ text: val as string, value: val as string })),
@@ -292,6 +332,7 @@ const LeavePage = () => {
     {
       title: '请假类型',
       dataIndex: 'leave_type',
+      width: 120,
       filters: Array.from(new Set((leavesQuery.data?.records || []).map(r => r.leave_type).filter(Boolean)))
         .sort()
         .map(val => ({ text: val, value: val })),
@@ -299,6 +340,7 @@ const LeavePage = () => {
     },
     {
       title: '起止时间',
+      width: 220,
       render: (_, record) => `${record.start_date} ~ ${record.end_date}`,
     },
     {
@@ -393,6 +435,7 @@ const LeavePage = () => {
     {
       title: '状态',
       dataIndex: 'status',
+      width: 110,
       filters: [
         { text: '已提交', value: 'submitted' },
         { text: '审批中', value: 'reviewing' },
@@ -400,7 +443,15 @@ const LeavePage = () => {
         { text: '已驳回', value: 'rejected' },
       ],
       onFilter: (value, record) => record.status === value,
-      render: (value: LeaveStatus) => <Tag color={statusColorMap[value]}>{value}</Tag>,
+      render: (value: LeaveStatus) => {
+        const statusMap: Record<LeaveStatus, string> = {
+          submitted: '已提交',
+          reviewing: '审批中',
+          approved: '已通过',
+          rejected: '已驳回',
+        }
+        return <Tag color={statusColorMap[value]}>{statusMap[value] || value}</Tag>
+      },
     },
     {
       title: '操作',
@@ -515,6 +566,9 @@ const LeavePage = () => {
           <Button icon={<ReloadOutlined />} onClick={() => queryClient.invalidateQueries({ queryKey: ['leave', 'list'] })}>
             刷新
           </Button>
+          <Button icon={<DownloadOutlined />} onClick={handleExport}>
+            导出
+          </Button>
           <Button type="primary" icon={<PlusOutlined />} onClick={() => setCreateOpen(true)}>
             新建请假
           </Button>
@@ -557,17 +611,94 @@ const LeavePage = () => {
                   />
                   <RangePicker value={filters.dateRange} onChange={(value) => handleDateRangeChange(value, true)} />
                 </Flex>
+                {selectedRowKeys.length > 0 && (
+                  <Alert
+                    message={`已选择 ${selectedRowKeys.length} 条记录`}
+                    type="info"
+                    showIcon
+                    action={
+                      <Button size="small" onClick={() => setSelectedRowKeys([])}>
+                        清空选择
+                      </Button>
+                    }
+                  />
+                )}
                 <Table
                   rowKey="id"
                   loading={leavesQuery.isLoading}
                   columns={columns}
                   dataSource={leavesQuery.data?.records || []}
+                  rowSelection={{
+                    selectedRowKeys,
+                    onChange: setSelectedRowKeys,
+                    columnWidth: 48,
+                    selections: [
+                      {
+                        key: 'select-all-data',
+                        text: '全选所有数据',
+                        onSelect: () => {
+                          const allKeys = (leavesQuery.data?.records || []).map((record) => record.id)
+                          setSelectedRowKeys(allKeys)
+                          message.success(`已全选 ${allKeys.length} 条数据`)
+                        },
+                      },
+                      {
+                        key: 'select-current-page',
+                        text: '选择当前页',
+                        onSelect: () => {
+                          const records = leavesQuery.data?.records || []
+                          const startIndex = (filters.page - 1) * filters.page_size
+                          const endIndex = Math.min(startIndex + filters.page_size, records.length)
+                          const pageKeys = records
+                            .slice(startIndex, endIndex)
+                            .map((record) => record.id)
+                          setSelectedRowKeys(pageKeys)
+                          message.success(`已选中当前页 ${pageKeys.length} 条数据`)
+                        },
+                      },
+                      {
+                        key: 'invert-selection',
+                        text: '反选当前页',
+                        onSelect: () => {
+                          const records = leavesQuery.data?.records || []
+                          const startIndex = (filters.page - 1) * filters.page_size
+                          const endIndex = Math.min(startIndex + filters.page_size, records.length)
+                          const pageData = records.slice(startIndex, endIndex)
+                          const pageKeys = pageData.map((record) => record.id)
+                          
+                          const newSelectedKeys = [...selectedRowKeys]
+                          pageKeys.forEach(key => {
+                            const index = newSelectedKeys.indexOf(key)
+                            if (index > -1) {
+                              newSelectedKeys.splice(index, 1)
+                            } else {
+                              newSelectedKeys.push(key)
+                            }
+                          })
+                          setSelectedRowKeys(newSelectedKeys)
+                          message.success('已反选当前页')
+                        },
+                      },
+                      {
+                        key: 'clear-all',
+                        text: '清空所有选择',
+                        onSelect: () => {
+                          setSelectedRowKeys([])
+                          message.success('已清空所有选择')
+                        },
+                      },
+                    ],
+                  }}
                   pagination={{
                     current: filters.page,
                     pageSize: filters.page_size,
                     total: leavesQuery.data?.total,
+                    showTotal: (total) => `共 ${total} 条`,
+                    showSizeChanger: true,
+                    pageSizeOptions: ['10', '20', '50', '100'],
                     onChange: (page, pageSize) => setFilters((prev) => ({ ...prev, page, page_size: pageSize || prev.page_size })),
                   }}
+                  scroll={{ x: 1400 }}
                 />
               </Space>
             ),

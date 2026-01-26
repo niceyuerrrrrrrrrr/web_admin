@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 import {
+  Alert,
   App as AntdApp,
   Avatar,
   Button,
@@ -29,12 +30,14 @@ import {
   CheckCircleOutlined,
   CloudUploadOutlined,
   DeleteOutlined,
+  DownloadOutlined,
   FileAddOutlined,
   FileProtectOutlined,
   FileSearchOutlined,
   ReloadOutlined,
 } from '@ant-design/icons'
 import type { DocumentRecord, DocumentStats } from '../api/types'
+import * as XLSX from 'xlsx'
 import {
   createDocument,
   deleteDocument,
@@ -123,6 +126,7 @@ const DocumentsPage = () => {
   const [editingRecord, setEditingRecord] = useState<DocumentRecord | null>(null)
   const [form] = Form.useForm()
   const [editForm] = Form.useForm()
+  const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([])
 
   const listQuery = useQuery({
     queryKey: ['documents', filters, effectiveCompanyId],
@@ -324,6 +328,48 @@ const DocumentsPage = () => {
     })
   }
 
+  // 导出证件列表
+  const handleExport = () => {
+    const records = listQuery.data?.records || []
+    if (records.length === 0) {
+      message.warning('暂无数据可导出')
+      return
+    }
+
+    try {
+      const exportData = records.map((record) => {
+        const expireDate = record.expire_date
+        let expireStatus = '-'
+        if (expireDate) {
+          const diff = dayjs(expireDate).diff(dayjs(), 'day')
+          if (diff < 0) expireStatus = '已过期'
+          else if (diff === 0) expireStatus = '今天到期'
+          else if (diff <= 30) expireStatus = `${diff}天后到期（即将到期）`
+          else expireStatus = `${diff}天后到期`
+        }
+
+        return {
+          '证件类型': record.doc_type || '-',
+          '证件号': record.doc_no || '-',
+          '所属对象': record.subject_display || '-',
+          '到期日': expireDate || '-',
+          '到期状态': expireStatus,
+          '备注': record.remark || '-',
+        }
+      })
+
+      const ws = XLSX.utils.json_to_sheet(exportData)
+      const wb = XLSX.utils.book_new()
+      XLSX.utils.book_append_sheet(wb, ws, '证件列表')
+      
+      const fileName = `证件列表_${dayjs().format('YYYY-MM-DD_HH-mm-ss')}.xlsx`
+      XLSX.writeFile(wb, fileName)
+      message.success('导出成功')
+    } catch (error) {
+      message.error('导出失败：' + (error as Error).message)
+    }
+  }
+
   return (
     <Space direction="vertical" size="large" style={{ width: '100%' }}>
       <Flex justify="space-between" align="center">
@@ -334,6 +380,9 @@ const DocumentsPage = () => {
         <Space>
           <Button icon={<ReloadOutlined />} onClick={() => queryClient.invalidateQueries({ queryKey: ['documents'] })}>
             刷新
+          </Button>
+          <Button icon={<DownloadOutlined />} onClick={handleExport}>
+            导出
           </Button>
           <Button type="primary" icon={<FileAddOutlined />} onClick={() => setCreateModalOpen(true)}>
             新增证件
@@ -396,15 +445,91 @@ const DocumentsPage = () => {
                     onChange={(value) => setFilters((prev) => ({ ...prev, expire_status: value || undefined, page: 1 }))}
                   />
                 </Flex>
+                {selectedRowKeys.length > 0 && (
+                  <Alert
+                    message={`已选择 ${selectedRowKeys.length} 条记录`}
+                    type="info"
+                    showIcon
+                    action={
+                      <Button size="small" onClick={() => setSelectedRowKeys([])}>
+                        清空选择
+                      </Button>
+                    }
+                  />
+                )}
                 <Table
                   rowKey="id"
                   loading={listQuery.isLoading}
                   columns={tableColumns}
                   dataSource={listQuery.data?.records || []}
+                  rowSelection={{
+                    selectedRowKeys,
+                    onChange: setSelectedRowKeys,
+                    columnWidth: 48,
+                    selections: [
+                      {
+                        key: 'select-all-data',
+                        text: '全选所有数据',
+                        onSelect: () => {
+                          const allKeys = (listQuery.data?.records || []).map((record) => record.id)
+                          setSelectedRowKeys(allKeys)
+                          message.success(`已全选 ${allKeys.length} 条数据`)
+                        },
+                      },
+                      {
+                        key: 'select-current-page',
+                        text: '选择当前页',
+                        onSelect: () => {
+                          const records = listQuery.data?.records || []
+                          const startIndex = (filters.page - 1) * filters.page_size
+                          const endIndex = Math.min(startIndex + filters.page_size, records.length)
+                          const pageKeys = records
+                            .slice(startIndex, endIndex)
+                            .map((record) => record.id)
+                          setSelectedRowKeys(pageKeys)
+                          message.success(`已选中当前页 ${pageKeys.length} 条数据`)
+                        },
+                      },
+                      {
+                        key: 'invert-selection',
+                        text: '反选当前页',
+                        onSelect: () => {
+                          const records = listQuery.data?.records || []
+                          const startIndex = (filters.page - 1) * filters.page_size
+                          const endIndex = Math.min(startIndex + filters.page_size, records.length)
+                          const pageData = records.slice(startIndex, endIndex)
+                          const pageKeys = pageData.map((record) => record.id)
+                          
+                          const newSelectedKeys = [...selectedRowKeys]
+                          pageKeys.forEach(key => {
+                            const index = newSelectedKeys.indexOf(key)
+                            if (index > -1) {
+                              newSelectedKeys.splice(index, 1)
+                            } else {
+                              newSelectedKeys.push(key)
+                            }
+                          })
+                          setSelectedRowKeys(newSelectedKeys)
+                          message.success('已反选当前页')
+                        },
+                      },
+                      {
+                        key: 'clear-all',
+                        text: '清空所有选择',
+                        onSelect: () => {
+                          setSelectedRowKeys([])
+                          message.success('已清空所有选择')
+                        },
+                      },
+                    ],
+                  }}
                   pagination={{
                     current: filters.page,
                     pageSize: filters.page_size,
                     total: listQuery.data?.total,
+                    showTotal: (total) => `共 ${total} 条`,
+                    showSizeChanger: true,
+                    pageSizeOptions: ['10', '20', '50', '100'],
                     onChange: (page, pageSize) => setFilters((prev) => ({ ...prev, page, page_size: pageSize || prev.page_size })),
                   }}
                 />

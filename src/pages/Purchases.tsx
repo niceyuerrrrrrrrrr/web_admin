@@ -26,12 +26,14 @@ import {
   CheckCircleOutlined,
   CloseCircleOutlined,
   CommentOutlined,
+  DownloadOutlined,
   FileSearchOutlined,
   PlusOutlined,
   ReloadOutlined,
 } from '@ant-design/icons'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import dayjs from 'dayjs'
+import * as XLSX from 'xlsx'
 import {
   PURCHASE_STATUS_OPTIONS,
   addComment,
@@ -85,6 +87,9 @@ const PurchasesPage = () => {
   const [actionModal, setActionModal] = useState<{ type: 'approve' | 'reject' | null }>({ type: null })
   const [createForm] = Form.useForm()
   const [commentForm] = Form.useForm()
+  const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([])
+  const [currentPage, setCurrentPage] = useState(1)
+  const [pageSize, setPageSize] = useState(20)
 
   const canApprove = ['财务', '总经理'].includes((user as any)?.position_type || (user as any)?.role)
 
@@ -458,6 +463,43 @@ const PurchasesPage = () => {
     })
   }
 
+  // 导出采购列表
+  const handleExport = () => {
+    if (records.length === 0) {
+      message.warning('暂无数据可导出')
+      return
+    }
+
+    try {
+      const exportData = records.map((record) => ({
+        '编号': record.id,
+        '申请人': record.applicant_name || '-',
+        '金额（元）': record.amount?.toFixed(2) || '-',
+        '类别': record.category || '-',
+        '供应商': record.supplier || '-',
+        '项目/备注': record.project || record.remark || '-',
+        '日期': record.date || '-',
+        '最新评论': record.latest_comment || '-',
+        '评论人': (record as any).comment_user || '-',
+        '当前审批人': record.current_approver || '-',
+        '状态': record.status === 'submitted' ? '已提交' : 
+                record.status === 'reviewing' ? '审核中' : 
+                record.status === 'approved' ? '已通过' : 
+                record.status === 'rejected' ? '已拒绝' : record.status,
+      }))
+
+      const ws = XLSX.utils.json_to_sheet(exportData)
+      const wb = XLSX.utils.book_new()
+      XLSX.utils.book_append_sheet(wb, ws, '采购列表')
+      
+      const fileName = `采购列表_${dayjs().format('YYYY-MM-DD_HH-mm-ss')}.xlsx`
+      XLSX.writeFile(wb, fileName)
+      message.success('导出成功')
+    } catch (error) {
+      message.error('导出失败：' + (error as Error).message)
+    }
+  }
+
   return (
     <Space direction="vertical" size="large" style={{ width: '100%' }}>
       <Flex justify="space-between" align="center" wrap gap={16}>
@@ -472,6 +514,9 @@ const PurchasesPage = () => {
         <Space>
           <Button icon={<ReloadOutlined />} onClick={() => queryClient.invalidateQueries({ queryKey: ['purchases'] })}>
             刷新
+          </Button>
+          <Button icon={<DownloadOutlined />} onClick={handleExport}>
+            导出
           </Button>
           <Button type="primary" icon={<PlusOutlined />} onClick={() => setCreateModalOpen(true)}>
             新建采购
@@ -538,15 +583,94 @@ const PurchasesPage = () => {
         {listQuery.error && (
           <Alert type="error" showIcon message={(listQuery.error as Error).message || '数据加载失败'} style={{ marginBottom: 16 }} />
         )}
+        {selectedRowKeys.length > 0 && (
+          <Alert
+            message={`已选择 ${selectedRowKeys.length} 条记录`}
+            type="info"
+            showIcon
+            style={{ marginBottom: 16 }}
+            action={
+              <Button size="small" onClick={() => setSelectedRowKeys([])}>
+                清空选择
+              </Button>
+            }
+          />
+        )}
         <Table
           rowKey="id"
           columns={columns}
           dataSource={records}
           loading={listQuery.isLoading}
+          rowSelection={{
+            selectedRowKeys,
+            onChange: setSelectedRowKeys,
+            columnWidth: 48,
+            selections: [
+              {
+                key: 'select-all-data',
+                text: '全选所有数据',
+                onSelect: () => {
+                  const allKeys = records.map((record) => record.id)
+                  setSelectedRowKeys(allKeys)
+                  message.success(`已全选 ${allKeys.length} 条数据`)
+                },
+              },
+              {
+                key: 'select-current-page',
+                text: '选择当前页',
+                onSelect: () => {
+                  const startIndex = (currentPage - 1) * pageSize
+                  const endIndex = Math.min(startIndex + pageSize, records.length)
+                  const pageKeys = records
+                    .slice(startIndex, endIndex)
+                    .map((record) => record.id)
+                  setSelectedRowKeys(pageKeys)
+                  message.success(`已选中当前页 ${pageKeys.length} 条数据`)
+                },
+              },
+              {
+                key: 'invert-selection',
+                text: '反选当前页',
+                onSelect: () => {
+                  const startIndex = (currentPage - 1) * pageSize
+                  const endIndex = Math.min(startIndex + pageSize, records.length)
+                  const pageData = records.slice(startIndex, endIndex)
+                  const pageKeys = pageData.map((record) => record.id)
+                  
+                  const newSelectedKeys = [...selectedRowKeys]
+                  pageKeys.forEach(key => {
+                    const index = newSelectedKeys.indexOf(key)
+                    if (index > -1) {
+                      newSelectedKeys.splice(index, 1)
+                    } else {
+                      newSelectedKeys.push(key)
+                    }
+                  })
+                  setSelectedRowKeys(newSelectedKeys)
+                  message.success('已反选当前页')
+                },
+              },
+              {
+                key: 'clear-all',
+                text: '清空所有选择',
+                onSelect: () => {
+                  setSelectedRowKeys([])
+                  message.success('已清空所有选择')
+                },
+              },
+            ],
+          }}
           pagination={{
+            current: currentPage,
+            pageSize: pageSize,
             total: listQuery.data?.total || 0,
-            pageSize: 20,
             showTotal: (total) => `共 ${total} 条`,
+            showSizeChanger: true,
+            pageSizeOptions: ['10', '20', '50', '100'],
+            onChange: (page, size) => {
+              setCurrentPage(page)
+              setPageSize(size)
+            },
           }}
           scroll={{ x: 1200 }}
         />

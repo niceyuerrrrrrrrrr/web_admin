@@ -5,6 +5,32 @@ export interface ApiResponse<T> {
   data: T
 }
 
+export interface NavigationAddress {
+  id: number
+  type: 'loading' | 'unloading' | 'charging'
+  typeText?: string
+  name: string
+  address: string
+  longitude?: number | null
+  latitude?: number | null
+  contact?: string | null
+  phone?: string | null
+  remark?: string | null
+  use_count?: number
+  last_used?: string | null
+  created_by?: number
+  created_at?: string | null
+  updated_at?: string | null
+}
+
+export interface DistanceRecord {
+  id: number
+  loading_company: string
+  unloading_company: string
+  distance: number
+  updated_at?: string
+}
+
 // 票据相关类型
 export type ReceiptType = 'loading' | 'unloading' | 'charging' | 'water' | 'departure'
 
@@ -167,6 +193,7 @@ export interface ReceiptListParams {
   vehicleNo?: string
   tankerVehicleCode?: string
   driverName?: string
+  chargingStation?: string
   page?: number
   pageSize?: number
   deletedStatus?: 'all' | 'normal' | 'deleted'
