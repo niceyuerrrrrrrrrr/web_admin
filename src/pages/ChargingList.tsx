@@ -30,6 +30,7 @@ import useAuthStore from '../store/auth'
 import useCompanyStore from '../store/company'
 import ColumnSettings from '../components/ColumnSettings'
 import type { ColumnConfig } from '../components/ColumnSettings'
+import ResizableHeaderCell from '../components/ResizableHeaderCell'
 
 const { Text } = Typography
 const { RangePicker } = DatePicker
@@ -49,6 +50,7 @@ const ChargingList = () => {
     vehicleNo?: string
     chargingStation?: string
     driverName?: string
+    amountDifference?: string[]
   }>({})
   const [selectedReceipt, setSelectedReceipt] = useState<Receipt | null>(null)
   const [detailDrawerOpen, setDetailDrawerOpen] = useState(false)
@@ -505,99 +507,302 @@ const ChargingList = () => {
 
   // 列配置状态
   const [columnConfig, setColumnConfig] = useState<ColumnConfig[]>([])
+  
+  // 列宽状态
+  const [columnWidths, setColumnWidths] = useState<Record<string, number>>({
+    receipt_number: 150,
+    driver_name: 120,
+    vehicle_no: 120,
+    charging_station: 150,
+    charging_pile: 120,
+    energy_kwh: 120,
+    amount: 130,
+    calculated_amount: 130,
+    calculated_price: 150,
+    amount_difference: 130,
+    start_time: 180,
+    end_time: 180,
+    duration_min: 120,
+    thumb_url: 100,
+    action: 240,
+  })
+
+  // 处理列宽调整
+  const handleResize = (key: string) => (_e: any, { size }: any) => {
+    setColumnWidths(prev => ({
+      ...prev,
+      [key]: size.width,
+    }))
+  }
 
   const originalColumns: ColumnsType<Receipt> = useMemo(() => [
-      { title: '单据编号', dataIndex: 'receipt_number', key: 'receipt_number', width: 150 },
+      { 
+        title: '单据编号', 
+        dataIndex: 'receipt_number', 
+        key: 'receipt_number', 
+        width: columnWidths.receipt_number,
+        onHeaderCell: () => ({
+          width: columnWidths.receipt_number,
+          onResize: handleResize('receipt_number'),
+        }),
+      },
       {
         title: '司机',
         dataIndex: 'driver_name',
         key: 'driver_name',
-        width: 120,
+        width: columnWidths.driver_name,
         filters: driverOptions.map((v) => ({ text: v, value: v })),
         filteredValue: filters.driverName ? [filters.driverName] : null,
         filterSearch: true,
+        onHeaderCell: () => ({
+          width: columnWidths.driver_name,
+          onResize: handleResize('driver_name'),
+        }),
       },
       {
         title: '车牌号',
         dataIndex: 'vehicle_no',
         key: 'vehicle_no',
-        width: 120,
+        width: columnWidths.vehicle_no,
         filters: vehicleOptions.map((v) => ({ text: v, value: v })),
         filteredValue: filters.vehicleNo ? [filters.vehicleNo] : null,
         filterSearch: true,
+        onHeaderCell: () => ({
+          width: columnWidths.vehicle_no,
+          onResize: handleResize('vehicle_no'),
+        }),
       },
       {
         title: '充电站',
         dataIndex: 'charging_station',
         key: 'charging_station',
-        width: 150,
+        width: columnWidths.charging_station,
         filters: stationOptions.map((v) => ({ text: v, value: v })),
         filteredValue: filters.chargingStation ? [filters.chargingStation] : null,
         filterSearch: true,
+        onHeaderCell: () => ({
+          width: columnWidths.charging_station,
+          onResize: handleResize('charging_station'),
+        }),
       },
-      { title: '充电桩', dataIndex: 'charging_pile', key: 'charging_pile', width: 120 },
-      { title: '电量(kWh)', dataIndex: 'energy_kwh', key: 'energy_kwh', width: 120, sorter: (a: any, b: any) => (a.energy_kwh || 0) - (b.energy_kwh || 0), render: (v) => v?.toFixed(2) || '-' },
+      { 
+        title: '充电桩', 
+        dataIndex: 'charging_pile', 
+        key: 'charging_pile', 
+        width: columnWidths.charging_pile,
+        onHeaderCell: () => ({
+          width: columnWidths.charging_pile,
+          onResize: handleResize('charging_pile'),
+        }),
+      },
+      { 
+        title: '电量(kWh)', 
+        dataIndex: 'energy_kwh', 
+        key: 'energy_kwh', 
+        width: columnWidths.energy_kwh, 
+        sorter: (a: any, b: any) => (a.energy_kwh || 0) - (b.energy_kwh || 0), 
+        render: (v) => v?.toFixed(2) || '-',
+        onHeaderCell: () => ({
+          width: columnWidths.energy_kwh,
+          onResize: handleResize('energy_kwh'),
+        }),
+      },
       { 
         title: '识别金额(元)', 
         dataIndex: 'amount', 
         key: 'amount', 
-        width: 130, 
+        width: columnWidths.amount, 
         sorter: (a: any, b: any) => (a.amount || 0) - (b.amount || 0),
-        render: (v) => v?.toFixed(2) || '-' 
+        render: (v) => v?.toFixed(2) || '-',
+        onHeaderCell: () => ({
+          width: columnWidths.amount,
+          onResize: handleResize('amount'),
+        }),
       },
       { 
         title: '计算金额(元)', 
         dataIndex: 'calculated_amount', 
         key: 'calculated_amount', 
-        width: 130, 
+        width: columnWidths.calculated_amount, 
         sorter: (a: any, b: any) => (a.calculated_amount || 0) - (b.calculated_amount || 0),
-        render: (v) => (v === null || v === undefined) ? '-' : <span style={{ color: '#FFD700', fontWeight: 'bold' }}>￥{Number(v).toFixed(2)}</span>
+        render: (v, record: any) => {
+          if (v === null || v === undefined) return '-'
+          // 识别金额为0时，计算金额显示为绿色
+          const amount = record.amount ?? 0
+          const color = amount === 0 ? '#52c41a' : undefined
+          return <span style={{ color, fontWeight: amount === 0 ? 'normal' : undefined }}>￥{Number(v).toFixed(2)}</span>
+        },
+        onHeaderCell: () => ({
+          width: columnWidths.calculated_amount,
+          onResize: handleResize('calculated_amount'),
+        }),
       },
       { 
         title: '计算单价(元/kWh)', 
         dataIndex: 'calculated_price', 
         key: 'calculated_price', 
-        width: 150, 
+        width: columnWidths.calculated_price, 
         sorter: (a: any, b: any) => ((a.calculated_price ?? a.calculated_unit_price) ?? 0) - ((b.calculated_price ?? b.calculated_unit_price) ?? 0),
         render: (_: any, record: any) => {
           const unitPrice = (record?.calculated_price ?? record?.calculated_unit_price)
           if (unitPrice === null || unitPrice === undefined) return '-'
           return <span style={{ color: '#52c41a' }}>￥{Number(unitPrice).toFixed(4)}</span>
-        }
+        },
+        onHeaderCell: () => ({
+          width: columnWidths.calculated_price,
+          onResize: handleResize('calculated_price'),
+        }),
       },
       { 
         title: '金额差异(元)', 
         dataIndex: 'amount_difference',
         key: 'amount_difference', 
-        width: 130, 
+        width: columnWidths.amount_difference, 
+        filters: [
+          { text: '异常数据(差异>5元)', value: 'abnormal' },
+          { text: '正常数据(差异≤5元)', value: 'normal' },
+          { text: '识别金额为0', value: 'zero_amount' },
+          { text: '已计算', value: 'calculated' },
+          { text: '未计算', value: 'not_calculated' },
+        ],
+        filteredValue: filters.amountDifference || null,
+        onFilter: (value, record: any) => {
+          const amount = record.amount ?? 0
+          const calculatedAmount = record.calculated_amount
+          
+          // 筛选：已计算
+          if (value === 'calculated') {
+            return calculatedAmount !== null && calculatedAmount !== undefined
+          }
+          
+          // 筛选：未计算
+          if (value === 'not_calculated') {
+            return calculatedAmount === null || calculatedAmount === undefined
+          }
+          
+          // 筛选：识别金额为0
+          if (value === 'zero_amount') {
+            return amount === 0
+          }
+          
+          // 对于异常和正常数据筛选，必须同时满足：
+          // 1. 识别金额不为0
+          // 2. 计算金额存在（已经计算过）
+          if (calculatedAmount === null || calculatedAmount === undefined) {
+            // 未计算的数据不参与异常/正常筛选
+            return false
+          }
+          
+          // 计算差异
+          let diff: number
+          if (record.amount_difference !== null && record.amount_difference !== undefined) {
+            diff = record.amount_difference
+          } else {
+            diff = amount - calculatedAmount
+          }
+          
+          const absDiff = Math.abs(diff)
+          
+          if (value === 'abnormal') {
+            // 识别金额不为0 且 差异绝对值大于5
+            return amount !== 0 && absDiff > 5
+          }
+          if (value === 'normal') {
+            // 识别金额不为0 且 差异绝对值小于等于5
+            return amount !== 0 && absDiff <= 5
+          }
+          return true
+        },
         sorter: (a: any, b: any) => {
           const diffA = (a.amount_difference ?? ((a.amount ?? 0) - (a.calculated_amount ?? 0)))
           const diffB = (b.amount_difference ?? ((b.amount ?? 0) - (b.calculated_amount ?? 0)))
           return diffA - diffB
         },
         render: (v, record: any) => {
+          // 获取识别金额
+          const amount = record.amount ?? 0
+          
+          // 计算差异
           const diff = (record.amount_difference ?? v)
+          let computed: number
+          
           if (diff === null || diff === undefined) {
             if (record.amount === null || record.amount === undefined || record.calculated_amount === null || record.calculated_amount === undefined) return '-'
-            const computed = Number(record.amount) - Number(record.calculated_amount)
-            const color = computed > 0 ? '#ff4d4f' : computed < 0 ? '#52c41a' : undefined
-            const prefix = computed > 0 ? '+' : ''
-            return <span style={{ color, fontWeight: 'bold' }}>{prefix}￥{computed.toFixed(2)}</span>
+            computed = Number(record.amount) - Number(record.calculated_amount)
+          } else {
+            computed = Number(diff)
           }
-          const num = Number(diff)
-          const color = num > 0 ? '#ff4d4f' : num < 0 ? '#52c41a' : undefined
-          const prefix = num > 0 ? '+' : ''
-          return <span style={{ color, fontWeight: 'bold' }}>{prefix}￥{num.toFixed(2)}</span>
-        }
+          
+          // 识别金额为0：不校验，不显示颜色
+          if (amount === 0) {
+            const prefix = computed > 0 ? '+' : ''
+            return <span>{prefix}￥{computed.toFixed(2)}</span>
+          }
+          
+          // 识别金额不为0：进行校验
+          const absDiff = Math.abs(computed)
+          let color: string | undefined
+          let fontWeight: string | undefined
+          
+          if (absDiff > 5) {
+            // 差异大于5元：标红加粗
+            color = '#ff4d4f'
+            fontWeight = 'bold'
+          } else {
+            // 差异小于等于5元：显示为黑色
+            color = undefined
+            fontWeight = undefined
+          }
+          
+          const prefix = computed > 0 ? '+' : ''
+          return <span style={{ color, fontWeight }}>{prefix}￥{computed.toFixed(2)}</span>
+        },
+        onHeaderCell: () => ({
+          width: columnWidths.amount_difference,
+          onResize: handleResize('amount_difference'),
+        }),
       },
-      { title: '开始充电时间', dataIndex: 'start_time', key: 'start_time', width: 180, sorter: (a: any, b: any) => dayjs(a.start_time).unix() - dayjs(b.start_time).unix(), render: (v: string) => v ? dayjs(v).format('YYYY-MM-DD HH:mm') : '-' },
-      { title: '结束充电时间', dataIndex: 'end_time', key: 'end_time', width: 180, sorter: (a: any, b: any) => dayjs(a.end_time).unix() - dayjs(b.end_time).unix(), render: (v: string) => v ? dayjs(v).format('YYYY-MM-DD HH:mm') : '-' },
-      { title: '充电时长(分钟)', dataIndex: 'duration_min', key: 'duration_min', width: 120, sorter: (a: any, b: any) => (a.duration_min || 0) - (b.duration_min || 0), render: (v) => v || '-' },
+      { 
+        title: '开始充电时间', 
+        dataIndex: 'start_time', 
+        key: 'start_time', 
+        width: columnWidths.start_time, 
+        sorter: (a: any, b: any) => dayjs(a.start_time).unix() - dayjs(b.start_time).unix(), 
+        render: (v: string) => v ? dayjs(v).format('YYYY-MM-DD HH:mm') : '-',
+        onHeaderCell: () => ({
+          width: columnWidths.start_time,
+          onResize: handleResize('start_time'),
+        }),
+      },
+      { 
+        title: '结束充电时间', 
+        dataIndex: 'end_time', 
+        key: 'end_time', 
+        width: columnWidths.end_time, 
+        sorter: (a: any, b: any) => dayjs(a.end_time).unix() - dayjs(b.end_time).unix(), 
+        render: (v: string) => v ? dayjs(v).format('YYYY-MM-DD HH:mm') : '-',
+        onHeaderCell: () => ({
+          width: columnWidths.end_time,
+          onResize: handleResize('end_time'),
+        }),
+      },
+      { 
+        title: '充电时长(分钟)', 
+        dataIndex: 'duration_min', 
+        key: 'duration_min', 
+        width: columnWidths.duration_min, 
+        sorter: (a: any, b: any) => (a.duration_min || 0) - (b.duration_min || 0), 
+        render: (v) => v || '-',
+        onHeaderCell: () => ({
+          width: columnWidths.duration_min,
+          onResize: handleResize('duration_min'),
+        }),
+      },
       {
         title: '充电单图片',
         dataIndex: 'thumb_url',
         key: 'thumb_url',
-        width: 100,
+        width: columnWidths.thumb_url,
         render: (value: string) => {
           if (!value || value.startsWith('wxfile://') || value.startsWith('file://')) {
             return '-'
@@ -615,11 +820,15 @@ const ChargingList = () => {
             />
           )
         },
+        onHeaderCell: () => ({
+          width: columnWidths.thumb_url,
+          onResize: handleResize('thumb_url'),
+        }),
       },
       {
         title: '操作',
         key: 'action',
-        width: 240,
+        width: columnWidths.action,
         fixed: 'right',
         render: (_, record) => (
           <Space size="small" direction="vertical">
@@ -638,8 +847,12 @@ const ChargingList = () => {
             </Button>
           </Space>
         ),
+        onHeaderCell: () => ({
+          width: columnWidths.action,
+          onResize: handleResize('action'),
+        }),
       },
-  ], [driverOptions, stationOptions, vehicleOptions, filters])
+  ], [driverOptions, stationOptions, vehicleOptions, filters, columnWidths])
 
   // 生成列配置
   const columnSettingsConfig = useMemo(() => {
@@ -741,10 +954,25 @@ const ChargingList = () => {
           columns={columns}
           dataSource={receipts}
           loading={receiptsQuery.isLoading}
+          className="resizable-table"
+          components={{
+            header: {
+              cell: ResizableHeaderCell,
+            },
+          }}
+          rowClassName={(record: any) => {
+            // 未计算的数据用灰色背景
+            const calculatedAmount = record.calculated_amount
+            if (calculatedAmount === null || calculatedAmount === undefined) {
+              return 'row-not-calculated'
+            }
+            return ''
+          }}
           rowSelection={{
             selectedRowKeys,
             onChange: setSelectedRowKeys,
-            columnWidth: 48,
+            columnWidth: 50,
+            fixed: 'left',
             selections: [
               {
                 key: 'select-all-data',
@@ -800,7 +1028,8 @@ const ChargingList = () => {
               },
             ],
           }}
-          scroll={{ x: 2400 }}
+          scroll={{ x: 2400, y: 'calc(100vh - 400px)' }}
+          sticky={{ offsetHeader: 0 }}
           pagination={{
             current: currentPage,
             pageSize: pageSize,
@@ -818,6 +1047,7 @@ const ChargingList = () => {
               driverName: filters.driver_name?.[0] as string | undefined,
               vehicleNo: filters.vehicle_no?.[0] as string | undefined,
               chargingStation: filters.charging_station?.[0] as string | undefined,
+              amountDifference: filters.amount_difference as string[] | undefined,
             })
           }}
         />

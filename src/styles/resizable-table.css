@@ -1,0 +1,192 @@
+/* 可调整列宽样式 - Excel风格 */
+
+/* 调整手柄的基础样式 */
+.react-resizable {
+  position: relative;
+}
+
+/* 调整手柄 */
+.react-resizable-handle {
+  position: absolute;
+  width: 10px;
+  height: 100%;
+  bottom: 0;
+  right: -5px;
+  cursor: col-resize;
+  z-index: 1;
+}
+
+/* 调整手柄的可视化指示器 */
+.react-resizable-handle::after {
+  content: '';
+  position: absolute;
+  right: 3px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 2px;
+  height: 20px;
+  background-color: #d9d9d9;
+  transition: all 0.2s;
+}
+
+/* 鼠标悬停时的效果 */
+.react-resizable-handle:hover::after {
+  background-color: #1890ff;
+  height: 30px;
+  width: 3px;
+}
+
+/* 拖动时的效果 */
+.react-resizable-handle-dragging::after {
+  background-color: #1890ff;
+  height: 100%;
+  width: 3px;
+  box-shadow: 0 0 5px rgba(24, 144, 255, 0.5);
+}
+
+/* 表头单元格样式优化 */
+.ant-table-thead > tr > th {
+  position: relative;
+  user-select: none;
+}
+
+/* 表头单元格边框 */
+.ant-table-thead > tr > th::after {
+  content: '';
+  position: absolute;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 1px;
+  height: 60%;
+  background-color: #f0f0f0;
+}
+
+/* 最后一列不显示边框 */
+.ant-table-thead > tr > th:last-child::after {
+  display: none;
+}
+
+/* 拖动时的列高亮效果 */
+.resizing-column {
+  background-color: #e6f7ff !important;
+}
+
+/* 拖动时显示虚线 */
+.resize-line {
+  position: fixed;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background-color: #1890ff;
+  z-index: 9999;
+  pointer-events: none;
+  box-shadow: 0 0 5px rgba(24, 144, 255, 0.5);
+}
+
+/* 调整手柄的双线样式（更像Excel） */
+.react-resizable-handle-excel::before,
+.react-resizable-handle-excel::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 1px;
+  height: 20px;
+  background-color: #d9d9d9;
+  transition: all 0.2s;
+}
+
+.react-resizable-handle-excel::before {
+  right: 2px;
+}
+
+.react-resizable-handle-excel::after {
+  right: 5px;
+}
+
+.react-resizable-handle-excel:hover::before,
+.react-resizable-handle-excel:hover::after {
+  background-color: #1890ff;
+  height: 30px;
+}
+
+/* 表格整体样式优化 */
+.resizable-table .ant-table-thead > tr > th {
+  border-right: 1px solid #f0f0f0;
+  padding: 12px 8px;
+}
+
+.resizable-table .ant-table-thead > tr > th:hover {
+  background-color: #fafafa;
+}
+
+/* 拖动时的光标样式 */
+.resizing-cursor {
+  cursor: col-resize !important;
+}
+
+.resizing-cursor * {
+  cursor: col-resize !important;
+}
+
+/* 修复固定列的层级问题 */
+.ant-table-thead > tr > th.ant-table-cell-fix-right {
+  z-index: 3 !important;
+}
+
+.ant-table-tbody > tr > td.ant-table-cell-fix-right {
+  z-index: 2 !important;
+}
+
+.ant-table-thead > tr > th.ant-table-cell-fix-left {
+  z-index: 3 !important;
+}
+
+.ant-table-tbody > tr > td.ant-table-cell-fix-left {
+  z-index: 2 !important;
+}
+
+/* 确保sticky表头的层级正确 */
+.ant-table-thead > tr > th.ant-table-cell-fix-right.ant-table-cell-fix-sticky {
+  z-index: 4 !important;
+}
+
+.ant-table-thead > tr > th.ant-table-cell-fix-left.ant-table-cell-fix-sticky {
+  z-index: 4 !important;
+}
+
+/* 普通表头的层级 */
+.ant-table-thead > tr > th {
+  z-index: 2;
+}
+
+/* sticky表头的层级 */
+.ant-table-thead.ant-table-thead-sticky > tr > th {
+  z-index: 3;
+}
+
+/* 未计算数据的行样式 */
+.row-not-calculated {
+  background-color: #fafafa !important;
+}
+
+.row-not-calculated:hover > td {
+  background-color: #f0f0f0 !important;
+}
+
+/* 未计算数据的单元格样式 */
+.row-not-calculated > td {
+  color: #8c8c8c;
+}
+
+/* 未计算数据的操作按钮保持正常颜色 */
+.row-not-calculated .ant-btn-link {
+  color: #1890ff;
+}
+
+.row-not-calculated .ant-btn-link:hover {
+  color: #40a9ff;
+}
+
+
