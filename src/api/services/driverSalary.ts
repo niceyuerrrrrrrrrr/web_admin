@@ -89,6 +89,16 @@ export interface RealtimeTripCount {
   trip_count: number
 }
 
+export interface TripDetailByCompany {
+  user_id: number
+  user_name: string
+  company_trips: Array<{
+    company_name: string
+    trip_count: number
+  }>
+  total_trips: number
+}
+
 // ==================== 全局配置 API ====================
 
 /**
@@ -224,6 +234,18 @@ export const fetchRealtimeTrips = async (params: {
   department_id?: number
 }): Promise<ApiResponse<RealtimeTripCount[]>> => {
   const response = await client.get('/driver-salary/trips/realtime', { params })
+  return response.data
+}
+
+/**
+ * 获取司机趟次明细（按装料公司统计）
+ */
+export const fetchTripDetailsByCompany = async (params: {
+  period: string
+  company_id?: number
+  department_id?: number
+}): Promise<ApiResponse<TripDetailByCompany[]>> => {
+  const response = await client.get('/driver-salary/trips/detail-by-company', { params })
   return response.data
 }
 

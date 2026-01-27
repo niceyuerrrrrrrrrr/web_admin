@@ -38,6 +38,7 @@ import {
   createOrUpdateDriverConfig,
   fetchSalarySummaryList,
   fetchRealtimeTrips,
+  fetchTripDetailsByCompany,
   calculateDriverSalary,
   batchCalculateSalary,
   batchConfirmSalary,
@@ -47,6 +48,7 @@ import {
   sendSalarySlip,
   type GlobalConfig,
   type SalarySummary,
+  type TripDetailByCompany,
 } from '../api/services/driverSalary'
 import { fetchUsers } from '../api/services/users'
 import { fetchDepartments } from '../api/services/departments'
@@ -156,6 +158,18 @@ const DriverSalaryPage: React.FC = () => {
       }),
     enabled: activeTab === 'salary' && !!selectedCompanyId,
     refetchInterval: 60 * 1000,
+  })
+
+  // 获取趟次明细（按装料公司统计）
+  const { data: tripDetailsData, refetch: refetchTripDetails } = useQuery({
+    queryKey: ['tripDetails', selectedPeriod, selectedCompanyId, selectedDepartmentId],
+    queryFn: () =>
+      fetchTripDetailsByCompany({
+        period: selectedPeriod,
+        company_id: selectedCompanyId || undefined,
+        department_id: selectedDepartmentId,
+      }),
+    enabled: activeTab === 'tripDetails' && !!selectedCompanyId,
   })
 
   const { data: driverConfigData, refetch: refetchDriverConfig } = useQuery({
@@ -391,6 +405,64 @@ const DriverSalaryPage: React.FC = () => {
   })
 
   // ==================== 表格列定义 ====================
+
+  // 趟次明细统计表格列
+  const tripDetailsColumns = [
+    {
+      title: '司机姓名',
+      dataIndex: 'user_name',
+      key: 'user_name',
+      width: 120,
+      fixed: 'left' as const,
+    },
+  ]
+
+  // 动态生成装料公司列
+  const tripDetailsData_raw = (tripDetailsData as any)?.data || []
+  const allCompanies = new Set<string>()
+  tripDetailsData_raw.forEach((item: TripDetailByCompany) => {
+    item.company_trips.forEach((ct) => {
+      allCompanies.add(ct.company_name)
+    })
+  })
+  const sortedCompanies = Array.from(allCompanies).sort()
+
+  // 为每个装料公司添加一列
+  sortedCompanies.forEach((companyName) => {
+    tripDetailsColumns.push({
+      title: companyName,
+      key: `company_${companyName}`,
+      width: 100,
+      render: (_: any, record: TripDetailByCompany) => {
+        const companyTrip = record.company_trips.find(
+          (ct) => ct.company_name === companyName
+        )
+        return companyTrip ? companyTrip.trip_count : 0
+      },
+    } as any)
+  })
+
+  // 添加总计列
+  tripDetailsColumns.push({
+    title: '总计',
+    dataIndex: 'total_trips',
+    key: 'total_trips',
+    width: 100,
+    fixed: 'right' as const,
+    render: (value: number) => (
+      <span style={{ fontWeight: 'bold', color: '#1890ff' }}>{value}</span>
+    ),
+  } as any)
+
+  // 计算每个装料公司的总趟数（用于表格底部总计行）
+  const companyTotals: Record<string, number> = {}
+  let grandTotal = 0
+  tripDetailsData_raw.forEach((item: TripDetailByCompany) => {
+    item.company_trips.forEach((ct) => {
+      companyTotals[ct.company_name] = (companyTotals[ct.company_name] || 0) + ct.trip_count
+    })
+    grandTotal += item.total_trips
+  })
 
   const salaryColumns = [
     {
@@ -720,6 +792,9 @@ const DriverSalaryPage: React.FC = () => {
                   refetchDriverConfig()
                   refetchRealtimeTrips()
                 }
+                if (activeTab === 'tripDetails') {
+                  refetchTripDetails()
+                }
               }}
             >
               刷新
@@ -904,6 +979,56 @@ const DriverSalaryPage: React.FC = () => {
                         </strong>
                       </Table.Summary.Cell>
                       <Table.Summary.Cell index={15} colSpan={3} />
+                    </Table.Summary.Row>
+                  </Table.Summary>
+                )
+              }}
+            />
+          </Tabs.TabPane>
+
+          {/* 趟次明细统计 */}
+          <Tabs.TabPane
+            tab={
+              <span>
+                <CalculatorOutlined />
+                趟次明细统计
+              </span>
+            }
+            key="tripDetails"
+          >
+            <div style={{ marginBottom: 16 }}>
+              <Space>
+                <span style={{ color: '#999', fontSize: 14 }}>
+                  按司机姓名统计各装料公司的趟次明细
+                </span>
+              </Space>
+            </div>
+            <Table
+              columns={tripDetailsColumns}
+              dataSource={tripDetailsData_raw}
+              rowKey="user_id"
+              scroll={{ x: 'max-content' }}
+              pagination={false}
+              summary={() => {
+                if (tripDetailsData_raw.length === 0) return null
+                return (
+                  <Table.Summary fixed>
+                    <Table.Summary.Row style={{ backgroundColor: '#fafafa' }}>
+                      <Table.Summary.Cell index={0}>
+                        <strong>总计</strong>
+                      </Table.Summary.Cell>
+                      {sortedCompanies.map((companyName, idx) => (
+                        <Table.Summary.Cell key={companyName} index={idx + 1}>
+                          <strong style={{ color: '#1890ff' }}>
+                            {companyTotals[companyName] || 0}
+                          </strong>
+                        </Table.Summary.Cell>
+                      ))}
+                      <Table.Summary.Cell index={sortedCompanies.length + 1}>
+                        <strong style={{ color: '#1890ff', fontSize: 16 }}>
+                          {grandTotal}
+                        </strong>
+                      </Table.Summary.Cell>
                     </Table.Summary.Row>
                   </Table.Summary>
                 )
