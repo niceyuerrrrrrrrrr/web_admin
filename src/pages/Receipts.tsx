@@ -69,6 +69,7 @@ import useAuthStore from '../store/auth'
 import useCompanyStore from '../store/company'
 import client from '../api/client'
 import ColumnSettings from '../components/ColumnSettings'
+import ResizableHeaderCell from '../components/ResizableHeaderCell'
 import { useColumnSettings } from '../hooks/useColumnSettings'
 
 const { Title, Paragraph } = Typography
@@ -224,6 +225,49 @@ const ReceiptsPage = () => {
   const [editingMatched, setEditingMatched] = useState<any>(null)
   const [matchedEditModalOpen, setMatchedEditModalOpen] = useState(false)
   const showCompanyWarning = isSuperAdmin && !effectiveCompanyId
+
+  // 列宽状态管理
+  const [columnWidths, setColumnWidths] = useState<Record<string, number>>({
+    id: 80,
+    company: 150,
+    driver_name: 120,
+    vehicle_plate: 120,
+    tanker_vehicle_code: 120,
+    material_name: 150,
+    material_spec: 120,
+    gross_weight: 100,
+    net_weight: 100,
+    tare_weight: 100,
+    loading_time: 180,
+    unloading_time: 180,
+    task_id: 200,
+    created_at: 180,
+    deleted_at: 150,
+    submitted_at: 180,
+    loading_company: 150,
+    unloading_company: 150,
+    project_name: 150,
+    construction_site: 150,
+    volume: 100,
+    unit_price: 100,
+    total_price: 120,
+    charging_time: 180,
+    water_time: 180,
+    departure_time: 180,
+    loading_receipt_number: 150,
+    unloading_receipt_number: 150,
+    charging_receipt_number: 150,
+    water_receipt_number: 150,
+    departure_receipt_number: 150,
+    actions: 200,
+  })
+
+  const handleResize = (key: string) => (_e: any, { size }: any) => {
+    setColumnWidths(prev => ({
+      ...prev,
+      [key]: size.width,
+    }))
+  }
 
   // 加载数据清洗配置
   const { data: cleanConfigs } = useQuery({
@@ -1036,6 +1080,10 @@ const ReceiptsPage = () => {
       message.warning('司机无权限编辑票据')
       return
     }
+    
+    // 先重置表单，清除之前的所有字段
+    editForm.resetFields()
+    
     setEditingReceipt(receipt)
     setEditDrawerOpen(true)
 
@@ -2857,8 +2905,19 @@ const ReceiptsPage = () => {
       }
     }
 
-    return orderedColumns
-  }, [getCurrentColumns, columnConfig])
+    return orderedColumns.map((col: any) => {
+      if (!col.width || col.fixed === 'right') return col
+      const key = col.key || (typeof col.dataIndex === 'string' ? col.dataIndex : String(col.title || 'unknown'))
+      return {
+        ...col,
+        width: columnWidths[key] || col.width,
+        onHeaderCell: () => ({
+          width: columnWidths[key] || col.width,
+          onResize: handleResize(key),
+        }),
+      }
+    })
+  }, [getCurrentColumns, columnConfig, columnWidths, handleResize])
 
   const renderDetail = () => {
     if (!selectedReceipt) return null
@@ -4296,6 +4355,12 @@ const ReceiptsPage = () => {
                   columns={getColumns(activeTab)}
                   dataSource={currentDisplayData as any}
                   loading={activeTab === 'matched' ? matchedReceiptsQuery.isLoading : receiptsQuery.isLoading}
+                  className="resizable-table"
+                  components={{
+                    header: {
+                      cell: ResizableHeaderCell,
+                    },
+                  }}
                   rowSelection={{
                     selectedRowKeys,
                     onChange: setSelectedRowKeys,
