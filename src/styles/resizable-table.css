@@ -132,7 +132,7 @@
 
 /* 修复固定列的层级问题 */
 .ant-table-thead > tr > th.ant-table-cell-fix-right {
-  z-index: 3 !important;
+  z-index: 5 !important;
 }
 
 .ant-table-tbody > tr > td.ant-table-cell-fix-right {
@@ -140,7 +140,7 @@
 }
 
 .ant-table-thead > tr > th.ant-table-cell-fix-left {
-  z-index: 3 !important;
+  z-index: 5 !important;
 }
 
 .ant-table-tbody > tr > td.ant-table-cell-fix-left {
@@ -149,20 +149,42 @@
 
 /* 确保sticky表头的层级正确 */
 .ant-table-thead > tr > th.ant-table-cell-fix-right.ant-table-cell-fix-sticky {
-  z-index: 4 !important;
+  z-index: 6 !important;
 }
 
 .ant-table-thead > tr > th.ant-table-cell-fix-left.ant-table-cell-fix-sticky {
-  z-index: 4 !important;
+  z-index: 6 !important;
 }
 
 /* 普通表头的层级 */
 .ant-table-thead > tr > th {
-  z-index: 2;
+  z-index: 1;
 }
 
 /* sticky表头的层级 */
 .ant-table-thead.ant-table-thead-sticky > tr > th {
+  z-index: 2;
+}
+
+/* 分组表头的层级（第一行表头） */
+.ant-table-thead > tr:first-child > th {
+  z-index: 1;
+}
+
+/* 分组表头中的固定列需要更高层级 */
+.ant-table-thead > tr:first-child > th.ant-table-cell-fix-left,
+.ant-table-thead > tr:first-child > th.ant-table-cell-fix-right {
+  z-index: 7 !important;
+}
+
+/* 分组表头的第二行（子列）中的固定列需要最高层级 */
+.ant-table-thead > tr:nth-child(2) > th.ant-table-cell-fix-left,
+.ant-table-thead > tr:nth-child(2) > th.ant-table-cell-fix-right {
+  z-index: 8 !important;
+}
+
+/* 分组表头的第二行普通列 */
+.ant-table-thead > tr:nth-child(2) > th {
   z-index: 3;
 }
 
@@ -189,4 +211,40 @@
   color: #40a9ff;
 }
 
+/* 固定列样式优化 */
+.ant-table-cell-fix-left,
+.ant-table-cell-fix-right {
+  background: #fff !important;
+}
 
+/* 固定列在表头的背景 */
+.ant-table-thead > tr > th.ant-table-cell-fix-left,
+.ant-table-thead > tr > th.ant-table-cell-fix-right {
+  background: #fafafa !important;
+}
+
+/* 固定列的阴影效果 */
+.ant-table-thead .ant-table-cell-fix-left::after,
+.ant-table-thead .ant-table-cell-fix-left-last::after,
+.ant-table-thead .ant-table-cell-fix-right::before,
+.ant-table-thead .ant-table-cell-fix-right-first::before,
+.ant-table-summary .ant-table-cell-fix-left::after,
+.ant-table-summary .ant-table-cell-fix-left-last::after,
+.ant-table-summary .ant-table-cell-fix-right::before,
+.ant-table-summary .ant-table-cell-fix-right-first::before {
+  display: none !important;
+}
+
+.ant-table-tbody .ant-table-cell-fix-left-last::after {
+  box-shadow: inset 10px 0 8px -8px rgba(0, 0, 0, 0.15) !important;
+}
+
+.ant-table-tbody .ant-table-cell-fix-right-first::before {
+  box-shadow: inset -10px 0 8px -8px rgba(0, 0, 0, 0.15) !important;
+}
+
+/* 鼠标悬停时固定列的背景 */
+.ant-table-tbody > tr:hover > td.ant-table-cell-fix-left,
+.ant-table-tbody > tr:hover > td.ant-table-cell-fix-right {
+  background: #fafafa !important;
+}

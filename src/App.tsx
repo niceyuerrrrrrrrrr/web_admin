@@ -52,6 +52,7 @@ import StatisticsPage from './pages/Statistics'
 import ApprovalsPage from './pages/Approvals'
 import ApprovalWorkflowsPage from './pages/ApprovalWorkflows'
 import AttendancePage from './pages/Attendance'
+import AttendanceCalendarPage from './pages/AttendanceCalendar'
 import ReceiptsPage from './pages/Receipts'
 import ReceiptsRecycleBin from './pages/ReceiptsRecycleBin'
 import ReceiptAnalytics from './pages/ReceiptAnalytics'
@@ -301,6 +302,12 @@ const routeDefinitions = [
             label: '考勤明细',
             path: '/attendance',
             element: <AttendancePage />,
+          },
+          {
+            key: 'attendance-calendar',
+            label: '考勤日历',
+            path: '/attendance-calendar',
+            element: <AttendanceCalendarPage />,
           },
           {
             key: 'attendance-config',

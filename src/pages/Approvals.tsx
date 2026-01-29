@@ -59,6 +59,7 @@ import {
   type ManagerTypeStat,
 } from '../api/services/approval'
 
+import ResizableHeaderCell from '../components/ResizableHeaderCell'
 const { Title, Paragraph, Text } = Typography
 const { RangePicker } = DatePicker
 
@@ -219,6 +220,32 @@ const ApprovalsPage = () => {
       groupBy: managerFilters.groupBy,
     })
   }, [managerFilters, managerForm])
+
+  // 列宽状态管理
+  const [columnWidths, setColumnWidths] = useState<Record<string, number>>({})
+
+  const handleResize = useCallback((key: string) => (_e: any, { size }: any) => {
+    setColumnWidths(prev => ({
+      ...prev,
+      [key]: size.width,
+    }))
+  }, [])
+
+  // 为列添加可调整大小的功能
+  const addResizableToColumns = useCallback(<T,>(columns: ColumnsType<T>): ColumnsType<T> => {
+    return columns.map((col: any) => {
+      if (!col.width || col.fixed === 'right') return col
+      const key = col.key || (typeof col.dataIndex === 'string' ? col.dataIndex : String(col.title || 'unknown'))
+      return {
+        ...col,
+        width: columnWidths[key] || col.width,
+        onHeaderCell: () => ({
+          width: columnWidths[key] || col.width,
+          onResize: handleResize(key),
+        }),
+      }
+    }) as ColumnsType<T>
+  }, [columnWidths, handleResize])
 
   const statsQuery = useQuery<ApprovalStats>({
     queryKey: ['approval', 'stats', selectedCompanyId],
@@ -423,6 +450,11 @@ const ApprovalsPage = () => {
       render: (_, record) => formatMetricValue(record),
     },
   ]
+
+  const managerColumnsResizable = useMemo(
+    () => addResizableToColumns(managerColumns),
+    [managerColumns, addResizableToColumns]
+  )
 
   const statCards = useMemo(() => {
     if (!statsQuery.data) return []
@@ -854,6 +886,11 @@ const ApprovalsPage = () => {
     [openActionModal, openDetail, handleSingleDelete, pendingQuery.data?.records],
   )
 
+  const pendingColumnsResizable = useMemo(
+    () => addResizableToColumns(pendingColumns),
+    [pendingColumns, addResizableToColumns]
+  )
+
   const historyColumns: ColumnsType<ApprovalCoreFields> = useMemo(
     () => [
       {
@@ -1019,6 +1056,11 @@ const ApprovalsPage = () => {
       },
     ],
     [openDetail, handleSingleDelete, authUser?.role, authUser?.positionType, historyQuery.data?.records],
+  )
+
+  const historyColumnsResizable = useMemo(
+    () => addResizableToColumns(historyColumns),
+    [historyColumns, addResizableToColumns]
   )
 
   const handlePendingFilterChange = (_: unknown, allValues: { approvalType?: string }) => {
@@ -1319,9 +1361,15 @@ const ApprovalsPage = () => {
 
                   <Table
                     rowKey={(record) => `${record.approval_type}-${record.id}`}
-                    columns={pendingColumns}
+                    columns={pendingColumnsResizable}
                     dataSource={pendingQuery.data?.records}
                     loading={pendingQuery.isLoading}
+                    className="resizable-table"
+                    components={{
+                      header: {
+                        cell: ResizableHeaderCell,
+                      },
+                    }}
                     pagination={{
                       current: pendingPage,
                       pageSize: pendingPageSize,
@@ -1481,9 +1529,15 @@ const ApprovalsPage = () => {
 
                   <Table
                     rowKey={(record) => `${record.approval_type}-${record.id}`}
-                    columns={historyColumns}
+                    columns={historyColumnsResizable}
                     dataSource={historyQuery.data?.records}
                     loading={historyQuery.isLoading}
+                    className="resizable-table"
+                    components={{
+                      header: {
+                        cell: ResizableHeaderCell,
+                      },
+                    }}
                     pagination={{
                       current: historyPagination.current,
                       pageSize: historyPagination.pageSize,

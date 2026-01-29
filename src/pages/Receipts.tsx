@@ -64,6 +64,14 @@ import { fetchCompanyDetail } from '../api/services/companies'
 import { fetchDepartments } from '../api/services/departments'
 import { fetchUsers } from '../api/services/users'
 import { fetchDataCleanConfigs, saveDataCleanConfig } from '../api/services/dataCleanConfig'
+import { 
+  fetchSmallVolumeRules, 
+  createSmallVolumeRule, 
+  updateSmallVolumeRule, 
+  deleteSmallVolumeRule,
+  type SmallVolumeRule,
+  type SmallVolumeRuleCreate 
+} from '../api/services/smallVolumeRules'
 import type { Receipt, ReceiptType } from '../api/types'
 import useAuthStore from '../store/auth'
 import useCompanyStore from '../store/company'
@@ -71,6 +79,7 @@ import client from '../api/client'
 import ColumnSettings from '../components/ColumnSettings'
 import ResizableHeaderCell from '../components/ResizableHeaderCell'
 import { useColumnSettings } from '../hooks/useColumnSettings'
+import { fixImageUrl } from '../utils/imageUrl'
 
 const { Title, Paragraph } = Typography
 const { RangePicker } = DatePicker
@@ -92,36 +101,44 @@ const getVehiclePlateValue = (record: any, businessType: string) => {
 }
 
 const generateFiltersWithEmpty = <T,>(data: T[], field: keyof T, sorted: boolean = false): Array<{ text: string; value: string }> => {
-  const values = data?.map(item => item[field]) || []
-  const nonEmptyValues = Array.from(new Set(values.filter(v => v !== null && v !== undefined && v !== '')))
-  
-  let filters = nonEmptyValues.map(value => ({
-    text: String(value),
-    value: String(value),
-  }))
-  
+  const values = data?.map((item) => (item as any)?.[field]) || []
+
+  const nonEmptyValues = values.filter((v) => v !== null && v !== undefined && v !== '')
+  const counts = new Map<string, number>()
+  for (const v of nonEmptyValues) {
+    const key = String(v)
+    counts.set(key, (counts.get(key) || 0) + 1)
+  }
+
+  const uniques = Array.from(new Set(nonEmptyValues.map((v) => String(v))))
+
+  const sortKeys = (aKey: string, bKey: string) => {
+    if (!sorted) return 0
+
+    const aNum = parseFloat(aKey)
+    const bNum = parseFloat(bKey)
+
+    if (!isNaN(aNum) && !isNaN(bNum)) {
+      return aNum - bNum
+    }
+
+    return aKey.localeCompare(bKey, 'zh-CN')
+  }
+
   if (sorted) {
-    filters.sort((a, b) => {
-      // 尝试将值转换为数字进行比较
-      const aNum = parseFloat(a.text)
-      const bNum = parseFloat(b.text)
-      
-      // 如果两个值都是有效数字，按数值大小排序
-      if (!isNaN(aNum) && !isNaN(bNum)) {
-        return aNum - bNum
-      }
-      
-      // 否则按字符串排序
-      return a.text.localeCompare(b.text, 'zh-CN')
-    })
+    uniques.sort(sortKeys)
   }
-  
-  // 检查是否有空值数据
-  const hasEmpty = values.some(v => v === null || v === undefined || v === '')
-  if (hasEmpty) {
-    filters.unshift({ text: '(空值)', value: EMPTY_VALUE_FLAG })
+
+  let filters = uniques.map((key) => ({
+    text: `${key} (${counts.get(key) || 0})`,
+    value: key,
+  }))
+
+  const emptyCount = values.filter((v) => v === null || v === undefined || v === '').length
+  if (emptyCount > 0) {
+    filters.unshift({ text: `(空值) (${emptyCount})`, value: EMPTY_VALUE_FLAG })
   }
-  
+
   return filters
 }
 
@@ -206,6 +223,8 @@ const ReceiptsPage = () => {
   
   // 数据清洗相关状态
   const [dataCleanModalOpen, setDataCleanModalOpen] = useState(false)
+  const [cleanScope, setCleanScope] = useState<'current' | 'global'>('current')
+  const [cleanDepartmentIds, setCleanDepartmentIds] = useState<number[]>([])
   const [cleanField, setCleanField] = useState<string>('')
   const [selectedOldValues, setSelectedOldValues] = useState<string[]>([])
   const [newValue, setNewValue] = useState<string>('')
@@ -225,6 +244,11 @@ const ReceiptsPage = () => {
   const [editingMatched, setEditingMatched] = useState<any>(null)
   const [matchedEditModalOpen, setMatchedEditModalOpen] = useState(false)
   const showCompanyWarning = isSuperAdmin && !effectiveCompanyId
+  
+  // 小方量规则配置相关状态
+  const [smallVolumeRuleModalOpen, setSmallVolumeRuleModalOpen] = useState(false)
+  const [ruleForm] = Form.useForm()
+  const [editingRule, setEditingRule] = useState<SmallVolumeRule | null>(null)
 
   // 列宽状态管理
   const [columnWidths, setColumnWidths] = useState<Record<string, number>>({
@@ -286,6 +310,53 @@ const ReceiptsPage = () => {
       setStandardValues(newStandardValues)
     }
   }, [cleanConfigs])
+  
+  // 加载小方量规则（始终加载，不限制tab）
+  const { data: smallVolumeRules, refetch: refetchRules } = useQuery({
+    queryKey: ['smallVolumeRules', effectiveCompanyId],
+    queryFn: () => fetchSmallVolumeRules(effectiveCompanyId),
+    enabled: !!effectiveCompanyId,
+  })
+  
+  // 创建规则
+  const createRuleMutation = useMutation({
+    mutationFn: (data: SmallVolumeRuleCreate) => createSmallVolumeRule(data, effectiveCompanyId),
+    onSuccess: () => {
+      message.success('规则创建成功')
+      refetchRules()
+      ruleForm.resetFields()
+      setEditingRule(null)
+    },
+    onError: (error: any) => {
+      message.error(error.response?.data?.message || '创建失败')
+    },
+  })
+  
+  // 更新规则
+  const updateRuleMutation = useMutation({
+    mutationFn: ({ id, data }: { id: number; data: any }) => updateSmallVolumeRule(id, data),
+    onSuccess: () => {
+      message.success('规则更新成功')
+      refetchRules()
+      ruleForm.resetFields()
+      setEditingRule(null)
+    },
+    onError: (error: any) => {
+      message.error(error.response?.data?.message || '更新失败')
+    },
+  })
+  
+  // 删除规则
+  const deleteRuleMutation = useMutation({
+    mutationFn: (id: number) => deleteSmallVolumeRule(id),
+    onSuccess: () => {
+      message.success('规则删除成功')
+      refetchRules()
+    },
+    onError: (error: any) => {
+      message.error(error.response?.data?.message || '删除失败')
+    },
+  })
 
   // 获取当前公司信息以判断业务类型
   // 如果用户信息中没有业务类型，需要从API获取（非超级管理员也可能需要）
@@ -466,20 +537,105 @@ const ReceiptsPage = () => {
       return receipts
     }
 
+    console.log('[小方量筛选] 开始筛选，规则数量:', smallVolumeRules?.length || 0)
+    console.log('[小方量筛选] 规则列表:', smallVolumeRules)
+
     return receipts.filter((r: any) => {
       if (r.type !== 'departure') return true
       
-      const volume = parseFloat(r.concrete_volume || 0)
+      // 使用本车方量（concrete_volume）来判断小方量，而不是结算方量
+      // 因为结算方量可能被业务规则调整（如<9.1按9.1计），不适合用于小方量判断
+      const volume = parseFloat(r.concrete_volume || r.settlement_volume || 0)
+      console.log('[小方量筛选] 出厂单:', {
+        id: r.id,
+        loading_company: r.loading_company,
+        department_id: r.department_id,
+        concrete_volume: r.concrete_volume,
+        settlement_volume: r.settlement_volume,
+        volume
+      })
       
       if (filters.volumeFilter === 'small') {
-        return volume > 0 && volume < 9.1
+        // 根据配置的规则判断是否为小方量
+        if (!smallVolumeRules || smallVolumeRules.length === 0) {
+          // 如果没有配置规则，使用默认阈值 9.1
+          return volume > 0 && volume <= 9.1
+        }
+        
+        // 查找匹配的规则
+        let threshold = 9.1 // 默认阈值
+        
+        // 优先匹配装料公司规则（双向模糊匹配）
+        const companyRule = smallVolumeRules.find(
+          rule => rule.rule_type === 'loading_company' && 
+                  rule.is_active && 
+                  rule.loading_company && 
+                  r.loading_company && (
+                    r.loading_company.includes(rule.loading_company) ||
+                    rule.loading_company.includes(r.loading_company)
+                  )
+        )
+        
+        if (companyRule) {
+          threshold = companyRule.threshold
+          console.log('[小方量筛选] 匹配到装料公司规则:', companyRule.loading_company, '阈值:', threshold)
+        } else {
+          // 如果没有匹配的装料公司规则，尝试匹配部门规则
+          const deptRule = smallVolumeRules.find(
+            rule => rule.rule_type === 'department' && 
+                    rule.is_active && 
+                    rule.department_id === r.department_id
+          )
+          
+          if (deptRule) {
+            threshold = deptRule.threshold
+            console.log('[小方量筛选] 匹配到部门规则:', deptRule.department_id, '阈值:', threshold)
+          } else {
+            console.log('[小方量筛选] 未匹配到规则，使用默认阈值:', threshold)
+          }
+        }
+        
+        const isSmall = volume > 0 && volume <= threshold
+        console.log('[小方量筛选] 判断结果:', { volume, threshold, isSmall })
+        return isSmall
       } else if (filters.volumeFilter === 'normal') {
-        return volume >= 9.1
+        // 大于小方量阈值的为正常方量
+        if (!smallVolumeRules || smallVolumeRules.length === 0) {
+          return volume > 9.1
+        }
+        
+        let threshold = 9.1
+        
+        const companyRule = smallVolumeRules.find(
+          rule => rule.rule_type === 'loading_company' && 
+                  rule.is_active && 
+                  rule.loading_company && 
+                  r.loading_company && (
+                    r.loading_company.includes(rule.loading_company) ||
+                    rule.loading_company.includes(r.loading_company)
+                  )
+        )
+        
+        if (companyRule) {
+          threshold = companyRule.threshold
+        } else {
+          const deptRule = smallVolumeRules.find(
+            rule => rule.rule_type === 'department' && 
+                    rule.is_active && 
+                    rule.department_id === r.department_id
+          )
+          
+          if (deptRule) {
+            threshold = deptRule.threshold
+          }
+        }
+        
+        return volume > threshold
       }
       
       return true
     })
-  }, [receipts, activeTab, filters.volumeFilter])
+  }, [receipts, activeTab, filters.volumeFilter, smallVolumeRules])
 
   // 计算当前显示的数据（只包含顶部筛选，列筛选由 Table 自己处理）
   const currentDisplayData = useMemo(() => {
@@ -495,8 +651,37 @@ const ReceiptsPage = () => {
   }, [displayDataForStats, currentDisplayData])
 
   const cleanSourceRecords = useMemo(() => {
-    return activeTab === 'matched' ? (matchedReceipts as any[]) : (filteredReceipts as any[])
-  }, [activeTab, matchedReceipts, filteredReceipts])
+    // 默认跟随当前筛选结果（包含列筛选）；全局清洗时，旧值选择仍基于当前页面数据，避免无界全量加载
+    return dataForOperations as any[]
+  }, [dataForOperations])
+
+  const resolveCleanTargetIds = useCallback(
+    (field: string) => {
+      if (cleanScope !== 'current') return undefined
+
+      const rows = dataForOperations as any[]
+      if (!rows || rows.length === 0) return []
+
+      if (activeTab === 'matched') {
+        if (field.startsWith('load_')) {
+          return rows.map((r) => r?.loadBill?.id).filter(Boolean)
+        }
+        if (field.startsWith('unload_')) {
+          return rows.map((r) => r?.unloadBill?.id).filter(Boolean)
+        }
+        return []
+      }
+
+      return rows.map((r) => r?.id).filter(Boolean)
+    },
+    [activeTab, cleanScope, dataForOperations],
+  )
+
+  const selectedDepartmentName = useMemo(() => {
+    if (!selectedDepartmentId) return '全部部门'
+    const dept = (departments || []).find((d: any) => d.id === selectedDepartmentId)
+    return dept?.title || '全部部门'
+  }, [departments, selectedDepartmentId])
 
   const getCleanStandardKey = useCallback((field: string) => {
     if (activeTab === 'matched') {
@@ -1466,19 +1651,17 @@ const ReceiptsPage = () => {
         key: 'thumb_url',
         width: 100,
         render: (value: string) => {
-          if (!value || value.startsWith('wxfile://') || value.startsWith('file://')) {
+          const imageUrl = fixImageUrl(value)
+          if (!imageUrl) {
             return '-'
           }
           return (
             <Image
-              src={value}
+              src={imageUrl}
               width={60}
               height={60}
               style={{ objectFit: 'cover', borderRadius: 4 }}
-              fallback="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAMIAAADDCAYAAADQvc6UAAABRWlDQ1BJQ0MgUHJvZmlsZQAAKJFjYGASSSwoyGFhYGDIzSspCnJ3UoiIjFJgf8LAwSDCIMogwMCcmFxc4BgQ4ANUwgCjUcG3awyMIPqyLsis7PPOq3QdDFcvjV3jOD1boQVTPQrgSkktTgbSf4A4LbmgqISBgTEFyFYuLykAsTuAbJEioKOA7DkgdjqEvQHEToKwj4DVhAQ5A9k3gGyB5IxEoBmML4BsnSQk8XQkNtReEOBxcfXxUQg1Mjc0dyHgXNJBSWpFCYh2zi+oLMpMzyhRcASGUqqCZ16yno6CkYGRAQMDKMwhqj/fAIcloxgHQqxAjIHBEugw5sUIsSQpBobtQPdLciLEVJYzMPBHMDBsayhILEqEO4DxG0txmrERhM29nYGBddr//5/DGRjYNRkY/l7////39v///y4Dmn+LgesAMT8BhpYAAAGdaVRYdFhNTDpjb20uYWRvYmUueG1wAAAAAAA8eDp4bXBtZXRhIHhtbG5zOng9ImFkb2JlOm5zOm1ldGEvIiB4OnhtcHRrPSJYTVAgQ29yZSA1LjQuMCI+CiAgIDxyZGY6UkRGIHhtbG5zOnJkZj0iaHR0cDovL3d3dy53My5vcmcvMTk5OS8wMi8yMi1yZGYtc3ludGF4LW5zIyI+CiAgICAgIDxyZGY6RGVzY3JpcHRpb24gcmRmOmFib3V0PSIiCiAgICAgICAgICAgIHhtbG5zOmV4aWY9Imh0dHA6Ly9ucy5hZG9iZS5jb20vZXhpZi8xLjAvIj4KICAgICAgICAgPGV4aWY6UGl4ZWxYRGltZW5zaW9uPjE5NDwvZXhpZjpQaXhlbFhEaW1lbnNpb24+CiAgICAgICAgIDxleGlmOlBpeGVsWURpbWVuc2lvbj4xOTU8L2V4aWY6UGl4ZWxZRGltZW5zaW9uPgogICAgICA8L3JkZjpEZXNjcmlwdGlvbj4KICAgPC9yZGY6UkRGPgo8L3g6eG1wbWV0YT4K"
-              preview={{
-                mask: '查看',
-              }}
+              preview={{ mask: '查看' }}
             />
           )
         },
@@ -1710,12 +1893,13 @@ const ReceiptsPage = () => {
         key: 'thumb_url',
         width: 100,
         render: (value: string) => {
-          if (!value || value.startsWith('wxfile://') || value.startsWith('file://')) {
+          const imageUrl = fixImageUrl(value)
+          if (!imageUrl) {
             return '-'
           }
           return (
             <Image
-              src={value}
+              src={imageUrl}
               width={60}
               height={60}
               style={{ objectFit: 'cover', borderRadius: 4 }}
@@ -1945,12 +2129,13 @@ const ReceiptsPage = () => {
         key: 'thumb_url',
         width: 100,
         render: (value: string) => {
-          if (!value || value.startsWith('wxfile://') || value.startsWith('file://')) {
+          const imageUrl = fixImageUrl(value)
+          if (!imageUrl) {
             return '-'
           }
           return (
             <Image
-              src={value}
+              src={imageUrl}
               width={60}
               height={60}
               style={{ objectFit: 'cover', borderRadius: 4 }}
@@ -2124,8 +2309,8 @@ const ReceiptsPage = () => {
         dataIndex: 'thumb_url',
         width: 100,
         render: (value: string, record: any) => {
-          const imageUrl = value || record.image_path
-          if (!imageUrl || imageUrl.startsWith('wxfile://') || imageUrl.startsWith('file://')) {
+          const imageUrl = fixImageUrl(value || record.image_path)
+          if (!imageUrl) {
             return '-'
           }
           return (
@@ -2428,12 +2613,13 @@ const ReceiptsPage = () => {
         key: 'loadBill_thumb_url',
         width: 100,
         render: (value: string) => {
-          if (!value || value.startsWith('wxfile://') || value.startsWith('file://')) {
+          const imageUrl = fixImageUrl(value)
+          if (!imageUrl) {
             return '-'
           }
           return (
             <Image
-              src={value}
+              src={imageUrl}
               width={60}
               height={60}
               style={{ objectFit: 'cover', borderRadius: 4 }}
@@ -2451,12 +2637,13 @@ const ReceiptsPage = () => {
         key: 'unloadBill_thumb_url',
         width: 100,
         render: (value: string) => {
-          if (!value || value.startsWith('wxfile://') || value.startsWith('file://')) {
+          const imageUrl = fixImageUrl(value)
+          if (!imageUrl) {
             return '-'
           }
           return (
             <Image
-              src={value}
+              src={imageUrl}
               width={60}
               height={60}
               style={{ objectFit: 'cover', borderRadius: 4 }}
@@ -2814,8 +3001,8 @@ const ReceiptsPage = () => {
         dataIndex: 'thumb_url',
         width: 100,
         render: (value: string, record: any) => {
-          const imageUrl = value || record.image_path
-          if (!imageUrl || imageUrl.startsWith('wxfile://') || imageUrl.startsWith('file://')) {
+          const imageUrl = fixImageUrl(value || record.image_path)
+          if (!imageUrl) {
             return '-'
           }
           return (
@@ -2919,16 +3106,99 @@ const ReceiptsPage = () => {
     })
   }, [getCurrentColumns, columnConfig, columnWidths, handleResize])
 
+  const tableColumns = useMemo(() => {
+    const cols = getColumns(activeTab)
+
+    const getColKey = (col: any) => String(col.key || col.dataIndex || col.title || '')
+
+    const sorterArray = Array.isArray(sortedInfo) ? sortedInfo : sortedInfo ? [sortedInfo] : []
+    const getSortOrder = (colKey: string) => {
+      const hit = sorterArray.find((s: any) => String(s?.columnKey || s?.field || '') === colKey)
+      return hit?.order || null
+    }
+
+    const filterCols = new Map<string, { onFilter?: (value: any, record: any) => boolean }>()
+    for (const c of cols as any[]) {
+      const k = getColKey(c)
+      if (c.filters && typeof c.onFilter === 'function') {
+        filterCols.set(k, { onFilter: c.onFilter })
+      }
+    }
+
+    const applyOtherFilters = (data: any[], excludeKey: string) => {
+      let result = data
+      for (const key of Object.keys(filteredInfo || {})) {
+        if (key === excludeKey) continue
+        const val = (filteredInfo as any)?.[key]
+        if (!val || (Array.isArray(val) && val.length === 0)) continue
+
+        const selected = Array.isArray(val) ? val : [val]
+        const colMeta = filterCols.get(key)
+
+        if (colMeta?.onFilter) {
+          result = result.filter((record) => selected.some((v) => colMeta.onFilter!(v, record)))
+        } else {
+          result = result.filter((record) => selected.includes((record as any)[key]))
+        }
+      }
+      return result
+    }
+
+    const cascadedDataIndexAllowlist = new Set<string>([
+      'company',
+      'driver_name',
+      'vehicle_no',
+      'user_plate',
+      'tanker_vehicle_code',
+      'material_name',
+      'material_spec',
+      'charging_station',
+      'charging_pile',
+      'company_name',
+      'loading_company',
+      'unloading_company',
+      'project_name',
+      'pour_location',
+      'customer_name',
+    ])
+
+    const isSortedFilterField = (field: string) =>
+      ['driver_name', 'vehicle_no', 'user_plate', 'tanker_vehicle_code'].includes(field)
+
+    return (cols as any[]).map((col: any) => {
+      const colKey = getColKey(col)
+
+      const next: any = { ...col }
+
+      if (col.filters) {
+        next.filteredValue = filteredInfo?.[colKey] ?? null
+
+        if (typeof col.dataIndex === 'string' && cascadedDataIndexAllowlist.has(col.dataIndex)) {
+          const optionData = applyOtherFilters((currentDisplayData as any[]) || [], colKey)
+          next.filters = generateFiltersWithEmpty(optionData || [], col.dataIndex as any, isSortedFilterField(col.dataIndex))
+
+          if (filteredInfo?.[colKey]) {
+            const allowedValues = new Set((next.filters || []).map((f: any) => String(f.value)))
+            const prev = filteredInfo?.[colKey]
+            const prevArr = Array.isArray(prev) ? prev : [prev]
+            next.filteredValue = prevArr.filter((v) => allowedValues.has(String(v)))
+          }
+        }
+      }
+
+      if (col.sorter) {
+        next.sortOrder = getSortOrder(colKey)
+      }
+
+      return next
+    })
+  }, [activeTab, currentDisplayData, filteredInfo, getColumns, sortedInfo])
+
   const renderDetail = () => {
     if (!selectedReceipt) return null
 
     const receipt = selectedReceipt
-    let imageUrl = (receipt as any).thumb_url || (receipt as any).image_path
-    
-    // 过滤掉无效的图片URL（如微信小程序的临时文件路径）
-    if (imageUrl && (imageUrl.startsWith('wxfile://') || imageUrl.startsWith('file://') || imageUrl.includes('wxfile://'))) {
-      imageUrl = undefined
-    }
+    let imageUrl = fixImageUrl((receipt as any).thumb_url || (receipt as any).image_path)
     
     // 调试信息
     if (import.meta.env.DEV) {
@@ -4200,8 +4470,8 @@ const ReceiptsPage = () => {
                   style={{ width: 150 }}
                   options={[
                     { label: '全部', value: 'all' },
-                    { label: '小方量(<9.1)', value: 'small' },
-                    { label: '正常方量(≥9.1)', value: 'normal' },
+                    { label: '小方量', value: 'small' },
+                    { label: '正常方量', value: 'normal' },
                   ]}
                 />
               </Form.Item>
@@ -4316,6 +4586,11 @@ const ReceiptsPage = () => {
               <Button icon={<ToolOutlined />} onClick={() => setCleanConfigModalOpen(true)}>
                 清洗配置
               </Button>
+              {activeTab === 'departure' && (
+                <Button icon={<ToolOutlined />} onClick={() => setSmallVolumeRuleModalOpen(true)}>
+                  小方量规则
+                </Button>
+              )}
             </>
           )}
         </Space>
@@ -4352,7 +4627,7 @@ const ReceiptsPage = () => {
                     }
                     return `${record.type}-${record.id}`
                   }}
-                  columns={getColumns(activeTab)}
+                  columns={tableColumns}
                   dataSource={currentDisplayData as any}
                   loading={activeTab === 'matched' ? matchedReceiptsQuery.isLoading : receiptsQuery.isLoading}
                   className="resizable-table"
@@ -4693,10 +4968,8 @@ const ReceiptsPage = () => {
               <>
                 {/* 票据图片 */}
                 {(() => {
-                  const imageUrl = (editingReceipt as any).thumb_url || (editingReceipt as any).image_path
-                  return imageUrl && 
-                    !imageUrl.startsWith('wxfile://') && 
-                    !imageUrl.startsWith('file://') && (
+                  const imageUrl = fixImageUrl((editingReceipt as any).thumb_url || (editingReceipt as any).image_path)
+                  return imageUrl && (
                     <div style={{ marginBottom: 16 }}>
                       <Typography.Text strong>票据图片：</Typography.Text>
                       <div style={{ marginTop: 8 }}>
@@ -4957,6 +5230,8 @@ const ReceiptsPage = () => {
         open={dataCleanModalOpen}
         onCancel={() => {
           setDataCleanModalOpen(false)
+          setCleanScope('current')
+          setCleanDepartmentIds([])
           setCleanField('')
           setSelectedOldValues([])
           setNewValue('')
@@ -4966,6 +5241,36 @@ const ReceiptsPage = () => {
           if (!cleanField || selectedOldValues.length === 0 || !newValue) {
             message.warning('请完整填写所有字段')
             return
+          }
+
+          if (cleanScope === 'global') {
+            const selectedNames = (cleanDepartmentIds.length ? cleanDepartmentIds : (departments || []).map((d: any) => d.id))
+              .map((id: number) => (departments || []).find((d: any) => d.id === id)?.title)
+              .filter(Boolean)
+
+            const targetDeptText = cleanDepartmentIds.length ? selectedNames.join('，') : '全部部门'
+
+            try {
+              await new Promise<void>((resolve, reject) => {
+                modal.confirm({
+                  title: '确认全局清洗',
+                  content: (
+                    <div>
+                      <div>当前列表部门筛选：{selectedDepartmentName}</div>
+                      <div style={{ marginTop: 8 }}>将要清洗的部门范围：{targetDeptText}</div>
+                      <div style={{ marginTop: 8 }}>该操作会忽略当前页面筛选条件，请确认后继续。</div>
+                    </div>
+                  ),
+                  okText: '确认执行',
+                  cancelText: '取消',
+                  okButtonProps: { danger: true },
+                  onOk: () => resolve(),
+                  onCancel: () => reject(new Error('cancel')),
+                })
+              })
+            } catch {
+              return
+            }
           }
           
           try {
@@ -4978,14 +5283,26 @@ const ReceiptsPage = () => {
               unload_material_spec: { receipt_type: 'unloading', field_name: 'material_spec' },
             }
 
-            const { receipt_type, field_name } = activeTab === 'matched'
+            let { receipt_type, field_name } = activeTab === 'matched'
               ? (matchedFieldMap[cleanField] || {})
               : ({ receipt_type: activeTab, field_name: cleanField } as any)
+
+            if (receipt_type === 'water') {
+              receipt_type = 'water_ticket'
+            }
 
             if (!receipt_type || !field_name) {
               message.warning('该字段暂不支持清洗')
               return
             }
+
+            if (cleanScope === 'global' && cleanDepartmentIds.length === 0) {
+              // 允许不选=全部部门，但需要二次确认
+              // 这里不拦截，继续执行
+            }
+
+            const receipt_ids = resolveCleanTargetIds(cleanField)
+            const department_ids = cleanScope === 'global' ? (cleanDepartmentIds.length ? cleanDepartmentIds : undefined) : undefined
 
             const result = await batchUpdateReceiptField({
               receipt_type,
@@ -4993,6 +5310,8 @@ const ReceiptsPage = () => {
               old_values: selectedOldValues,
               new_value: newValue,
               company_id: effectiveCompanyId,
+              receipt_ids,
+              department_ids,
             }) as any
             
             message.success(`成功更新 ${result.affected_rows || 0} 条记录`)
@@ -5016,6 +5335,54 @@ const ReceiptsPage = () => {
             type="info"
             showIcon
           />
+
+          <Form layout="vertical">
+            <Form.Item label="清洗范围" required>
+              <Select
+                value={cleanScope}
+                onChange={(v) => {
+                  setCleanScope(v)
+                  setCleanDepartmentIds([])
+                }}
+                options={[
+                  { label: '当前筛选结果（推荐）', value: 'current' },
+                  { label: '全局清洗（按部门）', value: 'global' },
+                ]}
+              />
+            </Form.Item>
+
+            {cleanScope === 'global' && (
+              <>
+                <Alert
+                  type="warning"
+                  showIcon
+                  message="全局清洗说明"
+                  description="全局清洗会忽略当前页面筛选条件，按所选部门（或全部部门）对整个公司范围内数据执行替换，请谨慎操作。"
+                />
+
+                <Alert
+                  type="info"
+                  showIcon
+                  message="当前页面数据来源"
+                  description={`当前列表部门筛选：${selectedDepartmentName}`}
+                />
+
+                <Form.Item label="选择要清洗的部门（可多选，不选=全部部门）">
+                  <Select
+                    mode="multiple"
+                    value={cleanDepartmentIds}
+                    onChange={(vals) => setCleanDepartmentIds(vals as number[])}
+                    placeholder="不选择则表示全部部门"
+                    options={(departments || []).map((d: any) => ({ label: d.title, value: d.id }))}
+                    filterOption={(input, option) =>
+                      String(option?.label ?? '').toLowerCase().includes(input.toLowerCase())
+                    }
+                    showSearch
+                  />
+                </Form.Item>
+              </>
+            )}
+          </Form>
           
           <Form layout="vertical">
             <Form.Item label="选择要清洗的字段" required>
@@ -5367,6 +5734,233 @@ const ReceiptsPage = () => {
               </>
             )}
           </Form>
+        </Space>
+      </Modal>
+
+      {/* 小方量规则配置对话框 */}
+      <Modal
+        title="小方量规则配置"
+        open={smallVolumeRuleModalOpen}
+        onCancel={() => {
+          setSmallVolumeRuleModalOpen(false)
+          setEditingRule(null)
+          ruleForm.resetFields()
+        }}
+        footer={null}
+        width={800}
+      >
+        <Space direction="vertical" size="large" style={{ width: '100%' }}>
+          <Alert
+            message="配置说明"
+            description="为不同的装料公司或部门配置小方量阈值。当出厂单的结算方量小于等于阈值时，将被识别为小方量。"
+            type="info"
+            showIcon
+          />
+
+          {/* 新增/编辑规则表单 */}
+          <Card title={editingRule ? "编辑规则" : "新增规则"} size="small">
+            <Form
+              form={ruleForm}
+              layout="vertical"
+              onFinish={(values) => {
+                if (editingRule) {
+                  updateRuleMutation.mutate({ id: editingRule.id, data: values })
+                } else {
+                  createRuleMutation.mutate(values)
+                }
+              }}
+            >
+              <Form.Item
+                name="rule_type"
+                label="规则类型"
+                rules={[{ required: true, message: '请选择规则类型' }]}
+              >
+                <Select
+                  placeholder="选择规则类型"
+                  onChange={(value) => {
+                    if (value === 'loading_company') {
+                      ruleForm.setFieldValue('department_id', undefined)
+                    } else {
+                      ruleForm.setFieldValue('loading_company', undefined)
+                    }
+                  }}
+                >
+                  <Select.Option value="loading_company">按装料公司</Select.Option>
+                  <Select.Option value="department">按部门</Select.Option>
+                </Select>
+              </Form.Item>
+
+              <Form.Item noStyle shouldUpdate={(prev, curr) => prev.rule_type !== curr.rule_type}>
+                {({ getFieldValue }) => {
+                  const ruleType = getFieldValue('rule_type')
+                  
+                  if (ruleType === 'loading_company') {
+                    return (
+                      <Form.Item
+                        name="loading_company"
+                        label="装料公司名称"
+                        rules={[{ required: true, message: '请输入装料公司名称' }]}
+                      >
+                        <Input placeholder="例如：中建、恒盛隆岳" />
+                      </Form.Item>
+                    )
+                  }
+                  
+                  if (ruleType === 'department') {
+                    return (
+                      <Form.Item
+                        name="department_id"
+                        label="部门"
+                        rules={[{ required: true, message: '请选择部门' }]}
+                      >
+                        <Select
+                          placeholder="选择部门"
+                          showSearch
+                          optionFilterProp="children"
+                        >
+                          {(departmentsQuery.data?.records || []).map((dept: any) => (
+                            <Select.Option key={dept.id} value={dept.id}>
+                              {dept.title}
+                            </Select.Option>
+                          ))}
+                        </Select>
+                      </Form.Item>
+                    )
+                  }
+                  
+                  return null
+                }}
+              </Form.Item>
+
+              <Form.Item
+                name="threshold"
+                label="小方量阈值（方）"
+                rules={[{ required: true, message: '请输入阈值' }]}
+              >
+                <InputNumber
+                  min={0}
+                  step={0.1}
+                  precision={2}
+                  placeholder="例如：9.1"
+                  style={{ width: '100%' }}
+                />
+              </Form.Item>
+
+              <Form.Item>
+                <Space>
+                  <Button type="primary" htmlType="submit" loading={createRuleMutation.isPending || updateRuleMutation.isPending}>
+                    {editingRule ? '更新' : '创建'}
+                  </Button>
+                  {editingRule && (
+                    <Button onClick={() => {
+                      setEditingRule(null)
+                      ruleForm.resetFields()
+                    }}>
+                      取消编辑
+                    </Button>
+                  )}
+                </Space>
+              </Form.Item>
+            </Form>
+          </Card>
+
+          {/* 规则列表 */}
+          <Card title="已配置规则" size="small">
+            {smallVolumeRules && smallVolumeRules.length > 0 ? (
+              <Table
+                dataSource={smallVolumeRules}
+                rowKey="id"
+                pagination={false}
+                size="small"
+                columns={[
+                  {
+                    title: '规则类型',
+                    dataIndex: 'rule_type',
+                    width: 120,
+                    render: (type) => type === 'loading_company' ? '装料公司' : '部门',
+                  },
+                  {
+                    title: '目标',
+                    key: 'target',
+                    render: (_, record) => {
+                      if (record.rule_type === 'loading_company') {
+                        return record.loading_company
+                      }
+                      return record.department_name || `部门ID: ${record.department_id}`
+                    },
+                  },
+                  {
+                    title: '阈值（方）',
+                    dataIndex: 'threshold',
+                    width: 120,
+                    render: (val) => `≤ ${val}`,
+                  },
+                  {
+                    title: '状态',
+                    dataIndex: 'is_active',
+                    width: 80,
+                    render: (active) => (
+                      <Tag color={active ? 'success' : 'default'}>
+                        {active ? '启用' : '禁用'}
+                      </Tag>
+                    ),
+                  },
+                  {
+                    title: '操作',
+                    key: 'actions',
+                    width: 150,
+                    render: (_, record) => (
+                      <Space size="small">
+                        <Button
+                          type="link"
+                          size="small"
+                          onClick={() => {
+                            setEditingRule(record)
+                            ruleForm.setFieldsValue({
+                              rule_type: record.rule_type,
+                              loading_company: record.loading_company,
+                              department_id: record.department_id,
+                              threshold: record.threshold,
+                            })
+                          }}
+                        >
+                          编辑
+                        </Button>
+                        <Button
+                          type="link"
+                          size="small"
+                          onClick={() => {
+                            updateRuleMutation.mutate({
+                              id: record.id,
+                              data: { is_active: !record.is_active }
+                            })
+                          }}
+                        >
+                          {record.is_active ? '禁用' : '启用'}
+                        </Button>
+                        <Button
+                          type="link"
+                          danger
+                          size="small"
+                          onClick={() => {
+                            Modal.confirm({
+                              title: '确认删除',
+                              content: '确定要删除这条规则吗？',
+                              onOk: () => deleteRuleMutation.mutate(record.id),
+                            })
+                          }}
+                        >
+                          删除
+                        </Button>
+                      </Space>
+                    ),
+                  },
+                ]}
+              />
+            ) : (
+              <Empty description="暂无规则配置" image={Empty.PRESENTED_IMAGE_SIMPLE} />
+            )}
+          </Card>
         </Space>
       </Modal>
     </Space>

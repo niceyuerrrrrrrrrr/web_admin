@@ -39,6 +39,7 @@ import { fetchDepartments, type Department } from '../api/services/departments'
 
 import useAuthStore from '../store/auth'
 import useCompanyStore from '../store/company'
+import ResizableHeaderCell from '../components/ResizableHeaderCell'
 
 const { Title, Paragraph, Text } = Typography
 
@@ -57,6 +58,32 @@ const ApprovalWorkflowsPage = () => {
   const [editingWorkflow, setEditingWorkflow] = useState<Workflow | null>(null)
   const [modalOpen, setModalOpen] = useState(false)
   const [form] = Form.useForm<WorkflowPayload>()
+
+  // 列宽状态管理
+  const [columnWidths, setColumnWidths] = useState<Record<string, number>>({})
+
+  const handleResize = useCallback((key: string) => (_e: any, { size }: any) => {
+    setColumnWidths(prev => ({
+      ...prev,
+      [key]: size.width,
+    }))
+  }, [])
+
+  // 为列添加可调整大小的功能
+  const addResizableToColumns = useCallback(<T,>(columns: ColumnsType<T>): ColumnsType<T> => {
+    return columns.map((col: any) => {
+      if (!col.width || col.fixed === 'right') return col
+      const key = col.key || (typeof col.dataIndex === 'string' ? col.dataIndex : String(col.title || 'unknown'))
+      return {
+        ...col,
+        width: columnWidths[key] || col.width,
+        onHeaderCell: () => ({
+          width: columnWidths[key] || col.width,
+          onResize: handleResize(key),
+        }),
+      }
+    }) as ColumnsType<T>
+  }, [columnWidths, handleResize])
 
   const workflowsQuery = useQuery({
     queryKey: ['approval', 'workflows', filterType, effectiveCompanyId],
@@ -247,6 +274,11 @@ const ApprovalWorkflowsPage = () => {
     [deleteMutation, handleDrawerOpen, modal, departments],
   )
 
+  const columnsResizable = useMemo(
+    () => addResizableToColumns(columns),
+    [columns, addResizableToColumns]
+  )
+
   const roleOptions = useMemo(
     () =>
       Object.entries(roleUsersMap).map(([role, users]) => ({
@@ -310,7 +342,13 @@ const ApprovalWorkflowsPage = () => {
       <Card>
         <Table
           rowKey="id"
-          columns={columns}
+          className="resizable-table"
+          components={{
+            header: {
+              cell: ResizableHeaderCell,
+            },
+          }}
+          columns={columnsResizable}
           dataSource={workflows}
           loading={workflowsQuery.isLoading}
           pagination={false}
@@ -334,6 +372,12 @@ const ApprovalWorkflowsPage = () => {
             </Text>
             <Table
               rowKey="id"
+            className="resizable-table"
+            components={{
+              header: {
+                cell: ResizableHeaderCell,
+              },
+            }}
               size="small"
               pagination={false}
               columns={[

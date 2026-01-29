@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import {
   Alert,
   App as AntdApp,
@@ -63,6 +63,7 @@ import {
 import { fetchUsers } from '../api/services/users'
 import useAuthStore from '../store/auth'
 import useCompanyStore from '../store/company'
+import ResizableHeaderCell from '../components/ResizableHeaderCell'
 
 const { RangePicker } = DatePicker
 const { Title, Text, Paragraph } = Typography
@@ -102,6 +103,28 @@ const LeavePage = () => {
   const [commentImages, setCommentImages] = useState<string[]>([])
   const [createForm] = Form.useForm()
   const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([])
+
+  // 列宽状态管理
+  const [columnWidths, setColumnWidths] = useState<Record<string, number>>({})
+  const handleResizeColumn = useCallback((key: string) => (_e: any, { size }: any) => {
+    setColumnWidths(prev => ({ ...prev, [key]: size.width }))
+  }, [])
+
+  // 为列添加可调整大小的功能
+  const addResizableToColumns = useCallback(<T,>(columns: ColumnsType<T>): ColumnsType<T> => {
+    return columns.map((col: any) => {
+      if (!col.width || col.fixed === 'right') return col
+      const key = col.key || (typeof col.dataIndex === 'string' ? col.dataIndex : String(col.title || 'unknown'))
+      return {
+        ...col,
+        width: columnWidths[key] || col.width,
+        onHeaderCell: () => ({
+          width: columnWidths[key] || col.width,
+          onResize: handleResizeColumn(key),
+        }),
+      }
+    }) as ColumnsType<T>
+  }, [columnWidths, handleResizeColumn])
 
   const handleDateRangeChange = (value: [dayjs.Dayjs | null, dayjs.Dayjs | null] | null, resetPage = true) => {
     const normalized =
@@ -502,6 +525,11 @@ const LeavePage = () => {
     },
   ]
 
+  const columnsResizable = useMemo(
+    () => addResizableToColumns(columns),
+    [columns, addResizableToColumns]
+  )
+
   const stats = statsQuery.data as LeaveStats | undefined
   const typeData =
     stats?.by_type.map((item) => ({
@@ -624,9 +652,15 @@ const LeavePage = () => {
                   />
                 )}
                 <Table
+                  className="resizable-table"
+                  components={{
+                    header: {
+                      cell: ResizableHeaderCell,
+                    },
+                  }}
                   rowKey="id"
                   loading={leavesQuery.isLoading}
-                  columns={columns}
+                  columns={columnsResizable}
                   dataSource={leavesQuery.data?.records || []}
                   rowSelection={{
                     selectedRowKeys,

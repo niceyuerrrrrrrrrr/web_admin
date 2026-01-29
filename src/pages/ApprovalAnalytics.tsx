@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import {
   Alert,
   Button,
@@ -40,6 +40,7 @@ import {
   type ApprovalRankingResponse,
 } from '../api/services/approval'
 import useCompanyStore from '../store/company'
+import ResizableHeaderCell from '../components/ResizableHeaderCell'
 
 const { Title, Text, Paragraph } = Typography
 const { RangePicker } = DatePicker
@@ -77,6 +78,12 @@ const ApprovalAnalytics = () => {
   const [selectedTrendTypes, setSelectedTrendTypes] = useState<string[]>(
     TREND_TYPE_OPTIONS.map((item) => item.value),
   )
+
+  // 列宽状态管理（用于所有表格）
+  const [columnWidths, setColumnWidths] = useState<Record<string, number>>({})
+  const handleResize = useCallback((key: string) => (_e: any, { size }: any) => {
+    setColumnWidths(prev => ({ ...prev, [key]: size.width }))
+  }, [])
 
   // 获取统计数据
   const managerQuery = useQuery<ApprovalManagerStats>({
@@ -771,6 +778,12 @@ const ApprovalAnalytics = () => {
                   <Card title="申请活跃榜 (Top 10)" bordered={false}>
                     <Table
                       dataSource={rankingQuery.data?.applicant_ranking || []}
+                      className="resizable-table"
+                      components={{
+                        header: {
+                          cell: ResizableHeaderCell,
+                        },
+                      }}
                       columns={[
                         { title: '排名', key: 'rank', render: (_, __, index) => index + 1, width: 60 },
                         { title: '申请人', dataIndex: 'user_name', key: 'user_name' },
@@ -787,6 +800,12 @@ const ApprovalAnalytics = () => {
                   <Card title="审批金额榜 (Top 10)" bordered={false}>
                     <Table
                       dataSource={rankingQuery.data?.amount_ranking || []}
+                      className="resizable-table"
+                      components={{
+                        header: {
+                          cell: ResizableHeaderCell,
+                        },
+                      }}
                       columns={[
                         { title: '排名', key: 'rank', render: (_, __, index) => index + 1, width: 60 },
                         { title: '申请人', dataIndex: 'user_name', key: 'user_name' },
@@ -808,6 +827,12 @@ const ApprovalAnalytics = () => {
             children: (
               <Card bordered={false}>
                 <Table
+                  className="resizable-table"
+                  components={{
+                    header: {
+                      cell: ResizableHeaderCell,
+                    },
+                  }}
                   columns={[
                     { title: '审批类型', dataIndex: 'type_name', key: 'type' },
                     { title: '总数', dataIndex: 'total', key: 'total', sorter: (a: any, b: any) => a.total - b.total },

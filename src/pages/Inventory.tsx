@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   Alert,
   App as AntdApp,
@@ -57,6 +57,7 @@ import type {
 } from '../api/types'
 import useAuthStore from '../store/auth'
 import useCompanyStore from '../store/company'
+import ResizableHeaderCell from '../components/ResizableHeaderCell'
 
 const { Title, Paragraph } = Typography
 const { RangePicker } = DatePicker
@@ -94,6 +95,27 @@ const InventoryPage = () => {
   const [warehouseForm] = Form.useForm()
   const [inventoryForm] = Form.useForm()
   const [operationForm] = Form.useForm()
+
+  // 列宽状态管理
+  const [columnWidths, setColumnWidths] = useState<Record<string, number>>({})
+  const handleResize = useCallback((key: string) => (_e: any, { size }: any) => {
+    setColumnWidths(prev => ({ ...prev, [key]: size.width }))
+  }, [])
+
+  const addResizableToColumns = useCallback(<T,>(columns: ColumnsType<T>): ColumnsType<T> => {
+    return columns.map((col: any) => {
+      if (!col.width || col.fixed === 'right') return col
+      const key = col.key || (typeof col.dataIndex === 'string' ? col.dataIndex : String(col.title || 'unknown'))
+      return {
+        ...col,
+        width: columnWidths[key] || col.width,
+        onHeaderCell: () => ({
+          width: columnWidths[key] || col.width,
+          onResize: handleResize(key),
+        }),
+      }
+    }) as ColumnsType<T>
+  }, [columnWidths, handleResize])
 
   const warehousesQuery = useQuery({
     queryKey: ['inventory', 'warehouses', effectiveCompanyId],
@@ -542,6 +564,11 @@ const InventoryPage = () => {
     },
   ]
 
+  const inventoryColumnsResizable = useMemo(
+    () => addResizableToColumns(inventoryColumns),
+    [inventoryColumns, addResizableToColumns]
+  )
+
   const warehouseColumns: ColumnsType<Warehouse> = [
     { title: '仓库名称', dataIndex: 'name', width: 180 },
     { title: '编码', dataIndex: 'code', width: 120 },
@@ -587,6 +614,11 @@ const InventoryPage = () => {
       ),
     },
   ]
+
+  const warehouseColumnsResizable = useMemo(
+    () => addResizableToColumns(warehouseColumns),
+    [warehouseColumns, addResizableToColumns]
+  )
 
   const operationColumns: ColumnsType<StockOperationRecord> = [
     { title: '编号', dataIndex: 'id', width: 80 },
@@ -638,6 +670,11 @@ const InventoryPage = () => {
     },
     { title: '备注', dataIndex: 'reason', ellipsis: true, render: (v) => v || '-' },
   ]
+
+  const operationColumnsResizable = useMemo(
+    () => addResizableToColumns(operationColumns),
+    [operationColumns, addResizableToColumns]
+  )
 
   useEffect(() => {
     if (!inventoryModalOpen) {
@@ -844,8 +881,14 @@ const InventoryPage = () => {
                     />
                   )}
                   <Table
+                    className="resizable-table"
+                    components={{
+                      header: {
+                        cell: ResizableHeaderCell,
+                      },
+                    }}
                     rowKey="id"
-                    columns={inventoryColumns}
+                    columns={inventoryColumnsResizable}
                     dataSource={inventoryQuery.data?.records || []}
                     loading={inventoryQuery.isLoading}
                     rowSelection={{
@@ -932,8 +975,14 @@ const InventoryPage = () => {
             children: (
               <Card>
                 <Table
+                  className="resizable-table"
+                  components={{
+                    header: {
+                      cell: ResizableHeaderCell,
+                    },
+                  }}
                   rowKey="id"
-                  columns={warehouseColumns}
+                  columns={warehouseColumnsResizable}
                   dataSource={warehousesQuery.data?.records || []}
                   loading={warehousesQuery.isLoading}
                   pagination={false}
@@ -1011,8 +1060,14 @@ const InventoryPage = () => {
                     />
                   )}
                   <Table
+                    className="resizable-table"
+                    components={{
+                      header: {
+                        cell: ResizableHeaderCell,
+                      },
+                    }}
                     rowKey="id"
-                    columns={operationColumns}
+                    columns={operationColumnsResizable}
                     dataSource={operationsQuery.data?.records || []}
                     loading={operationsQuery.isLoading}
                     rowSelection={{

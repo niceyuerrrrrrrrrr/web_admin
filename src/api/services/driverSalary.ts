@@ -58,6 +58,9 @@ export interface SalarySummary {
   user_name: string
   period: string
   trip_count: number
+  departure_trip_count?: number
+  water_ticket_trip_count?: number
+  total_trip_count?: number
   trip_income: number
   safety_bonus: number
   attendance_bonus: number
@@ -87,6 +90,9 @@ export interface RealtimeTripCount {
   user_name: string
   business_type: string
   trip_count: number
+  departure_trip_count?: number
+  water_ticket_trip_count?: number
+  total_trip_count?: number
 }
 
 export interface TripDetailByCompany {
@@ -214,6 +220,8 @@ export const fetchSalarySummaryList = async (params: {
   statistics: {
     total_count: number
     total_trips: number
+    departure_total_trips?: number
+    water_ticket_total_trips?: number
     total_trip_income: number
     total_bonus: number
     total_deduction: number

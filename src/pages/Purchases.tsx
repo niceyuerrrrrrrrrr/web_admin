@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   Alert,
   App as AntdApp,
@@ -50,6 +50,7 @@ import { fetchUsers } from '../api/services/users'
 import type { PurchaseRecord } from '../api/types'
 import useAuthStore from '../store/auth'
 import useCompanyStore from '../store/company'
+import ResizableHeaderCell from '../components/ResizableHeaderCell'
 
 const { Title, Paragraph, Text } = Typography
 const { RangePicker } = DatePicker
@@ -90,6 +91,28 @@ const PurchasesPage = () => {
   const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([])
   const [currentPage, setCurrentPage] = useState(1)
   const [pageSize, setPageSize] = useState(20)
+
+  // 列宽状态管理
+  const [columnWidths, setColumnWidths] = useState<Record<string, number>>({})
+  const handleResize = useCallback((key: string) => (_e: any, { size }: any) => {
+    setColumnWidths(prev => ({ ...prev, [key]: size.width }))
+  }, [])
+
+  // 为列添加可调整大小的功能
+  const addResizableToColumns = useCallback(<T,>(columns: ColumnsType<T>): ColumnsType<T> => {
+    return columns.map((col: any) => {
+      if (!col.width || col.fixed === 'right') return col
+      const key = col.key || (typeof col.dataIndex === 'string' ? col.dataIndex : String(col.title || 'unknown'))
+      return {
+        ...col,
+        width: columnWidths[key] || col.width,
+        onHeaderCell: () => ({
+          width: columnWidths[key] || col.width,
+          onResize: handleResize(key),
+        }),
+      }
+    }) as ColumnsType<T>
+  }, [columnWidths, handleResize])
 
   const canApprove = ['财务', '总经理'].includes((user as any)?.position_type || (user as any)?.role)
 
@@ -439,6 +462,11 @@ const PurchasesPage = () => {
     [submitMutation, user, records],
   )
 
+  const columnsResizable = useMemo(
+    () => addResizableToColumns(columns),
+    [columns, addResizableToColumns]
+  )
+
   const handleCreate = () => {
     createForm.validateFields().then((values) => {
       createMutation.mutate({
@@ -597,8 +625,14 @@ const PurchasesPage = () => {
           />
         )}
         <Table
+          className="resizable-table"
+          components={{
+            header: {
+              cell: ResizableHeaderCell,
+            },
+          }}
           rowKey="id"
-          columns={columns}
+          columns={columnsResizable}
           dataSource={records}
           loading={listQuery.isLoading}
           rowSelection={{

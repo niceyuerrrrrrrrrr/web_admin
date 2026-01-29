@@ -52,6 +52,7 @@ import {
 } from '../api/services/driverSalary'
 import { fetchUsers } from '../api/services/users'
 import { fetchDepartments } from '../api/services/departments'
+import { fetchCompanyDetail } from '../api/services/companies'
 import useCompanyStore from '../store/company'
 import useAuthStore from '../store/auth'
 
@@ -71,6 +72,15 @@ const DriverSalaryPage: React.FC = () => {
   const queryClient = useQueryClient()
   const { selectedCompanyId } = useCompanyStore()
   const { user: currentUser } = useAuthStore()
+
+  const { data: selectedCompanyDetail } = useQuery({
+    queryKey: ['companyDetail', selectedCompanyId],
+    queryFn: () => fetchCompanyDetail(Number(selectedCompanyId)),
+    enabled: !!selectedCompanyId,
+  })
+
+  const selectedBusinessType = (selectedCompanyDetail as any)?.business_type
+  const isTankerCompany = selectedBusinessType === 'tanker' || selectedBusinessType === '罐车'
 
   const isGeneralManager =
     currentUser?.role === 'general_manager' || currentUser?.positionType === '总经理'
@@ -398,49 +408,138 @@ const DriverSalaryPage: React.FC = () => {
     // 仅在待确认状态下使用实时趟数，避免“已确认/已发放”的工资记录被实时数据覆盖
     if (row.status && row.status !== 'pending') return row
 
+    const bt = (rt as any).business_type
+    const isTanker = bt === 'tanker' || bt === '罐车'
+    const dep = isTanker ? Number((rt as any).departure_trip_count ?? 0) : 0
+    const water = isTanker ? Number((rt as any).water_ticket_trip_count ?? 0) : 0
+    const total = isTanker ? dep + water : Number((rt as any).trip_count ?? 0)
+
     return {
       ...row,
-      trip_count: rt.trip_count,
+      departure_trip_count: dep,
+      water_ticket_trip_count: water,
+      total_trip_count: total,
+      trip_count: total,
     }
   })
 
   // ==================== 表格列定义 ====================
 
   // 趟次明细统计表格列
-  const tripDetailsColumns = [
+  const tripDetailsData_raw = (tripDetailsData as any)?.data || []
+  
+  // 收集所有公司及其数据来源
+  const companySourceMap = new Map<string, string>()
+  tripDetailsData_raw.forEach((item: any) => {
+    item.company_trips.forEach((ct: any) => {
+      if (!companySourceMap.has(ct.company_name)) {
+        companySourceMap.set(ct.company_name, ct.source || 'unknown')
+      }
+    })
+  })
+
+  // 按数据来源分组
+  const loadingCompanies: string[] = []
+  const departureCompanies: string[] = []
+  const waterTicketCompanies: string[] = []
+  const mixedCompanies: string[] = []
+  
+  Array.from(companySourceMap.entries())
+    .sort((a, b) => a[0].localeCompare(b[0]))
+    .forEach(([companyName, source]) => {
+      if (source === 'loading') {
+        loadingCompanies.push(companyName)
+      } else if (source === 'departure') {
+        departureCompanies.push(companyName)
+      } else if (source === 'water_ticket') {
+        waterTicketCompanies.push(companyName)
+      } else if (source === 'mixed') {
+        mixedCompanies.push(companyName)
+      }
+    })
+
+  // 构建表格列（使用分组表头）
+  const tripDetailsColumns: any[] = [
     {
       title: '司机姓名',
       dataIndex: 'user_name',
       key: 'user_name',
       width: 120,
-      fixed: 'left' as const,
+      fixed: 'left',
     },
   ]
 
-  // 动态生成装料公司列
-  const tripDetailsData_raw = (tripDetailsData as any)?.data || []
-  const allCompanies = new Set<string>()
-  tripDetailsData_raw.forEach((item: TripDetailByCompany) => {
-    item.company_trips.forEach((ct) => {
-      allCompanies.add(ct.company_name)
-    })
-  })
-  const sortedCompanies = Array.from(allCompanies).sort()
-
-  // 为每个装料公司添加一列
-  sortedCompanies.forEach((companyName) => {
+  // 添加装料单分组（非罐车公司主要使用该分组）
+  if (loadingCompanies.length > 0) {
     tripDetailsColumns.push({
-      title: companyName,
-      key: `company_${companyName}`,
-      width: 100,
-      render: (_: any, record: TripDetailByCompany) => {
-        const companyTrip = record.company_trips.find(
-          (ct) => ct.company_name === companyName
-        )
-        return companyTrip ? companyTrip.trip_count : 0
-      },
-    } as any)
-  })
+      title: '装料单',
+      children: loadingCompanies.map((companyName) => ({
+        title: companyName,
+        key: `company_${companyName}`,
+        width: 100,
+        render: (_: any, record: any) => {
+          const companyTrip = record.company_trips.find(
+            (ct: any) => ct.company_name === companyName,
+          )
+          return companyTrip ? companyTrip.trip_count : 0
+        },
+      })),
+    })
+  }
+
+  // 添加出厂单分组
+  if (departureCompanies.length > 0) {
+    tripDetailsColumns.push({
+      title: '出厂单',
+      children: departureCompanies.map((companyName) => ({
+        title: companyName,
+        key: `company_${companyName}`,
+        width: 100,
+        render: (_: any, record: any) => {
+          const companyTrip = record.company_trips.find(
+            (ct: any) => ct.company_name === companyName
+          )
+          return companyTrip ? companyTrip.trip_count : 0
+        },
+      })),
+    })
+  }
+
+  // 添加水票分组
+  if (waterTicketCompanies.length > 0) {
+    tripDetailsColumns.push({
+      title: '水票',
+      children: waterTicketCompanies.map((companyName) => ({
+        title: companyName,
+        key: `company_${companyName}`,
+        width: 100,
+        render: (_: any, record: any) => {
+          const companyTrip = record.company_trips.find(
+            (ct: any) => ct.company_name === companyName
+          )
+          return companyTrip ? companyTrip.trip_count : 0
+        },
+      })),
+    })
+  }
+
+  // 添加混合来源分组（如果有）
+  if (mixedCompanies.length > 0) {
+    tripDetailsColumns.push({
+      title: '混合来源',
+      children: mixedCompanies.map((companyName) => ({
+        title: companyName,
+        key: `company_${companyName}`,
+        width: 100,
+        render: (_: any, record: any) => {
+          const companyTrip = record.company_trips.find(
+            (ct: any) => ct.company_name === companyName
+          )
+          return companyTrip ? companyTrip.trip_count : 0
+        },
+      })),
+    })
+  }
 
   // 添加总计列
   tripDetailsColumns.push({
@@ -448,21 +547,24 @@ const DriverSalaryPage: React.FC = () => {
     dataIndex: 'total_trips',
     key: 'total_trips',
     width: 100,
-    fixed: 'right' as const,
+    fixed: 'right',
     render: (value: number) => (
       <span style={{ fontWeight: 'bold', color: '#1890ff' }}>{value}</span>
     ),
-  } as any)
+  })
 
   // 计算每个装料公司的总趟数（用于表格底部总计行）
   const companyTotals: Record<string, number> = {}
   let grandTotal = 0
-  tripDetailsData_raw.forEach((item: TripDetailByCompany) => {
-    item.company_trips.forEach((ct) => {
+  tripDetailsData_raw.forEach((item: any) => {
+    item.company_trips.forEach((ct: any) => {
       companyTotals[ct.company_name] = (companyTotals[ct.company_name] || 0) + ct.trip_count
     })
     grandTotal += item.total_trips
   })
+
+  // 所有公司列表（用于总计行）
+  const allCompanies = [...loadingCompanies, ...departureCompanies, ...waterTicketCompanies, ...mixedCompanies]
 
   const salaryColumns = [
     {
@@ -472,11 +574,30 @@ const DriverSalaryPage: React.FC = () => {
       width: 100,
       fixed: 'left' as const,
     },
+    ...(isTankerCompany
+      ? [
+          {
+            title: '出厂单趟数',
+            dataIndex: 'departure_trip_count',
+            key: 'departure_trip_count',
+            width: 110,
+            render: (value: number) => value || 0,
+          },
+          {
+            title: '水票趟数',
+            dataIndex: 'water_ticket_trip_count',
+            key: 'water_ticket_trip_count',
+            width: 100,
+            render: (value: number) => value || 0,
+          },
+        ]
+      : []),
     {
-      title: '趟数',
-      dataIndex: 'trip_count',
-      key: 'trip_count',
+      title: '总计趟数',
+      dataIndex: 'total_trip_count',
+      key: 'total_trip_count',
       width: 80,
+      render: (value: number, record: any) => value ?? record.trip_count ?? 0,
     },
     {
       title: '基本工资',
@@ -484,7 +605,7 @@ const DriverSalaryPage: React.FC = () => {
       key: 'trip_income',
       width: 120,
       render: (value: number, record: any) => (
-        <Tooltip title={`${record.trip_count} 趟 × 单价`}>
+        <Tooltip title={`${record.total_trip_count ?? record.trip_count} 趟 × 单价`}>
           ¥{value.toFixed(2)}
         </Tooltip>
       ),
@@ -839,9 +960,15 @@ const DriverSalaryPage: React.FC = () => {
                 <Col span={6}>
                   <Card>
                     <Statistic
-                      title="总趟数"
+                      title="总计趟数"
                       value={summaryStatistics.total_trips}
                     />
+                    {isTankerCompany ? (
+                      <div style={{ marginTop: 8, color: '#8c8c8c', fontSize: 12 }}>
+                        <div>出厂单：{(summaryStatistics as any).departure_total_trips ?? 0}</div>
+                        <div>水票：{(summaryStatistics as any).water_ticket_total_trips ?? 0}</div>
+                      </div>
+                    ) : null}
                   </Card>
                 </Col>
                 <Col span={6}>
@@ -944,41 +1071,58 @@ const DriverSalaryPage: React.FC = () => {
               pagination={false}
               summary={() => {
                 if (!summaryStatistics) return null
+
+                const selectionOffset = canSendSalarySlip ? 1 : 0
+                const tripSplitCols = isTankerCompany ? 2 : 0
+
                 return (
                   <Table.Summary fixed>
                     <Table.Summary.Row style={{ backgroundColor: '#fafafa' }}>
-                      <Table.Summary.Cell index={0} colSpan={3}>
+                      <Table.Summary.Cell index={0} colSpan={selectionOffset + 1}>
                         <strong>总计</strong>
                       </Table.Summary.Cell>
-                      <Table.Summary.Cell index={3}>
+                      {isTankerCompany ? (
+                        <>
+                          <Table.Summary.Cell index={selectionOffset + 1}>
+                            <strong style={{ color: '#1890ff' }}>
+                              {(summaryStatistics as any).departure_total_trips ?? 0}
+                            </strong>
+                          </Table.Summary.Cell>
+                          <Table.Summary.Cell index={selectionOffset + 2}>
+                            <strong style={{ color: '#1890ff' }}>
+                              {(summaryStatistics as any).water_ticket_total_trips ?? 0}
+                            </strong>
+                          </Table.Summary.Cell>
+                        </>
+                      ) : null}
+                      <Table.Summary.Cell index={selectionOffset + 1 + tripSplitCols}>
                         <strong style={{ color: '#1890ff' }}>
                           {summaryStatistics.total_trips}
                         </strong>
                       </Table.Summary.Cell>
-                      <Table.Summary.Cell index={4} />
-                      <Table.Summary.Cell index={5}>
+                      <Table.Summary.Cell index={selectionOffset + 2 + tripSplitCols}>
                         <strong style={{ color: '#1890ff' }}>
                           ¥{summaryStatistics.total_trip_income.toFixed(2)}
                         </strong>
                       </Table.Summary.Cell>
-                      <Table.Summary.Cell index={6} colSpan={4} />
-                      <Table.Summary.Cell index={10}>
+                      <Table.Summary.Cell index={selectionOffset + 3 + tripSplitCols} colSpan={4} />
+                      <Table.Summary.Cell index={selectionOffset + 7 + tripSplitCols}>
                         <strong style={{ color: '#1890ff' }}>
                           ¥{summaryStatistics.total_bonus.toFixed(2)}
                         </strong>
                       </Table.Summary.Cell>
-                      <Table.Summary.Cell index={11}>
+                      <Table.Summary.Cell index={selectionOffset + 8 + tripSplitCols}>
                         <strong style={{ color: '#ff4d4f' }}>
                           ¥{summaryStatistics.total_deduction.toFixed(2)}
                         </strong>
                       </Table.Summary.Cell>
-                      <Table.Summary.Cell index={12} colSpan={2} />
-                      <Table.Summary.Cell index={14}>
+                      <Table.Summary.Cell index={selectionOffset + 9 + tripSplitCols} colSpan={2} />
+                      <Table.Summary.Cell index={selectionOffset + 11 + tripSplitCols}>
                         <strong style={{ color: '#1890ff', fontSize: 16 }}>
                           ¥{summaryStatistics.total_net_salary.toFixed(2)}
                         </strong>
                       </Table.Summary.Cell>
-                      <Table.Summary.Cell index={15} colSpan={3} />
+                      <Table.Summary.Cell index={selectionOffset + 12 + tripSplitCols} colSpan={2} />
                     </Table.Summary.Row>
                   </Table.Summary>
                 )
@@ -1009,6 +1153,7 @@ const DriverSalaryPage: React.FC = () => {
               rowKey="user_id"
               scroll={{ x: 'max-content' }}
               pagination={false}
+              bordered
               summary={() => {
                 if (tripDetailsData_raw.length === 0) return null
                 return (
@@ -1017,14 +1162,14 @@ const DriverSalaryPage: React.FC = () => {
                       <Table.Summary.Cell index={0}>
                         <strong>总计</strong>
                       </Table.Summary.Cell>
-                      {sortedCompanies.map((companyName, idx) => (
+                      {allCompanies.map((companyName, idx) => (
                         <Table.Summary.Cell key={companyName} index={idx + 1}>
                           <strong style={{ color: '#1890ff' }}>
                             {companyTotals[companyName] || 0}
                           </strong>
                         </Table.Summary.Cell>
                       ))}
-                      <Table.Summary.Cell index={sortedCompanies.length + 1}>
+                      <Table.Summary.Cell index={allCompanies.length + 1}>
                         <strong style={{ color: '#1890ff', fontSize: 16 }}>
                           {grandTotal}
                         </strong>

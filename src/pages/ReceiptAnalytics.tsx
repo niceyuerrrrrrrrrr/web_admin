@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   Card,
   Col,
@@ -31,6 +31,7 @@ import type { Receipt, LoadingReceipt, UnloadingReceipt } from '../api/types'
 import useAuthStore from '../store/auth'
 import useCompanyStore from '../store/company'
 import client from '../api/client'
+import ResizableHeaderCell from '../components/ResizableHeaderCell'
 
 const { Title, Paragraph } = Typography
 const { RangePicker } = DatePicker
@@ -170,6 +171,12 @@ const ReceiptAnalytics = () => {
   }>({})
   
   const [selectedVehicleNo, setSelectedVehicleNo] = useState<string | undefined>(undefined)
+
+  // 列宽状态管理（用于所有表格）
+  const [columnWidths, setColumnWidths] = useState<Record<string, number>>({})
+  const handleResize = useCallback((key: string) => (_e: any, { size }: any) => {
+    setColumnWidths(prev => ({ ...prev, [key]: size.width }))
+  }, [])
 
   // 优先从 CEO 统计数据获取业务类型（更准确）
   const ceoStatsQuery = useQuery({
@@ -966,6 +973,12 @@ const ReceiptAnalytics = () => {
             <Col xs={24} lg={12}>
               <Card title="装料单统计 (按材料) - 详细数据" size="small">
                 <Table 
+                  className="resizable-table"
+                  components={{
+                    header: {
+                      cell: ResizableHeaderCell,
+                    },
+                  }}
                   size="small"
                   columns={materialStatsColumns} 
                   dataSource={trailerIndividualStats.loading} 
@@ -978,6 +991,12 @@ const ReceiptAnalytics = () => {
             <Col xs={24} lg={12}>
               <Card title="卸货单统计 (按材料) - 详细数据" size="small">
                 <Table 
+                  className="resizable-table"
+                  components={{
+                    header: {
+                      cell: ResizableHeaderCell,
+                    },
+                  }}
                   size="small"
                   columns={materialStatsColumns} 
                   dataSource={trailerIndividualStats.unloading} 
@@ -1313,6 +1332,12 @@ const ReceiptAnalytics = () => {
           {/* 运输任务匹配分析表格 */}
           <Card title="运输任务匹配分析 (装料 -> 卸货) - 详细数据" size="small">
             <Table
+                  className="resizable-table"
+                  components={{
+                    header: {
+                      cell: ResizableHeaderCell,
+                    },
+                  }}
               columns={matchedTasksColumns}
               dataSource={trailerMatchedStats}
               rowKey="key"
@@ -1367,6 +1392,12 @@ const ReceiptAnalytics = () => {
 
           <Card title="方量统计 (按装料公司) - 详细数据" size="small">
             <Table
+                  className="resizable-table"
+                  components={{
+                    header: {
+                      cell: ResizableHeaderCell,
+                    },
+                  }}
               columns={tankerCompanyColumns}
               dataSource={tankerCompanyStats}
               rowKey="company"
@@ -1478,6 +1509,12 @@ const ReceiptAnalytics = () => {
             <Col xs={24} lg={12}>
               <Card title="方量统计 (按司机) - 详细数据" size="small">
                 <Table
+                  className="resizable-table"
+                  components={{
+                    header: {
+                      cell: ResizableHeaderCell,
+                    },
+                  }}
                   size="small"
                   columns={tankerDriverColumns}
                   dataSource={tankerDriverStats}
@@ -1489,6 +1526,12 @@ const ReceiptAnalytics = () => {
             <Col xs={24} lg={12}>
               <Card title="方量统计 (按车号) - 详细数据" size="small">
                 <Table
+                  className="resizable-table"
+                  components={{
+                    header: {
+                      cell: ResizableHeaderCell,
+                    },
+                  }}
                   size="small"
                   columns={tankerVehicleColumns}
                   dataSource={tankerVehicleStats}
@@ -1609,6 +1652,12 @@ const ReceiptAnalytics = () => {
           <Col xs={24} lg={12}>
             <Card title="司机统计 - 详细数据" size="small">
               <Table
+                  className="resizable-table"
+                  components={{
+                    header: {
+                      cell: ResizableHeaderCell,
+                    },
+                  }}
                 size="small"
                 columns={driverStatsColumns}
                 dataSource={driverVehicleStats.byDriver}
@@ -1620,6 +1669,12 @@ const ReceiptAnalytics = () => {
           <Col xs={24} lg={12}>
             <Card title="车辆统计 - 详细数据" size="small">
               <Table
+                  className="resizable-table"
+                  components={{
+                    header: {
+                      cell: ResizableHeaderCell,
+                    },
+                  }}
                 size="small"
                 columns={vehicleStatsColumns}
                 dataSource={driverVehicleStats.byVehicle}

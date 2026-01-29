@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   Alert,
   App as AntdApp,
@@ -58,6 +58,8 @@ import { fetchUsers } from '../api/services/users'
 import type { ReimbursementRecord, ReimbursementStats } from '../api/types'
 import useAuthStore from '../store/auth'
 import useCompanyStore from '../store/company'
+import ResizableHeaderCell from '../components/ResizableHeaderCell'
+import { fixImageUrl } from '../utils/imageUrl'
 
 const { Title, Paragraph, Text } = Typography
 const { RangePicker } = DatePicker
@@ -110,6 +112,28 @@ const ReimbursementsPage = () => {
   const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([])
   const [currentPage, setCurrentPage] = useState(1)
   const [pageSize, setPageSize] = useState(20)
+
+  // 列宽状态管理
+  const [columnWidths, setColumnWidths] = useState<Record<string, number>>({})
+  const handleResize = useCallback((key: string) => (_e: any, { size }: any) => {
+    setColumnWidths(prev => ({ ...prev, [key]: size.width }))
+  }, [])
+
+  // 为列添加可调整大小的功能
+  const addResizableToColumns = useCallback(<T,>(columns: ColumnsType<T>): ColumnsType<T> => {
+    return columns.map((col: any) => {
+      if (!col.width || col.fixed === 'right') return col
+      const key = col.key || (typeof col.dataIndex === 'string' ? col.dataIndex : String(col.title || 'unknown'))
+      return {
+        ...col,
+        width: columnWidths[key] || col.width,
+        onHeaderCell: () => ({
+          width: columnWidths[key] || col.width,
+          onResize: handleResize(key),
+        }),
+      }
+    }) as ColumnsType<T>
+  }, [columnWidths, handleResize])
 
   const canApprove = ['财务', '总经理'].includes((user as any)?.position_type || (user as any)?.role)
 
@@ -319,7 +343,7 @@ const ReimbursementsPage = () => {
                 {shown.map((img, idx) => (
                   <Image
                     key={idx}
-                    src={img}
+                    src={fixImageUrl(img) || ''}
                     width={40}
                     height={40}
                     style={{ objectFit: 'cover', borderRadius: 6 }}
@@ -366,7 +390,7 @@ const ReimbursementsPage = () => {
                 {shown.map((img, idx) => (
                   <Image
                     key={idx}
-                    src={img}
+                    src={fixImageUrl(img) || ''}
                     width={40}
                     height={40}
                     style={{ objectFit: 'cover', borderRadius: 6 }}
@@ -469,6 +493,11 @@ const ReimbursementsPage = () => {
       },
     ],
     [canApprove, submitMutation, user, reimbursements],
+  )
+
+  const columnsResizable = useMemo(
+    () => addResizableToColumns(columns),
+    [columns, addResizableToColumns]
   )
 
   const summaryCards = useMemo(() => {
@@ -724,8 +753,14 @@ const ReimbursementsPage = () => {
                     />
                   )}
                   <Table
+                    className="resizable-table"
+                    components={{
+                      header: {
+                        cell: ResizableHeaderCell,
+                      },
+                    }}
                     rowKey="id"
-                    columns={columns}
+                    columns={columnsResizable}
                     dataSource={reimbursements}
                     loading={listQuery.isLoading}
                     rowSelection={{
@@ -966,7 +1001,7 @@ const ReimbursementsPage = () => {
                   <Image.PreviewGroup>
                     <Space wrap size="middle" style={{ marginTop: 12 }}>
                       {detailQuery.data.images.map((img) => (
-                        <Image key={img} src={img} width={120} height={120} style={{ objectFit: 'cover' }} />
+                        <Image key={img} src={fixImageUrl(img) || ''} width={120} height={120} style={{ objectFit: 'cover' }} />
                       ))}
                     </Space>
                   </Image.PreviewGroup>

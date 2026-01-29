@@ -396,6 +396,8 @@ export const batchUpdateReceiptField = (data: {
   old_values: string[]
   new_value: string
   company_id?: number
+  receipt_ids?: number[]
+  department_ids?: number[]
 }) =>
   unwrap(client.post('/receipts/batch-update-field', data))
 

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import {
   App as AntdApp,
   Avatar,
@@ -65,6 +65,7 @@ import {
 import { fetchUsers } from '../api/services/users'
 import useCompanyStore from '../store/company'
 import useAuthStore from '../store/auth'
+import ResizableHeaderCell from '../components/ResizableHeaderCell'
 
 const { RangePicker } = DatePicker
 
@@ -112,6 +113,27 @@ const ReportsPage = () => {
   const [commentValue, setCommentValue] = useState('')
   const [commentImages, setCommentImages] = useState<string[]>([])
   const [createForm] = Form.useForm()
+
+  // 列宽状态管理
+  const [columnWidths, setColumnWidths] = useState<Record<string, number>>({})
+  const handleResize = useCallback((key: string) => (_e: any, { size }: any) => {
+    setColumnWidths(prev => ({ ...prev, [key]: size.width }))
+  }, [])
+
+  const addResizableToColumns = useCallback(<T,>(columns: ColumnsType<T>): ColumnsType<T> => {
+    return columns.map((col: any) => {
+      if (!col.width || col.fixed === 'right') return col
+      const key = col.key || (typeof col.dataIndex === 'string' ? col.dataIndex : String(col.title || 'unknown'))
+      return {
+        ...col,
+        width: columnWidths[key] || col.width,
+        onHeaderCell: () => ({
+          width: columnWidths[key] || col.width,
+          onResize: handleResize(key),
+        }),
+      }
+    }) as ColumnsType<T>
+  }, [columnWidths, handleResize])
 
   const handleDateRangeChange = (value: [dayjs.Dayjs | null, dayjs.Dayjs | null] | null, resetPage = true) => {
     const normalized =
@@ -518,6 +540,11 @@ const ReportsPage = () => {
     },
   ]
 
+  const columnsResizable = useMemo(
+    () => addResizableToColumns(columns),
+    [columns, addResizableToColumns]
+  )
+
   const userOptions =
     usersQuery.data?.items.map((item) => ({
       value: item.id,
@@ -620,9 +647,15 @@ const ReportsPage = () => {
                   <RangePicker value={filters.dateRange} onChange={(value) => handleDateRangeChange(value, true)} />
                 </Flex>
                 <Table
+                  className="resizable-table"
+                  components={{
+                    header: {
+                      cell: ResizableHeaderCell,
+                    },
+                  }}
                   rowKey="id"
                   loading={reportsQuery.isLoading}
-                  columns={columns}
+                  columns={columnsResizable}
                   dataSource={reportsQuery.data?.records || []}
                   scroll={{ x: 1800 }}
                   pagination={{

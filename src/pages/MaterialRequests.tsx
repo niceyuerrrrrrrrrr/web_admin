@@ -53,6 +53,7 @@ import { fetchUsers } from '../api/services/users'
 import type { MaterialRequestRecord } from '../api/types'
 import useAuthStore from '../store/auth'
 import useCompanyStore from '../store/company'
+import ResizableHeaderCell from '../components/ResizableHeaderCell'
 
 const { Title, Paragraph, Text } = Typography
 const { RangePicker } = DatePicker

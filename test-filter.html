@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>筛选测试</title>
+    <script>
+        // 模拟数据
+        const testData = [
+            { id: 1, amount: 100, calculated_amount: 95, name: '已计算-正常' },
+            { id: 2, amount: 100, calculated_amount: 88, name: '已计算-异常' },
+            { id: 3, amount: 0, calculated_amount: 10, name: '识别金额为0' },
+            { id: 4, amount: 50, calculated_amount: null, name: '未计算' },
+            { id: 5, amount: 200, calculated_amount: 190, name: '已计算-正常2' },
+        ];
+
+        // 筛选函数
+        function testFilter(value, record) {
+            const amount = record.amount ?? 0;
+            const calculatedAmount = record.calculated_amount;
+            
+            console.log(`测试记录 ${record.name}:`, { value, amount, calculatedAmount });
+            
+            // 筛选：已计算
+            if (value === 'calculated') {
+                const result = calculatedAmount !== null && calculatedAmount !== undefined;
+                console.log(`  已计算筛选: ${result}`);
+                return result;
+            }
+            
+            // 筛选：未计算
+            if (value === 'not_calculated') {
+                const result = calculatedAmount === null || calculatedAmount === undefined;
+                console.log(`  未计算筛选: ${result}`);
+                return result;
+            }
+            
+            // 筛选：识别金额为0
+            if (value === 'zero_amount') {
+                const result = amount === 0;
+                console.log(`  识别金额为0筛选: ${result}`);
+                return result;
+            }
+            
+            // 对于异常和正常数据筛选，必须已计算
+            if (calculatedAmount === null || calculatedAmount === undefined) {
+                console.log(`  未计算，跳过异常/正常筛选`);
+                return false;
+            }
+            
+            // 计算差异
+            const diff = amount - calculatedAmount;
+            const absDiff = Math.abs(diff);
+            
+            if (value === 'abnormal') {
+                const result = amount !== 0 && absDiff > 5;
+                console.log(`  异常数据筛选: amount=${amount}, diff=${diff}, absDiff=${absDiff}, result=${result}`);
+                return result;
+            }
+            if (value === 'normal') {
+                const result = amount !== 0 && absDiff <= 5;
+                console.log(`  正常数据筛选: amount=${amount}, diff=${diff}, absDiff=${absDiff}, result=${result}`);
+                return result;
+            }
+            return true;
+        }
+
+        // 测试所有筛选条件
+        function runTests() {
+            console.log('=== 测试开始 ===\n');
+            
+            const filters = ['calculated', 'not_calculated', 'zero_amount', 'abnormal', 'normal'];
+            
+            filters.forEach(filterValue => {
+                console.log(`\n筛选条件: ${filterValue}`);
+                console.log('---');
+                const filtered = testData.filter(record => testFilter(filterValue, record));
+                console.log(`结果: ${filtered.length} 条数据`);
+                filtered.forEach(r => console.log(`  - ${r.name}`));
+            });
+            
+            console.log('\n=== 测试结束 ===');
+        }
+
+        window.onload = runTests;
+    </script>
+</head>
+<body>
+    <h1>筛选逻辑测试</h1>
+    <p>打开浏览器控制台查看测试结果</p>
+</body>
+</html>

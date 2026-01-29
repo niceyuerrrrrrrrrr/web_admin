@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Table, Card, Select, DatePicker, Button, Tag, Space, message, Modal, Descriptions, Alert } from 'antd';
-import { WarningOutlined, ExclamationCircleOutlined, SearchOutlined, ReloadOutlined } from '@ant-design/icons';
+import { Table, Card, Select, DatePicker, Button, Tag, Space, message, Modal, Descriptions, Alert, Row, Col, Statistic } from 'antd';
+import { WarningOutlined, ExclamationCircleOutlined, SearchOutlined, ReloadOutlined, UserOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import client from '../api/client';
 import useAuthStore from '../store/auth';
@@ -53,6 +53,46 @@ const AttendanceAnomaly: React.FC = () => {
   const [detailVisible, setDetailVisible] = useState(false);
   const [selectedRecord, setSelectedRecord] = useState<any>(null);
 
+  // 员工违规统计
+  const [statsLoading, setStatsLoading] = useState(false);
+  const [userStats, setUserStats] = useState<any[]>([]);
+
+  // 加载员工违规统计
+  const loadUserStats = async () => {
+    if (isSuperAdmin && !effectiveCompanyId) {
+      setUserStats([]);
+      return;
+    }
+
+    setStatsLoading(true);
+    try {
+      const params: any = {};
+      
+      if (filters.start_date) {
+        params.start_date = filters.start_date;
+      }
+      if (filters.end_date) {
+        params.end_date = filters.end_date;
+      }
+      if (effectiveCompanyId) {
+        params.company_id = effectiveCompanyId;
+      }
+
+      const res = await client.get('/attendance/alerts/user-stats', { params });
+      
+      if (res.data.success || res.data.code === 200) {
+        setUserStats(res.data.data.stats || []);
+      } else {
+        message.error(res.data.message || '加载统计失败');
+      }
+    } catch (error: any) {
+      console.error('加载员工违规统计失败:', error);
+      message.error(error.response?.data?.message || '加载统计失败');
+    } finally {
+      setStatsLoading(false);
+    }
+  };
+
   // 加载数据
   const loadData = async () => {
     if (isSuperAdmin && !effectiveCompanyId) {
@@ -102,12 +142,14 @@ const AttendanceAnomaly: React.FC = () => {
 
   useEffect(() => {
     loadData();
+    loadUserStats();
   }, [page, pageSize, effectiveCompanyId]);
 
   // 查询
   const handleSearch = () => {
     setPage(1);
     loadData();
+    loadUserStats();
   };
 
   // 重置
@@ -119,7 +161,10 @@ const AttendanceAnomaly: React.FC = () => {
       end_date: undefined,
     });
     setPage(1);
-    setTimeout(() => loadData(), 0);
+    setTimeout(() => {
+      loadData();
+      loadUserStats();
+    }, 0);
   };
 
   // 查看详情
@@ -127,6 +172,138 @@ const AttendanceAnomaly: React.FC = () => {
     setSelectedRecord(record);
     setDetailVisible(true);
   };
+
+  // 员工违规统计表格列定义
+  const statsColumns = [
+    {
+      title: '员工姓名',
+      dataIndex: 'user_name',
+      width: 120,
+      fixed: 'left' as const,
+    },
+    {
+      title: '手机号',
+      dataIndex: 'user_phone',
+      width: 130,
+    },
+    {
+      title: '迟到',
+      dataIndex: 'late_count',
+      width: 80,
+      align: 'center' as const,
+      render: (count: number) => {
+        const isWarning = count > 3;
+        return (
+          <span style={{ color: isWarning ? '#ff4d4f' : undefined, fontWeight: isWarning ? 'bold' : undefined }}>
+            {count || 0}
+          </span>
+        );
+      },
+    },
+    {
+      title: '早退',
+      dataIndex: 'early_leave_count',
+      width: 80,
+      align: 'center' as const,
+      render: (count: number) => {
+        const isWarning = count > 3;
+        return (
+          <span style={{ color: isWarning ? '#ff4d4f' : undefined, fontWeight: isWarning ? 'bold' : undefined }}>
+            {count || 0}
+          </span>
+        );
+      },
+    },
+    {
+      title: '缺勤',
+      dataIndex: 'absent_count',
+      width: 80,
+      align: 'center' as const,
+      render: (count: number) => {
+        const isWarning = count > 3;
+        return (
+          <span style={{ color: isWarning ? '#ff4d4f' : undefined, fontWeight: isWarning ? 'bold' : undefined }}>
+            {count || 0}
+          </span>
+        );
+      },
+    },
+    {
+      title: '位置异常',
+      dataIndex: 'location_abnormal_count',
+      width: 100,
+      align: 'center' as const,
+      render: (count: number) => {
+        const isWarning = count > 3;
+        return (
+          <span style={{ color: isWarning ? '#ff4d4f' : undefined, fontWeight: isWarning ? 'bold' : undefined }}>
+            {count || 0}
+          </span>
+        );
+      },
+    },
+    {
+      title: '时长异常',
+      dataIndex: 'time_abnormal_count',
+      width: 100,
+      align: 'center' as const,
+      render: (count: number) => {
+        const isWarning = count > 3;
+        return (
+          <span style={{ color: isWarning ? '#ff4d4f' : undefined, fontWeight: isWarning ? 'bold' : undefined }}>
+            {count || 0}
+          </span>
+        );
+      },
+    },
+    {
+      title: '跨天打卡',
+      dataIndex: 'cross_day_count',
+      width: 100,
+      align: 'center' as const,
+      render: (count: number) => {
+        const isWarning = count > 3;
+        return (
+          <span style={{ color: isWarning ? '#ff4d4f' : undefined, fontWeight: isWarning ? 'bold' : undefined }}>
+            {count || 0}
+          </span>
+        );
+      },
+    },
+    {
+      title: '其他违规',
+      dataIndex: 'other_count',
+      width: 100,
+      align: 'center' as const,
+      render: (count: number) => {
+        const isWarning = count > 3;
+        return (
+          <span style={{ color: isWarning ? '#ff4d4f' : undefined, fontWeight: isWarning ? 'bold' : undefined }}>
+            {count || 0}
+          </span>
+        );
+      },
+    },
+    {
+      title: '总计',
+      dataIndex: 'total_count',
+      width: 100,
+      align: 'center' as const,
+      fixed: 'right' as const,
+      render: (count: number) => {
+        const isWarning = count > 3;
+        return (
+          <span style={{ 
+            color: isWarning ? '#ff4d4f' : '#1890ff', 
+            fontWeight: 'bold',
+            fontSize: 16
+          }}>
+            {count || 0}
+          </span>
+        );
+      },
+    },
+  ];
 
   // 表格列定义
   const columns = [
@@ -210,6 +387,34 @@ const AttendanceAnomaly: React.FC = () => {
           style={{ marginBottom: 16 }}
         />
       )}
+
+      {/* 员工违规统计 */}
+      <Card 
+        title={
+          <Space>
+            <UserOutlined />
+            <span>员工违规统计</span>
+            <Tag color="red">超过3次标红</Tag>
+          </Space>
+        }
+        style={{ marginBottom: 16 }}
+      >
+        <Table
+          columns={statsColumns}
+          dataSource={userStats}
+          rowKey="user_id"
+          loading={statsLoading}
+          scroll={{ x: 1200 }}
+          pagination={{
+            pageSize: 10,
+            showSizeChanger: true,
+            showQuickJumper: true,
+            showTotal: (total) => `共 ${total} 位员工`,
+          }}
+          size="small"
+        />
+      </Card>
+
       <Card title="考勤异常监控" extra={
         <Space>
           <Tag color="orange">展示每一条违规事件明细</Tag>

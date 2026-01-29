@@ -35,6 +35,8 @@ import type { Receipt, ReceiptType } from '../api/types'
 import useAuthStore from '../store/auth'
 import useCompanyStore from '../store/company'
 import client from '../api/client'
+import ResizableHeaderCell from '../components/ResizableHeaderCell'
+import { fixImageUrl } from '../utils/imageUrl'
 
 const { Title, Paragraph } = Typography
 const { RangePicker } = DatePicker
@@ -170,6 +172,16 @@ export default function ReceiptsRecycleBin() {
   const [companyBusinessType, setCompanyBusinessType] = useState<'truck' | 'tanker' | null>(null)
   const [detailDrawerOpen, setDetailDrawerOpen] = useState(false)
   const [selectedReceipt, setSelectedReceipt] = useState<any>(null)
+
+  // 列宽状态管理
+  const [columnWidths, setColumnWidths] = useState<Record<string, number>>({})
+
+  const handleResize = useCallback((key: string) => (_e: any, { size }: any) => {
+    setColumnWidths(prev => ({
+      ...prev,
+      [key]: size.width,
+    }))
+  }, [])
 
   // 加载公司业务类型、部门和司机数据
   useEffect(() => {
@@ -518,8 +530,8 @@ export default function ReceiptsRecycleBin() {
     }
 
     // 普通票据详情
-    const imageUrl = receipt.thumb_url || receipt.image_path
-    const hasValidImage = imageUrl && !imageUrl.startsWith('wxfile://') && !imageUrl.startsWith('file://')
+    const imageUrl = fixImageUrl(receipt.thumb_url || receipt.image_path)
+    const hasValidImage = imageUrl !== null
 
     return (
       <Space direction="vertical" style={{ width: '100%' }} size="large">
@@ -920,8 +932,8 @@ export default function ReceiptsRecycleBin() {
           key: 'image',
           width: 100,
           render: (_, record: any) => {
-            const imageUrl = record.thumb_url || record.image_path
-            if (!imageUrl || imageUrl.startsWith('wxfile://') || imageUrl.startsWith('file://')) {
+            const imageUrl = fixImageUrl(record.thumb_url || record.image_path)
+            if (!imageUrl) {
               return '-'
             }
             return (
@@ -977,8 +989,8 @@ export default function ReceiptsRecycleBin() {
           key: 'image',
           width: 100,
           render: (_, record: any) => {
-            const imageUrl = record.thumb_url || record.image_path
-            if (!imageUrl || imageUrl.startsWith('wxfile://') || imageUrl.startsWith('file://')) {
+            const imageUrl = fixImageUrl(record.thumb_url || record.image_path)
+            if (!imageUrl) {
               return '-'
             }
             return (
@@ -1045,7 +1057,18 @@ export default function ReceiptsRecycleBin() {
       }
     )
 
-    return baseColumns
+    return baseColumns.map((col: any) => {
+      if (!col.width || col.fixed === 'right') return col
+      const key = col.key || (typeof col.dataIndex === 'string' ? col.dataIndex : String(col.title || 'unknown'))
+      return {
+        ...col,
+        width: columnWidths[key] || col.width,
+        onHeaderCell: () => ({
+          width: columnWidths[key] || col.width,
+          onResize: handleResize(key),
+        }),
+      }
+    })
   }
 
   return (
@@ -1145,6 +1168,12 @@ export default function ReceiptsRecycleBin() {
                   columns={getColumns(activeTab)}
                   dataSource={receipts as any}
                   loading={receiptsQuery.isLoading}
+                  className="resizable-table"
+                  components={{
+                    header: {
+                      cell: ResizableHeaderCell,
+                    },
+                  }}
                   rowSelection={{
                     selectedRowKeys,
                     onChange: setSelectedRowKeys,
