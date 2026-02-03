@@ -70,6 +70,8 @@ const UsersPage = () => {
 
   const isSuperAdmin = user?.role === 'super_admin' || user?.positionType === '超级管理员'
   const effectiveCompanyId = isSuperAdmin ? selectedCompanyId : undefined
+  const userCompanyId = user?.companyId
+  const departmentsCompanyId = isSuperAdmin ? effectiveCompanyId : userCompanyId
 
   const [filters, setFilters] = useState<{
     phone?: string
@@ -101,9 +103,9 @@ const UsersPage = () => {
 
   // 获取部门列表（用于筛选和选择器）
   const departmentsQuery = useQuery({
-    queryKey: ['departments', 'list', effectiveCompanyId],
-    queryFn: () => fetchDepartments({ company_id: effectiveCompanyId }),
-    enabled: !!effectiveCompanyId,
+    queryKey: ['departments', 'list', departmentsCompanyId],
+    queryFn: () => fetchDepartments({ company_id: departmentsCompanyId }),
+    enabled: !isSuperAdmin || !!effectiveCompanyId,
   })
 
   // 获取用户列表
@@ -1472,7 +1474,7 @@ const UsersPage = () => {
                 createForm.validateFields().then((values) => {
                   createUserMutation.mutate({
                     ...values,
-                    company_id: isSuperAdmin ? selectedCompanyId : undefined,
+                    company_id: isSuperAdmin ? selectedCompanyId : userCompanyId,
                   })
                 })
               }}
@@ -1551,7 +1553,7 @@ const UsersPage = () => {
           batchCreateMutation.mutate({ users, skip_duplicates: skipDuplicates })
         }}
         loading={batchCreateMutation.isPending}
-        companyId={effectiveCompanyId}
+        companyId={isSuperAdmin ? effectiveCompanyId : userCompanyId}
         departments={departmentsQuery.data?.records || []}
       />
 

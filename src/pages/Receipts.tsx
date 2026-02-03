@@ -15,10 +15,12 @@ import {
   Input,
   InputNumber,
   Modal,
+  Radio,
   Row,
   Select,
   Space,
   Statistic,
+  Switch,
   Table,
   Tabs,
   Tag,
@@ -916,14 +918,44 @@ const ReceiptsPage = () => {
   // 更新出厂单
   const updateDepartureMutation = useMutation({
     mutationFn: ({ id, data }: { id: number; data: any }) => updateDepartureReceipt(id, data),
+    onMutate: async ({ id, data }: { id: number; data: any }) => {
+      // 仅对整车退料开关做乐观更新，避免 Switch 受控状态下“立刻回弹”
+      if (data?.is_full_return === undefined) return
+
+      await queryClient.cancelQueries({ queryKey: ['receipts'] })
+
+      const previous = queryClient.getQueriesData({ queryKey: ['receipts'] })
+
+      queryClient.setQueriesData({ queryKey: ['receipts'] }, (oldData: any) => {
+        if (!oldData || !Array.isArray(oldData.receipts)) return oldData
+        return {
+          ...oldData,
+          receipts: oldData.receipts.map((r: any) =>
+            r?.id === id ? { ...r, is_full_return: data.is_full_return } : r,
+          ),
+        }
+      })
+
+      return { previous }
+    },
     onSuccess: () => {
       message.success('更新成功')
-      setEditDrawerOpen(false)
-      setEditingReceipt(null)
-      editForm.resetFields()
       queryClient.invalidateQueries({ queryKey: ['receipts'] })
+
+      // 只有在“编辑抽屉”提交时才关闭抽屉
+      if (editDrawerOpen) {
+        setEditDrawerOpen(false)
+        setEditingReceipt(null)
+        editForm.resetFields()
+      }
     },
-    onError: (error) => {
+    onError: (error, _vars, context: any) => {
+      // 回滚乐观更新
+      if (context?.previous) {
+        for (const [key, data] of context.previous) {
+          queryClient.setQueryData(key as any, data)
+        }
+      }
       message.error((error as Error).message || '更新失败')
     },
   })
@@ -1299,6 +1331,7 @@ const ReceiptsPage = () => {
         tare_weight: r.tare_weight,
         loading_time: r.loading_time ? dayjs(r.loading_time) : undefined,
         unloading_time: r.unloading_time ? dayjs(r.unloading_time) : undefined,
+        remarks: (r as any).remarks,
       })
     } else if (receipt.type === 'unloading') {
       const r = receipt as Receipt & {
@@ -1327,6 +1360,7 @@ const ReceiptsPage = () => {
         tare_weight: r.tare_weight,
         loading_time: r.loading_time ? dayjs(r.loading_time) : undefined,
         unloading_time: r.unloading_time ? dayjs(r.unloading_time) : undefined,
+        remarks: (r as any).remarks,
       })
     } else if (receipt.type === 'charging') {
       const r = receipt as Receipt & {
@@ -1350,6 +1384,7 @@ const ReceiptsPage = () => {
         start_time: r.start_time ? dayjs(r.start_time) : undefined,
         end_time: r.end_time ? dayjs(r.end_time) : undefined,
         duration_min: r.duration_min,
+        remarks: (r as any).remarks,
       })
     } else if (receipt.type === 'water') {
       const r = receipt as Receipt & {
@@ -1361,6 +1396,7 @@ const ReceiptsPage = () => {
         company_name: r.company_name || (receipt as Receipt & { company?: string }).company,
         vehicle_no: r.vehicle_no,
         ticket_date: r.ticket_date ? dayjs(r.ticket_date) : undefined,
+        remarks: (r as any).remarks,
       })
     } else if (receipt.type === 'departure') {
       const r = receipt as any
@@ -1383,6 +1419,8 @@ const ReceiptsPage = () => {
         loading_time: r.loading_time ? dayjs(r.loading_time) : undefined,
         exit_time: r.exit_time ? dayjs(r.exit_time) : undefined,
         production_date: r.production_date ? dayjs(r.production_date) : undefined,
+        is_full_return: r.is_full_return || 'N',
+        remarks: r.remarks,
       })
     }
   }, [editForm, canEditDelete, message])
@@ -1646,6 +1684,19 @@ const ReceiptsPage = () => {
         render: (value: string) => (value ? dayjs(value).format('YYYY-MM-DD HH:mm:ss') : '-'),
       },
       {
+        title: '备注',
+        dataIndex: 'remarks',
+        width: 200,
+        ellipsis: {
+          showTitle: false,
+        },
+        render: (value: string) => (
+          <Typography.Text ellipsis={{ tooltip: value }}>
+            {value || '-'}
+          </Typography.Text>
+        ),
+      },
+      {
         title: '装料单图片',
         dataIndex: 'thumb_url',
         key: 'thumb_url',
@@ -1888,6 +1939,19 @@ const ReceiptsPage = () => {
         render: (value: string) => (value ? dayjs(value).format('YYYY-MM-DD HH:mm:ss') : '-'),
       },
       {
+        title: '备注',
+        dataIndex: 'remarks',
+        width: 200,
+        ellipsis: {
+          showTitle: false,
+        },
+        render: (value: string) => (
+          <Typography.Text ellipsis={{ tooltip: value }}>
+            {value || '-'}
+          </Typography.Text>
+        ),
+      },
+      {
         title: '卸货单图片',
         dataIndex: 'thumb_url',
         key: 'thumb_url',
@@ -2124,6 +2188,19 @@ const ReceiptsPage = () => {
         },
       },
       {
+        title: '备注',
+        dataIndex: 'remarks',
+        width: 200,
+        ellipsis: {
+          showTitle: false,
+        },
+        render: (value: string) => (
+          <Typography.Text ellipsis={{ tooltip: value }}>
+            {value || '-'}
+          </Typography.Text>
+        ),
+      },
+      {
         title: '充电单图片',
         dataIndex: 'thumb_url',
         key: 'thumb_url',
@@ -2303,6 +2380,19 @@ const ReceiptsPage = () => {
           return aTime.localeCompare(bTime)
         },
         render: (value: string) => (value ? dayjs(value).format('YYYY-MM-DD HH:mm:ss') : '-'),
+      },
+      {
+        title: '备注',
+        dataIndex: 'remarks',
+        width: 200,
+        ellipsis: {
+          showTitle: false,
+        },
+        render: (value: string) => (
+          <Typography.Text ellipsis={{ tooltip: value }}>
+            {value || '-'}
+          </Typography.Text>
+        ),
       },
       {
         title: '水票图片',
@@ -2608,6 +2698,34 @@ const ReceiptsPage = () => {
         },
       },
       {
+        title: '装料单备注',
+        dataIndex: ['loadBill', 'remarks'],
+        key: 'loadBill_remarks',
+        width: 200,
+        ellipsis: {
+          showTitle: false,
+        },
+        render: (value: string) => (
+          <Typography.Text ellipsis={{ tooltip: value }}>
+            {value || '-'}
+          </Typography.Text>
+        ),
+      },
+      {
+        title: '卸货单备注',
+        dataIndex: ['unloadBill', 'remarks'],
+        key: 'unloadBill_remarks',
+        width: 200,
+        ellipsis: {
+          showTitle: false,
+        },
+        render: (value: string) => (
+          <Typography.Text ellipsis={{ tooltip: value }}>
+            {value || '-'}
+          </Typography.Text>
+        ),
+      },
+      {
         title: '装料单图片',
         dataIndex: ['loadBill', 'thumb_url'],
         key: 'loadBill_thumb_url',
@@ -2861,6 +2979,38 @@ const ReceiptsPage = () => {
         },
       },
       {
+        title: '整车退料',
+        dataIndex: 'is_full_return',
+        width: 100,
+        filters: [
+          { text: '是', value: 'Y' },
+          { text: '否', value: 'N' },
+        ],
+        onFilter: (value: any, record: any) => {
+          return (record.is_full_return || 'N') === value
+        },
+        render: (_value: string, record: any) => {
+          const isFullReturn = (record?.is_full_return || 'N') === 'Y'
+          const isUpdatingCurrentRow =
+            updateDepartureMutation.isPending && updateDepartureMutation.variables?.id === record.id
+          return (
+            <Switch
+              checked={isFullReturn}
+              onChange={(checked) => {
+                updateDepartureMutation.mutate({
+                  id: record.id,
+                  data: {
+                    is_full_return: checked ? 'Y' : 'N'
+                  }
+                })
+              }}
+              disabled={!canEditDelete}
+              loading={isUpdatingCurrentRow}
+            />
+          )
+        },
+      },
+      {
         title: '累计方量',
         dataIndex: 'total_volume',
         width: 100,
@@ -2995,6 +3145,19 @@ const ReceiptsPage = () => {
           return aTime.localeCompare(bTime)
         },
         render: (value: string) => (value ? dayjs(value).format('YYYY-MM-DD HH:mm:ss') : '-'),
+      },
+      {
+        title: '备注',
+        dataIndex: 'remarks',
+        width: 200,
+        ellipsis: {
+          showTitle: false,
+        },
+        render: (value: string) => (
+          <Typography.Text ellipsis={{ tooltip: value }}>
+            {value || '-'}
+          </Typography.Text>
+        ),
       },
       {
         title: '出厂单图片',
@@ -3280,6 +3443,7 @@ const ReceiptsPage = () => {
                     ? dayjs((receipt as any).loadBill.created_at).format('YYYY-MM-DD HH:mm:ss')
                     : '-'}
                 </Descriptions.Item>
+                <Descriptions.Item label="备注">{(receipt as any).loadBill.remarks || '-'}</Descriptions.Item>
               </Descriptions>
             </Card>
             
@@ -3327,6 +3491,7 @@ const ReceiptsPage = () => {
                     ? dayjs((receipt as any).unloadBill.created_at).format('YYYY-MM-DD HH:mm:ss')
                     : '-'}
                 </Descriptions.Item>
+                <Descriptions.Item label="备注">{(receipt as any).unloadBill.remarks || '-'}</Descriptions.Item>
               </Descriptions>
             </Card>
           </>
@@ -3375,6 +3540,7 @@ const ReceiptsPage = () => {
                 <Descriptions.Item label="创建时间">
                   {receipt.created_at ? dayjs(receipt.created_at).format('YYYY-MM-DD HH:mm:ss') : '-'}
                 </Descriptions.Item>
+                <Descriptions.Item label="备注">{(receipt as any).remarks || '-'}</Descriptions.Item>
               </>
             )}
 
@@ -3420,6 +3586,7 @@ const ReceiptsPage = () => {
                   {receipt.unloading_time ? dayjs(receipt.unloading_time).format('YYYY-MM-DD HH:mm:ss') : '-'}
                 </Descriptions.Item>
                 <Descriptions.Item label="任务ID">{receipt.task_id || '-'}</Descriptions.Item>
+                <Descriptions.Item label="备注">{(receipt as any).remarks || '-'}</Descriptions.Item>
               </>
             )}
 
@@ -3458,6 +3625,7 @@ const ReceiptsPage = () => {
                 <Descriptions.Item label="创建时间">
                   {receipt.created_at ? dayjs(receipt.created_at).format('YYYY-MM-DD HH:mm:ss') : '-'}
                 </Descriptions.Item>
+                <Descriptions.Item label="备注">{(receipt as any).remarks || '-'}</Descriptions.Item>
               </>
             )}
 
@@ -3485,6 +3653,7 @@ const ReceiptsPage = () => {
                 <Descriptions.Item label="创建时间">
                   {receipt.created_at ? dayjs(receipt.created_at).format('YYYY-MM-DD HH:mm:ss') : '-'}
                 </Descriptions.Item>
+                <Descriptions.Item label="备注">{(receipt as any).remarks || '-'}</Descriptions.Item>
               </>
             )}
 
@@ -3555,25 +3724,32 @@ const ReceiptsPage = () => {
                 <Descriptions.Item label="创建时间">
                   {receipt.created_at ? dayjs(receipt.created_at).format('YYYY-MM-DD HH:mm:ss') : '-'}
                 </Descriptions.Item>
+                <Descriptions.Item label="整车退料">
+                  {(receipt as any).is_full_return === 'Y' ? '是' : '否'}
+                </Descriptions.Item>
+                <Descriptions.Item label="备注">{(receipt as any).remarks || '-'}</Descriptions.Item>
               </>
             )}
             
-            {/* 删除信息显示 */}
-            {receipt.deleted_at && (
-              <>
-                <Descriptions.Item label="删除状态" span={3}>
-                  <Tag color="red">已删除</Tag>
-                </Descriptions.Item>
-                <Descriptions.Item label="删除时间" span={2}>
-                  {dayjs(receipt.deleted_at).format('YYYY-MM-DD HH:mm:ss')}
-                </Descriptions.Item>
-                <Descriptions.Item label="删除人">
-                  {receipt.deleted_by_name || '-'}
-                </Descriptions.Item>
-              </>
-            )}
           </Descriptions>
         </Card>
+            
+            {/* 删除信息显示 */}
+            {receipt.deleted_at && (
+              <Card title="删除信息" size="small">
+                <Descriptions column={1} bordered size="small">
+                  <Descriptions.Item label="删除状态">
+                    <Tag color="red">已删除</Tag>
+                  </Descriptions.Item>
+                  <Descriptions.Item label="删除时间">
+                    {dayjs(receipt.deleted_at).format('YYYY-MM-DD HH:mm:ss')}
+                  </Descriptions.Item>
+                  <Descriptions.Item label="删除人">
+                    {receipt.deleted_by_name || '-'}
+                  </Descriptions.Item>
+                </Descriptions>
+              </Card>
+            )}
           </>
         )}
       </Space>
@@ -3588,6 +3764,23 @@ const ReceiptsPage = () => {
       return Number.isFinite(n) ? n : null
     }
 
+    const pickField = (obj: any, keys: string[]) => {
+      for (const k of keys) {
+        const v = obj?.[k]
+        if (v !== undefined && v !== null && v !== '') return v
+      }
+      return undefined
+    }
+
+    const formatDateTime = (v: any) => {
+      if (!v) return ''
+      try {
+        return dayjs(v).format('YYYY-MM-DD HH:mm:ss')
+      } catch {
+        return ''
+      }
+    }
+
     if (receipts.length === 0) {
       message.warning('没有数据可导出')
       return
@@ -3596,10 +3789,18 @@ const ReceiptsPage = () => {
     try {
       // 准备导出数据
       const exportData = receipts.map((receipt) => {
+        const submittedToFinance = pickField(receipt, ['submitted_to_finance', 'submittedToFinance'])
+        const submittedAt = pickField(receipt, ['submitted_at', 'submittedAt', 'submitted_time', 'submittedTime'])
+        const deletedAt = pickField(receipt, ['deleted_at', 'deletedAt', 'deleted_time', 'deletedTime'])
+
         const base: Record<string, any> = {
           类型: getReceiptTypeLabel(receipt.type),
           ID: receipt.id,
           创建时间: receipt.created_at ? dayjs(receipt.created_at).format('YYYY-MM-DD HH:mm') : '',
+          交票状态: submittedToFinance === 'Y' ? '已交票' : '未交票',
+          交票时间: formatDateTime(submittedAt),
+          删除状态: deletedAt ? '已删除' : '正常',
+          删除时间: formatDateTime(deletedAt),
         }
 
         if (receipt.type === 'loading' || receipt.type === 'unloading') {
@@ -3627,6 +3828,7 @@ const ReceiptsPage = () => {
             皮重: toNumber(r.tare_weight),
             进厂时间: r.loading_time ? dayjs(r.loading_time).format('YYYY-MM-DD HH:mm:ss') : '',
             出厂时间: r.unloading_time ? dayjs(r.unloading_time).format('YYYY-MM-DD HH:mm:ss') : '',
+            备注: (r as any).remarks || '',
           }
         } else if (receipt.type === 'charging') {
           const r = receipt as Receipt & {
@@ -3651,6 +3853,7 @@ const ReceiptsPage = () => {
             开始时间: r.start_time ? dayjs(r.start_time).format('YYYY-MM-DD HH:mm:ss') : '',
             结束时间: r.end_time ? dayjs(r.end_time).format('YYYY-MM-DD HH:mm:ss') : '',
             时长: toNumber(r.duration_min),
+            备注: (r as any).remarks || '',
           }
         } else if (receipt.type === 'departure') {
           const r = receipt as Receipt & {
@@ -3693,7 +3896,8 @@ const ReceiptsPage = () => {
             提单号: r.bill_no || '',
             进厂时间: r.loading_time ? dayjs(r.loading_time).format('YYYY-MM-DD HH:mm:ss') : '',
             出厂时间: r.exit_time ? dayjs(r.exit_time).format('YYYY-MM-DD HH:mm:ss') : '',
-            交票状态: (receipt as any).submitted_to_finance === 'Y' ? '已交票' : '未交票',
+            整车退料: (r as any).is_full_return === 'Y' ? '是' : '否',
+            备注: (r as any).remarks || '',
           }
         } else if (receipt.type === 'water') {
           const r = receipt as Receipt & {
@@ -3718,22 +3922,40 @@ const ReceiptsPage = () => {
             自编车号: r.tanker_vehicle_code || '',
             日期: r.ticket_date ? dayjs(r.ticket_date).format('YYYY-MM-DD') : '',
             图片路径: r.image_path || r.thumb_url || '',
-            交票状态: r.submitted_to_finance === 'Y' ? '已交票' : '未交票',
-            交票时间: r.submitted_at ? dayjs(r.submitted_at).format('YYYY-MM-DD HH:mm:ss') : '',
-            删除状态: r.deleted_at ? '已删除' : '正常',
-            删除时间: r.deleted_at ? dayjs(r.deleted_at).format('YYYY-MM-DD HH:mm:ss') : '',
+            备注: (r as any).remarks || '',
           }
         }
         return base
       })
 
-      // 使用数据中的字段名作为表头，确保数据不为空
       const header = (() => {
-        const set = new Set<string>()
+        const allKeys: string[] = []
         exportData.forEach((row) => {
-          Object.keys(row).forEach((k) => set.add(k))
+          Object.keys(row).forEach((k) => {
+            if (!allKeys.includes(k)) allKeys.push(k)
+          })
         })
-        return Array.from(set)
+
+        const cols = (getColumns(activeTab) as any[]) || []
+        const ordered: string[] = []
+        const pushIfExists = (k: string) => {
+          if (k && allKeys.includes(k) && !ordered.includes(k)) ordered.push(k)
+        }
+        const normalizeTitle = (t: string) => (t || '').replace(/[（(].*?[)）]/g, '').trim()
+
+        cols.forEach((c) => {
+          const title = c?.title
+          if (typeof title !== 'string') return
+          if (title === '操作') return
+          pushIfExists(title)
+          pushIfExists(normalizeTitle(title))
+
+          if (title === '删除状态') pushIfExists('删除时间')
+          if (title === '交票状态') pushIfExists('交票时间')
+        })
+
+        allKeys.forEach((k) => pushIfExists(k))
+        return ordered
       })()
 
       const ws = XLSX.utils.json_to_sheet(exportData, { header })
@@ -3747,7 +3969,7 @@ const ReceiptsPage = () => {
     } catch (error) {
       message.error('导出失败：' + (error as Error).message)
     }
-  }, [receipts])
+  }, [receipts, activeTab, getColumns, message])
 
   // 批量导出
   const handleBatchExport = useCallback(() => {
@@ -3755,6 +3977,23 @@ const ReceiptsPage = () => {
       if (value === null || value === undefined || value === '') return null
       const n = Number(value)
       return Number.isFinite(n) ? n : null
+    }
+
+    const pickField = (obj: any, keys: string[]) => {
+      for (const k of keys) {
+        const v = obj?.[k]
+        if (v !== undefined && v !== null && v !== '') return v
+      }
+      return undefined
+    }
+
+    const formatDateTime = (v: any) => {
+      if (!v) return ''
+      try {
+        return dayjs(v).format('YYYY-MM-DD HH:mm:ss')
+      } catch {
+        return ''
+      }
     }
 
     if (selectedRowKeys.length === 0) {
@@ -3803,7 +4042,9 @@ const ReceiptsPage = () => {
             装料进厂时间: loadBill.loading_time ? dayjs(loadBill.loading_time).format('YYYY-MM-DD HH:mm:ss') : '',
             装料出厂时间: loadBill.unloading_time ? dayjs(loadBill.unloading_time).format('YYYY-MM-DD HH:mm:ss') : '',
             装料交票状态: loadBill.submitted_to_finance === 'Y' ? '已交票' : '未交票',
-            装料交票时间: loadBill.submitted_at ? dayjs(loadBill.submitted_at).format('YYYY-MM-DD HH:mm:ss') : '',
+            装料交票时间: formatDateTime(loadBill.submitted_at),
+            装料删除状态: loadBill.deleted_at ? '已删除' : '正常',
+            装料删除时间: formatDateTime(loadBill.deleted_at),
             
             // 卸货单信息
             卸货单ID: unloadBill.id || '',
@@ -3816,7 +4057,9 @@ const ReceiptsPage = () => {
             卸货进厂时间: unloadBill.loading_time ? dayjs(unloadBill.loading_time).format('YYYY-MM-DD HH:mm:ss') : '',
             卸货出厂时间: unloadBill.unloading_time ? dayjs(unloadBill.unloading_time).format('YYYY-MM-DD HH:mm:ss') : '',
             卸货交票状态: unloadBill.submitted_to_finance === 'Y' ? '已交票' : '未交票',
-            卸货交票时间: unloadBill.submitted_at ? dayjs(unloadBill.submitted_at).format('YYYY-MM-DD HH:mm:ss') : '',
+            卸货交票时间: formatDateTime(unloadBill.submitted_at),
+            卸货删除状态: unloadBill.deleted_at ? '已删除' : '正常',
+            卸货删除时间: formatDateTime(unloadBill.deleted_at),
             
             // 通用信息
             车牌号: loadBill.vehicle_no || unloadBill.vehicle_no || '',
@@ -3831,10 +4074,17 @@ const ReceiptsPage = () => {
         
         // 普通票据数据
         const receipt = record as Receipt
+        const submittedToFinance = pickField(receipt, ['submitted_to_finance', 'submittedToFinance'])
+        const submittedAt = pickField(receipt, ['submitted_at', 'submittedAt', 'submitted_time', 'submittedTime'])
+        const deletedAt = pickField(receipt, ['deleted_at', 'deletedAt', 'deleted_time', 'deletedTime'])
         const base: Record<string, any> = {
           类型: getReceiptTypeLabel(receipt.type),
           ID: receipt.id,
           创建时间: receipt.created_at ? dayjs(receipt.created_at).format('YYYY-MM-DD HH:mm') : '',
+          交票状态: submittedToFinance === 'Y' ? '已交票' : '未交票',
+          交票时间: formatDateTime(submittedAt),
+          删除状态: deletedAt ? '已删除' : '正常',
+          删除时间: formatDateTime(deletedAt),
         }
 
         if (receipt.type === 'loading' || receipt.type === 'unloading') {
@@ -3869,10 +4119,6 @@ const ReceiptsPage = () => {
             皮重: toNumber(r.tare_weight),
             进厂时间: r.loading_time ? dayjs(r.loading_time).format('YYYY-MM-DD HH:mm:ss') : '',
             出厂时间: r.unloading_time ? dayjs(r.unloading_time).format('YYYY-MM-DD HH:mm:ss') : '',
-            交票状态: r.submitted_to_finance === 'Y' ? '已交票' : '未交票',
-            交票时间: r.submitted_at ? dayjs(r.submitted_at).format('YYYY-MM-DD HH:mm:ss') : '',
-            删除状态: r.deleted_at ? '已删除' : '正常',
-            删除时间: r.deleted_at ? dayjs(r.deleted_at).format('YYYY-MM-DD HH:mm:ss') : '',
             图片路径: r.image_path || r.thumb_url || '',
           }
         } else if (receipt.type === 'charging') {
@@ -3907,10 +4153,6 @@ const ReceiptsPage = () => {
             开始时间: r.start_time ? dayjs(r.start_time).format('YYYY-MM-DD HH:mm:ss') : '',
             结束时间: r.end_time ? dayjs(r.end_time).format('YYYY-MM-DD HH:mm:ss') : '',
             时长: toNumber(r.duration_min),
-            交票状态: r.submitted_to_finance === 'Y' ? '已交票' : '未交票',
-            交票时间: r.submitted_at ? dayjs(r.submitted_at).format('YYYY-MM-DD HH:mm:ss') : '',
-            删除状态: r.deleted_at ? '已删除' : '正常',
-            删除时间: r.deleted_at ? dayjs(r.deleted_at).format('YYYY-MM-DD HH:mm:ss') : '',
             图片路径: r.image_path || r.thumb_url || '',
           }
         } else if (receipt.type === 'departure') {
@@ -3959,10 +4201,7 @@ const ReceiptsPage = () => {
             提单号: r.bill_no || '',
             进厂时间: r.loading_time ? dayjs(r.loading_time).format('YYYY-MM-DD HH:mm:ss') : '',
             出厂时间: r.exit_time ? dayjs(r.exit_time).format('YYYY-MM-DD HH:mm:ss') : '',
-            交票状态: r.submitted_to_finance === 'Y' ? '已交票' : '未交票',
-            交票时间: r.submitted_at ? dayjs(r.submitted_at).format('YYYY-MM-DD HH:mm:ss') : '',
-            删除状态: r.deleted_at ? '已删除' : '正常',
-            删除时间: r.deleted_at ? dayjs(r.deleted_at).format('YYYY-MM-DD HH:mm:ss') : '',
+            整车退料: (r as any).is_full_return === 'Y' ? '是' : '否',
             图片路径: r.image_path || r.thumb_url || '',
           }
         } else if (receipt.type === 'water') {
@@ -3978,7 +4217,9 @@ const ReceiptsPage = () => {
             thumb_url?: string
             submitted_to_finance?: string
             submitted_at?: string
+            submittedAt?: string
             deleted_at?: string
+            deletedAt?: string
           }
           return {
             ...base,
@@ -3989,22 +4230,39 @@ const ReceiptsPage = () => {
             自编车号: r.tanker_vehicle_code || '',
             日期: r.ticket_date ? dayjs(r.ticket_date).format('YYYY-MM-DD') : '',
             图片路径: r.image_path || r.thumb_url || '',
-            交票状态: r.submitted_to_finance === 'Y' ? '已交票' : '未交票',
-            交票时间: r.submitted_at ? dayjs(r.submitted_at).format('YYYY-MM-DD HH:mm:ss') : '',
-            删除状态: r.deleted_at ? '已删除' : '正常',
-            删除时间: r.deleted_at ? dayjs(r.deleted_at).format('YYYY-MM-DD HH:mm:ss') : '',
           }
         }
         return base
       })
 
-      // 使用数据中的字段名作为表头，确保数据不为空
       const header = (() => {
-        const set = new Set<string>()
+        const allKeys: string[] = []
         exportData.forEach((row) => {
-          Object.keys(row).forEach((k) => set.add(k))
+          Object.keys(row).forEach((k) => {
+            if (!allKeys.includes(k)) allKeys.push(k)
+          })
         })
-        return Array.from(set)
+
+        const cols = (getColumns(activeTab) as any[]) || []
+        const ordered: string[] = []
+        const pushIfExists = (k: string) => {
+          if (k && allKeys.includes(k) && !ordered.includes(k)) ordered.push(k)
+        }
+        const normalizeTitle = (t: string) => (t || '').replace(/[（(].*?[)）]/g, '').trim()
+
+        cols.forEach((c) => {
+          const title = c?.title
+          if (typeof title !== 'string') return
+          if (title === '操作') return
+          pushIfExists(title)
+          pushIfExists(normalizeTitle(title))
+
+          if (title === '删除状态') pushIfExists('删除时间')
+          if (title === '交票状态') pushIfExists('交票时间')
+        })
+
+        allKeys.forEach((k) => pushIfExists(k))
+        return ordered
       })()
 
       const ws = XLSX.utils.json_to_sheet(exportData, { header })
@@ -4017,7 +4275,7 @@ const ReceiptsPage = () => {
     } catch (error) {
       message.error('导出失败：' + (error as Error).message)
     }
-  }, [selectedRowKeys, activeTab, dataForOperations, message])
+  }, [selectedRowKeys, activeTab, dataForOperations, getColumns, message])
 
   // 批量删除（支持所有票据类型）
   const handleBatchDelete = useCallback(() => {
@@ -4716,14 +4974,27 @@ const ReceiptsPage = () => {
                     })
                     
                     // 更新筛选信息
-                    setFilteredInfo(filters || {})
+                    // 注意：antd 对 columnKey 的生成在 dataIndex 为数组时可能出现“逗号/点号”差异
+                    // 这里做一次归一化，避免受控 filteredValue 取不到值导致筛选不生效
+                    const normalizedFilters: Record<string, any> = { ...(filters || {}) }
+                    Object.keys(filters || {}).forEach((k) => {
+                      const v = (filters as any)?.[k]
+                      if (typeof k !== 'string') return
+                      if (k.includes('.') && !normalizedFilters[k.replace(/\./g, ',')]) {
+                        normalizedFilters[k.replace(/\./g, ',')] = v
+                      }
+                      if (k.includes(',') && !normalizedFilters[k.replace(/,/g, '.')]) {
+                        normalizedFilters[k.replace(/,/g, '.')] = v
+                      }
+                    })
+                    setFilteredInfo(normalizedFilters)
                     
                     // 更新排序信息
                     setSortedInfo(sorter || {})
                     
                     // 检查是否有活跃的筛选条件
-                    const hasActiveFilters = Object.keys(filters || {}).some(key => {
-                      const filterValue = filters?.[key]
+                    const hasActiveFilters = Object.keys(normalizedFilters || {}).some(key => {
+                      const filterValue = normalizedFilters?.[key]
                       return filterValue && (Array.isArray(filterValue) ? filterValue.length > 0 : true)
                     })
                     
@@ -4876,6 +5147,9 @@ const ReceiptsPage = () => {
                 <Form.Item name="unloading_time" label="出厂时间">
                   <DatePicker showTime style={{ width: '100%' }} format="YYYY-MM-DD HH:mm:ss" />
                 </Form.Item>
+                <Form.Item name="remarks" label="备注">
+                  <Input.TextArea rows={3} placeholder="请输入备注" />
+                </Form.Item>
               </>
             )}
             {editingReceipt.type === 'charging' && (
@@ -4928,6 +5202,9 @@ const ReceiptsPage = () => {
                 <Form.Item name="duration_min" label="时长(分钟)">
                   <InputNumber min={0} style={{ width: '100%' }} placeholder="请输入时长" />
                 </Form.Item>
+                <Form.Item name="remarks" label="备注">
+                  <Input.TextArea rows={3} placeholder="请输入备注" />
+                </Form.Item>
               </>
             )}
             {editingReceipt.type === 'water' && (
@@ -4961,6 +5238,9 @@ const ReceiptsPage = () => {
                 </Form.Item>
                 <Form.Item name="ticket_date" label="日期">
                   <DatePicker style={{ width: '100%' }} format="YYYY-MM-DD" />
+                </Form.Item>
+                <Form.Item name="remarks" label="备注">
+                  <Input.TextArea rows={3} placeholder="请输入备注" />
                 </Form.Item>
               </>
             )}
@@ -5041,6 +5321,15 @@ const ReceiptsPage = () => {
                 </Form.Item>
                 <Form.Item name="production_date" label="生产日期">
                   <DatePicker style={{ width: '100%' }} format="YYYY-MM-DD" />
+                </Form.Item>
+                <Form.Item name="is_full_return" label="整车退料">
+                  <Radio.Group>
+                    <Radio value="Y">是</Radio>
+                    <Radio value="N">否</Radio>
+                  </Radio.Group>
+                </Form.Item>
+                <Form.Item name="remarks" label="备注">
+                  <Input.TextArea rows={3} placeholder="请输入备注" />
                 </Form.Item>
               </>
             )}

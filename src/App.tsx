@@ -93,6 +93,8 @@ import AttendanceConfigPage from './pages/AttendanceConfig'
 import AttendanceAnomalyPage from './pages/AttendanceAnomaly'
 import DriverSalaryPage from './pages/DriverSalary'
 import StaffSalaryPage from './pages/StaffSalary'
+import SettlementStatementPage from './pages/SettlementStatement'
+import PriceConfigPage from './pages/PriceConfig'
 import './App.css'
 import { fetchSystemConfig } from './api/services/systemConfig'
 
@@ -177,6 +179,18 @@ const routeDefinitions = [
             label: '票据分析',
             path: '/receipts/analytics',
             element: <ReceiptAnalytics />,
+          },
+          {
+            key: 'settlement-statement',
+            label: '生成结算单',
+            path: '/receipts/settlement-statement',
+            element: <SettlementStatementPage />,
+          },
+          {
+            key: 'price-config',
+            label: '单价配置',
+            path: '/receipts/price-config',
+            element: <PriceConfigPage />,
           },
           {
             key: 'receipts-recycle-bin',

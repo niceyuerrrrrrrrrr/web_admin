@@ -66,6 +66,7 @@ export const createReimbursement = (data: {
   remark?: string
   images?: string[]
   project?: string
+  is_public_account?: string
 }) => unwrap<{ id: number }>(client.post('/reimbursement', data))
 
 export const updateReimbursement = (id: number, data: Partial<ReimbursementRecord>) =>

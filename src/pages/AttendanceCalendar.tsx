@@ -11,12 +11,14 @@ import {
   Tag,
   Tooltip,
   Typography,
+  message,
 } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
-import { ReloadOutlined } from '@ant-design/icons'
+import { ReloadOutlined, DownloadOutlined } from '@ant-design/icons'
 import { useQuery } from '@tanstack/react-query'
 import dayjs from 'dayjs'
 import type { Dayjs } from 'dayjs'
+import * as XLSX from 'xlsx'
 import client from '../api/client'
 import { fetchAttendanceHistory, type AttendanceRecord } from '../api/services/attendance'
 import { fetchUsers } from '../api/services/users'
@@ -454,6 +456,141 @@ const AttendanceCalendarPage: React.FC = () => {
     allHistoryQuery.isLoading ||
     alertsQuery.isLoading
 
+  const handleExport = () => {
+    if (!rows.length) {
+      message.warning('暂无数据可导出')
+      return
+    }
+
+    try {
+      // 构建Excel数据
+      const excelData: any[][] = []
+      
+      // 表头行1：日期
+      const headerRow1 = ['姓名']
+      monthDates.forEach(d => {
+        headerRow1.push(dayjs(d).format('M月D日'))
+      })
+      excelData.push(headerRow1)
+
+      // 表头行2：星期
+      const headerRow2 = ['']
+      monthDates.forEach(d => {
+        headerRow2.push(dayjs(d).format('ddd'))
+      })
+      excelData.push(headerRow2)
+
+      // 数据行
+      rows.forEach(row => {
+        const dataRow: any[] = [row.user_name]
+        
+        monthDates.forEach(date => {
+          const cell = row.days[date]
+          const meta = row.spans[date] || { colSpan: 1 }
+          
+          if (meta.colSpan === 0) {
+            // 被合并的单元格，跳过
+            dataRow.push('')
+            return
+          }
+
+          if (!cell) {
+            dataRow.push('')
+            return
+          }
+
+          const hasIn = !!cell.check_in?.time
+          const lastOut = cell.check_outs.length ? cell.check_outs[cell.check_outs.length - 1] : undefined
+          const hasOut = !!lastOut?.time
+
+          if (!hasIn && !hasOut && !cell.alert_count) {
+            dataRow.push('')
+            return
+          }
+
+          // 构建单元格内容
+          let cellContent = ''
+          
+          if (cell.alert_count > 0) {
+            cellContent += `[异常×${cell.alert_count}] `
+          }
+
+          if (hasIn) {
+            cellContent += `上班: ${dayjs(cell.check_in!.time).format('HH:mm')}`
+            if (cell.check_in!.location) {
+              cellContent += ` (${cell.check_in!.location})`
+            }
+          } else {
+            cellContent += '上班: -'
+          }
+
+          cellContent += '\n'
+
+          if (hasOut) {
+            cellContent += `下班: ${formatClockLabel(lastOut!.time, date)}`
+            if (lastOut!.location) {
+              cellContent += ` (${lastOut!.location})`
+            }
+            
+            // 检查是否跨天
+            const crossDay = dayjs(lastOut!.time).startOf('day').isAfter(dayjs(date).startOf('day'))
+            if (crossDay) {
+              cellContent += ' [跨天]'
+            }
+          } else {
+            cellContent += '下班: -'
+          }
+
+          if (cell.shift_id) {
+            cellContent += `\n班次: ${cell.shift_id}`
+          }
+
+          if (meta.colSpan > 1) {
+            cellContent = `[跨天班次 ${meta.colSpan}天]\n${cellContent}`
+          }
+
+          dataRow.push(cellContent)
+        })
+
+        excelData.push(dataRow)
+      })
+
+      // 创建工作簿
+      const ws = XLSX.utils.aoa_to_sheet(excelData)
+
+      // 设置列宽
+      const colWidths = [{ wch: 12 }] // 姓名列
+      monthDates.forEach(() => {
+        colWidths.push({ wch: 25 }) // 日期列
+      })
+      ws['!cols'] = colWidths
+
+      // 设置行高
+      const rowHeights: any[] = []
+      rowHeights.push({ hpt: 20 }) // 表头行1
+      rowHeights.push({ hpt: 20 }) // 表头行2
+      rows.forEach(() => {
+        rowHeights.push({ hpt: 60 }) // 数据行
+      })
+      ws['!rows'] = rowHeights
+
+      // 创建工作簿并添加工作表
+      const wb = XLSX.utils.book_new()
+      XLSX.utils.book_append_sheet(wb, ws, '考勤日历')
+
+      // 生成文件名
+      const fileName = `考勤日历_${selectedMonth.format('YYYY年MM月')}_${dayjs().format('YYYYMMDDHHmmss')}.xlsx`
+
+      // 导出文件
+      XLSX.writeFile(wb, fileName)
+
+      message.success('导出成功')
+    } catch (error) {
+      console.error('导出失败:', error)
+      message.error('导出失败，请重试')
+    }
+  }
+
   return (
     <div style={{ padding: 24 }}>
       <Card
@@ -484,6 +621,14 @@ const AttendanceCalendarPage: React.FC = () => {
               allowClear={false}
               onChange={(v) => v && setSelectedMonth(v)}
             />
+            <Button
+              icon={<DownloadOutlined />}
+              onClick={handleExport}
+              disabled={!rows.length || isLoading}
+              type="primary"
+            >
+              导出Excel
+            </Button>
             <Button
               icon={<ReloadOutlined />}
               onClick={() => {

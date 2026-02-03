@@ -20,8 +20,10 @@ import type { DistanceRecord, NavigationAddress } from '../api/types'
 import useAuthStore from '../store/auth'
 import useCompanyStore from '../store/company'
 import {
+  batchUpdateDistanceRecords,
   createDistanceRecord,
   deleteDistanceRecord,
+  fetchDistanceOptions,
   fetchDistanceRecords,
   updateDistanceRecord,
 } from '../api/services/distance'
@@ -40,6 +42,9 @@ const DistanceTableManagementPage = () => {
   const showCompanyWarning = isSuperAdmin && !effectiveCompanyId
 
   const [keyword, setKeyword] = useState('')
+  const [loadingCompanyFilter, setLoadingCompanyFilter] = useState<string[]>([])
+  const [unloadingCompanyFilter, setUnloadingCompanyFilter] = useState<string[]>([])
+  const [distanceFilter, setDistanceFilter] = useState<number[]>([])
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(20)
   const [selectedRowKeys, setSelectedRowKeys] = useState<Key[]>([])
@@ -53,10 +58,32 @@ const DistanceTableManagementPage = () => {
 
   const [batchEditOpen, setBatchEditOpen] = useState(false)
   const [batchEditForm] = Form.useForm()
+  const [batchEditSubmitting, setBatchEditSubmitting] = useState(false)
 
   const listQuery = useQuery({
-    queryKey: ['distance', 'list', { keyword, page, pageSize, effectiveCompanyId }],
-    queryFn: () => fetchDistanceRecords({ keyword, page, page_size: pageSize, companyId: effectiveCompanyId }),
+    queryKey: [
+      'distance',
+      'list',
+      {
+        keyword,
+        loadingCompanyFilter,
+        unloadingCompanyFilter,
+        distanceFilter,
+        page,
+        pageSize,
+        effectiveCompanyId,
+      },
+    ],
+    queryFn: () =>
+      fetchDistanceRecords({
+        keyword,
+        loading_company: loadingCompanyFilter.length ? loadingCompanyFilter.join(',') : undefined,
+        unloading_company: unloadingCompanyFilter.length ? unloadingCompanyFilter.join(',') : undefined,
+        distance_values: distanceFilter.length ? distanceFilter.join(',') : undefined,
+        page,
+        page_size: pageSize,
+        companyId: effectiveCompanyId,
+      }),
     enabled: !isSuperAdmin || !!effectiveCompanyId,
   })
 
@@ -72,8 +99,35 @@ const DistanceTableManagementPage = () => {
     enabled: !isSuperAdmin || !!effectiveCompanyId,
   })
 
+  const optionsQuery = useQuery({
+    queryKey: ['distance', 'options', effectiveCompanyId],
+    queryFn: () => fetchDistanceOptions({ companyId: effectiveCompanyId }),
+    enabled: !isSuperAdmin || !!effectiveCompanyId,
+  })
+
   const list = listQuery.data?.list || []
   const total = listQuery.data?.total || 0
+
+  const loadingCompanyFilters = useMemo(
+    () =>
+      (optionsQuery.data?.loading_companies || []).map((v) => ({ text: v, value: v })),
+    [optionsQuery.data?.loading_companies],
+  )
+
+  const unloadingCompanyFilters = useMemo(
+    () =>
+      (optionsQuery.data?.unloading_companies || []).map((v) => ({ text: v, value: v })),
+    [optionsQuery.data?.unloading_companies],
+  )
+
+  const distanceFilters = useMemo(() => {
+    const values = (optionsQuery.data?.distances || [])
+      .map((v) => (typeof v === 'number' ? Number(v.toFixed(2)) : NaN))
+      .filter((v) => Number.isFinite(v))
+      .sort((a, b) => a - b)
+
+    return values.map((v) => ({ text: v.toFixed(2), value: v }))
+  }, [optionsQuery.data?.distances])
 
   const loadingOptions = (loadingAddressesQuery.data?.addresses || []).map((a: NavigationAddress) => ({
     label: a.name,
@@ -120,12 +174,35 @@ const DistanceTableManagementPage = () => {
 
   const columns: ColumnsType<DistanceRecord> = useMemo(
     () => [
-      { title: '装料地点', dataIndex: 'loading_company', width: 220 },
-      { title: '卸货地点', dataIndex: 'unloading_company', width: 220 },
+      {
+        title: '装料地点',
+        dataIndex: 'loading_company',
+        width: 220,
+        filters: loadingCompanyFilters,
+        filteredValue: loadingCompanyFilter.length ? loadingCompanyFilter : null,
+        filterMultiple: true,
+        filterSearch: true,
+        onFilter: () => true,
+      },
+      {
+        title: '卸货地点',
+        dataIndex: 'unloading_company',
+        width: 220,
+        filters: unloadingCompanyFilters,
+        filteredValue: unloadingCompanyFilter.length ? unloadingCompanyFilter : null,
+        filterMultiple: true,
+        filterSearch: true,
+        onFilter: () => true,
+      },
       {
         title: '距离(km)',
         dataIndex: 'distance',
         width: 120,
+        filters: distanceFilters,
+        filteredValue: distanceFilter.length ? distanceFilter : null,
+        filterMultiple: true,
+        filterSearch: true,
+        onFilter: () => true,
         render: (v) => (typeof v === 'number' ? v.toFixed(2) : v),
       },
       { title: '更新时间', dataIndex: 'updated_at', width: 160, render: (v) => v || '-' },
@@ -168,7 +245,17 @@ const DistanceTableManagementPage = () => {
         ),
       },
     ],
-    [deleteMutation, form, modal],
+    [
+      deleteMutation,
+      form,
+      distanceFilter,
+      distanceFilters,
+      loadingCompanyFilter,
+      loadingCompanyFilters,
+      modal,
+      unloadingCompanyFilter,
+      unloadingCompanyFilters,
+    ],
   )
 
   const openCreate = () => {
@@ -218,25 +305,66 @@ const DistanceTableManagementPage = () => {
   }
 
   const doBatchEdit = async () => {
-    if (!selectedRowKeys.length) {
-      message.warning('请先选择要编辑的记录')
-      return
-    }
+    try {
+      if (!selectedRowKeys.length) {
+        message.warning('请先选择要编辑的记录')
+        return
+      }
 
-    const values = await batchEditForm.validateFields()
-    const distance = Number(values.distance)
-    if (!Number.isFinite(distance)) {
-      message.error('距离格式错误')
-      return
-    }
+      setBatchEditSubmitting(true)
+      const values = await batchEditForm.validateFields()
+      const ids = selectedRowKeys.map((k) => Number(k)).filter((n) => Number.isFinite(n))
 
-    const ids = selectedRowKeys.map((k) => Number(k)).filter((n) => Number.isFinite(n))
-    await Promise.all(ids.map((id) => updateDistanceRecord(id, { distance }, { companyId: effectiveCompanyId })))
-    setBatchEditOpen(false)
-    batchEditForm.resetFields()
-    setSelectedRowKeys([])
-    message.success('批量更新成功')
-    queryClient.invalidateQueries({ queryKey: ['distance', 'list'] })
+      const loading_company: string | undefined = values.loading_company?.trim() || undefined
+      const unloading_company: string | undefined = values.unloading_company?.trim() || undefined
+      const distance: number | undefined =
+        values.distance === undefined || values.distance === null || values.distance === ''
+          ? undefined
+          : Number(values.distance)
+
+      if (distance !== undefined && !Number.isFinite(distance)) {
+        message.error('距离格式错误')
+        return
+      }
+
+      if (loading_company === undefined && unloading_company === undefined && distance === undefined) {
+        message.warning('请至少填写一个要修改的字段')
+        return
+      }
+
+      const res = await Promise.race([
+        batchUpdateDistanceRecords(
+          {
+            ids,
+            loading_company,
+            unloading_company,
+            distance,
+          },
+          { companyId: effectiveCompanyId },
+        ),
+        new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error('请求超时，请稍后重试（批量更新记录较多时可分批操作）')), 35000),
+        ),
+      ])
+
+      setBatchEditOpen(false)
+      batchEditForm.resetFields()
+      setSelectedRowKeys([])
+      message.success(`批量更新成功：${(res as any)?.updated_count ?? ids.length} 条`)
+
+      setKeyword('')
+      setLoadingCompanyFilter([])
+      setUnloadingCompanyFilter([])
+      setDistanceFilter([])
+      setPage(1)
+
+      queryClient.invalidateQueries({ queryKey: ['distance', 'options'] })
+      queryClient.invalidateQueries({ queryKey: ['distance', 'list'] })
+    } catch (error: any) {
+      message.error(error?.response?.data?.message || error?.message || '批量更新失败')
+    } finally {
+      setBatchEditSubmitting(false)
+    }
   }
 
   const doBatchCreate = async () => {
@@ -338,15 +466,35 @@ const DistanceTableManagementPage = () => {
             dataSource={list}
             loading={listQuery.isFetching}
             scroll={{ x: 900 }}
+            onChange={(pagination, filters, _sorter, extra) => {
+              const loadingSelected = (filters as any)?.loading_company
+              const unloadingSelected = (filters as any)?.unloading_company
+              const distanceSelected = (filters as any)?.distance
+
+              setLoadingCompanyFilter(Array.isArray(loadingSelected) ? loadingSelected.map((v: any) => String(v)) : [])
+              setUnloadingCompanyFilter(
+                Array.isArray(unloadingSelected) ? unloadingSelected.map((v: any) => String(v)) : [],
+              )
+              setDistanceFilter(
+                Array.isArray(distanceSelected)
+                  ? distanceSelected
+                      .map((v: any) => Number(v))
+                      .filter((n: any) => typeof n === 'number' && Number.isFinite(n))
+                  : [],
+              )
+
+              if (extra?.action === 'filter') {
+                setPage(1)
+              } else {
+                setPage(typeof pagination?.current === 'number' ? pagination.current : 1)
+              }
+              setPageSize(typeof pagination?.pageSize === 'number' ? pagination.pageSize : pageSize)
+            }}
             pagination={{
               current: page,
               pageSize,
               total,
               showSizeChanger: true,
-              onChange: (p, ps) => {
-                setPage(p)
-                setPageSize(ps)
-              },
             }}
             rowSelection={{
               selectedRowKeys,
@@ -426,10 +574,17 @@ const DistanceTableManagementPage = () => {
           batchEditForm.resetFields()
         }}
         onOk={doBatchEdit}
+        confirmLoading={batchEditSubmitting}
       >
         <Form form={batchEditForm} layout="vertical">
-          <Form.Item label="距离(km)" name="distance" rules={[{ required: true, message: '请输入距离' }]}>
-            <InputNumber min={0} precision={2} style={{ width: '100%' }} />
+          <Form.Item label="装料地点" name="loading_company">
+            <Input allowClear placeholder="不填写则不修改（批量改名）" />
+          </Form.Item>
+          <Form.Item label="卸货地点" name="unloading_company">
+            <Input allowClear placeholder="不填写则不修改（批量改名）" />
+          </Form.Item>
+          <Form.Item label="距离(km)" name="distance">
+            <InputNumber min={0} precision={2} style={{ width: '100%' }} placeholder="不填写则不修改" />
           </Form.Item>
         </Form>
       </Modal>

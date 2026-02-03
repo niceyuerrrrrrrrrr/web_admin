@@ -364,6 +364,7 @@ export interface ReimbursementRecord {
   date: string
   remark?: string
   project?: string
+  is_public_account?: string
   status: ReimbursementStatus
   images?: string[]
   created_at?: string

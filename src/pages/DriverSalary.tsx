@@ -28,9 +28,11 @@ import {
   ReloadOutlined,
   EyeOutlined,
   SaveOutlined,
+  DownloadOutlined,
 } from '@ant-design/icons'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import dayjs from 'dayjs'
+import * as XLSX from 'xlsx'
 import {
   fetchGlobalConfig,
   createOrUpdateGlobalConfig,
@@ -321,6 +323,64 @@ const DriverSalaryPage: React.FC = () => {
       delete newState[userId]
       return newState
     })
+  }
+
+  // 导出趟次明细报表
+  const handleExportTripDetails = () => {
+    if (!tripDetailsData_raw || tripDetailsData_raw.length === 0) {
+      message.warning('暂无数据可导出')
+      return
+    }
+
+    try {
+      const wb = XLSX.utils.book_new()
+      
+      // 创建表头
+      const headers = ['司机姓名', ...allCompanies, '总计']
+      
+      // 创建数据行
+      const data = tripDetailsData_raw.map((item: any) => {
+        const row: any = { '司机姓名': item.user_name }
+        
+        // 为每个装料公司添加趟次数据
+        allCompanies.forEach((companyName) => {
+          const companyTrip = item.company_trips?.find(
+            (ct: any) => ct.company_name === companyName
+          )
+          row[companyName] = companyTrip?.trip_count || 0
+        })
+        
+        row['总计'] = item.total_trips || 0
+        return row
+      })
+      
+      // 添加总计行
+      const totalRow: any = { '司机姓名': '总计' }
+      allCompanies.forEach((companyName) => {
+        totalRow[companyName] = companyTotals[companyName] || 0
+      })
+      totalRow['总计'] = grandTotal
+      data.push(totalRow)
+      
+      // 创建工作表
+      const ws = XLSX.utils.json_to_sheet(data, { header: headers })
+      
+      // 设置列宽
+      const colWidths = [{ wch: 15 }] // 司机姓名列
+      allCompanies.forEach(() => colWidths.push({ wch: 20 })) // 装料公司列
+      colWidths.push({ wch: 12 }) // 总计列
+      ws['!cols'] = colWidths
+      
+      XLSX.utils.book_append_sheet(wb, ws, '趟次明细统计')
+      
+      const fileName = `司机趟次明细_${selectedPeriod}.xlsx`
+      XLSX.writeFile(wb, fileName)
+      
+      message.success('导出成功')
+    } catch (error) {
+      console.error('导出失败:', error)
+      message.error('导出失败')
+    }
   }
 
   // 合并汇总数据和配置数据
@@ -1140,12 +1200,18 @@ const DriverSalaryPage: React.FC = () => {
             }
             key="tripDetails"
           >
-            <div style={{ marginBottom: 16 }}>
-              <Space>
-                <span style={{ color: '#999', fontSize: 14 }}>
-                  按司机姓名统计各装料公司的趟次明细
-                </span>
-              </Space>
+            <div style={{ marginBottom: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ color: '#999', fontSize: 14 }}>
+                按司机姓名统计各装料公司的趟次明细
+              </span>
+              <Button
+                type="primary"
+                icon={<DownloadOutlined />}
+                onClick={handleExportTripDetails}
+                disabled={!tripDetailsData_raw || tripDetailsData_raw.length === 0}
+              >
+                导出报表
+              </Button>
             </div>
             <Table
               columns={tripDetailsColumns}

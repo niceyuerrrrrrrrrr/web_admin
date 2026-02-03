@@ -297,6 +297,7 @@ export const updateDepartureReceipt = (
     loading_time?: string
     exit_time?: string
     production_date?: string
+    is_full_return?: string
   },
 ) => unwrap(client.put(`/receipts/departure/${receiptId}`, data))
 
@@ -406,3 +407,15 @@ export const batchUpdateReceiptField = (data: {
  */
 export const updateTransportTaskRemarks = (taskId: string, remarks: string) =>
   unwrap(client.put(`/receipts/transport-tasks/${taskId}`, { remarks }))
+
+/**
+ * 获取装料公司列表（从装料单据中提取）
+ */
+export const fetchLoadingCompanies = (params: { companyId?: number }) =>
+  unwrap<string[]>(
+    client.get('/receipts/loading-companies', {
+      params: {
+        company_id: params.companyId,
+      },
+    }),
+  )

@@ -19,6 +19,7 @@ import {
   Select,
   Space,
   Statistic,
+  Switch,
   Table,
   Tag,
   Tabs,
@@ -52,6 +53,7 @@ import {
   fetchReimbursementDetail,
   fetchReimbursementStats,
   fetchReimbursements,
+  updateReimbursement,
   submitReimbursement,
 } from '../api/services/reimbursements'
 import { fetchUsers } from '../api/services/users'
@@ -257,6 +259,20 @@ const ReimbursementsPage = () => {
     },
   })
 
+  const updatePublicAccountMutation = useMutation({
+    mutationFn: (params: { id: number; is_public_account: 'Y' | 'N' }) =>
+      updateReimbursement(params.id, { is_public_account: params.is_public_account }),
+    onSuccess: () => {
+      message.success('更新成功')
+      queryClient.invalidateQueries({ queryKey: ['reimbursements'] })
+      queryClient.invalidateQueries({ queryKey: ['reimbursements', 'stats'] })
+      queryClient.invalidateQueries({ queryKey: ['reimbursements', 'detail', selectedRecord?.id] })
+    },
+    onError: (error) => {
+      message.error((error as Error).message || '更新失败')
+    },
+  })
+
   const reimbursements = listQuery.data?.records || []
   const stats = statsQuery.data as ReimbursementStats | undefined
 
@@ -328,6 +344,37 @@ const ReimbursementsPage = () => {
         dataIndex: 'date',
         width: 120,
         sorter: (a, b) => (a.date || '').localeCompare(b.date || ''),
+      },
+      {
+        title: '公户报销',
+        dataIndex: 'is_public_account',
+        width: 110,
+        filters: [
+          { text: '是', value: 'Y' },
+          { text: '否', value: 'N' },
+        ],
+        onFilter: (value: any, record) => (record.is_public_account || 'N') === value,
+        render: (_: any, record) => {
+          const checked = (record.is_public_account || 'N') === 'Y'
+          const canToggle = isSuperAdmin || canApprove
+          if (!canToggle) {
+            return checked ? <Tag color="success">是</Tag> : <Tag>否</Tag>
+          }
+          const loading = updatePublicAccountMutation.isPending && updatePublicAccountMutation.variables?.id === record.id
+          return (
+            <Switch
+              checked={checked}
+              disabled={!canToggle}
+              loading={loading}
+              onChange={(v) => {
+                updatePublicAccountMutation.mutate({
+                  id: record.id,
+                  is_public_account: v ? 'Y' : 'N',
+                })
+              }}
+            />
+          )
+        },
       },
       {
         title: '凭证',
@@ -492,7 +539,7 @@ const ReimbursementsPage = () => {
         },
       },
     ],
-    [canApprove, submitMutation, user, reimbursements],
+    [canApprove, isSuperAdmin, submitMutation, updatePublicAccountMutation, user, reimbursements],
   )
 
   const columnsResizable = useMemo(
@@ -579,6 +626,7 @@ const ReimbursementsPage = () => {
         '类别': record.subcategory ? `${record.category} / ${record.subcategory}` : record.category,
         '项目/备注': record.project || record.remark || '-',
         '日期': record.date || '-',
+        '公户报销': (record.is_public_account || 'N') === 'Y' ? '是' : '否',
         '最新评论': record.latest_comment || '-',
         '评论人': (record as any).comment_user || '-',
         '当前审批人': record.current_approver || '-',
