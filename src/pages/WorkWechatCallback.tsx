@@ -52,8 +52,11 @@ function WorkWechatCallback() {
             token: result.data.token,
             user: {
               name: result.data.user.nickname || result.data.user.username,
-              role: result.data.user.role,
+              role: result.data.user.role || result.data.user.positionType || result.data.user.position_type || '管理员',
+              positionType: result.data.user.positionType || result.data.user.position_type,
               email: result.data.user.mobile,
+              companyId: result.data.user.companyId,
+              companyBusinessType: result.data.user.companyBusinessType,
             }
           });
           

@@ -137,7 +137,8 @@ const ReimbursementsPage = () => {
     }) as ColumnsType<T>
   }, [columnWidths, handleResize])
 
-  const canApprove = ['财务', '总经理'].includes((user as any)?.position_type || (user as any)?.role)
+  const userPosition = (user as any)?.positionType || (user as any)?.position_type
+  const canApprove = ['财务', '总经理'].includes(userPosition) || ['财务', '总经理'].includes((user as any)?.role)
 
   useEffect(() => {
     if (createModalOpen) {
@@ -380,25 +381,81 @@ const ReimbursementsPage = () => {
         title: '凭证',
         dataIndex: 'images',
         width: 180,
-        render: (value: string[]) => {
-          if (!value || value.length === 0) return '-'
-          const shown = value.slice(0, 2)
-          const rest = value.length - shown.length
+        render: (value: string[], record: ReimbursementRecord) => {
+          const images = value || []
+          const videos = record.video_urls || []
+          const totalCount = images.length + videos.length
+          
+          if (totalCount === 0) return '-'
+          
+          // 最多显示2个缩略图
+          const allMedia = [...images, ...videos]
+          const shown = allMedia.slice(0, 2)
+          const rest = totalCount - shown.length
+          
           return (
-            <Image.PreviewGroup>
-              <Space size={6} wrap>
-                {shown.map((img, idx) => (
-                  <Image
-                    key={idx}
-                    src={fixImageUrl(img) || ''}
-                    width={40}
-                    height={40}
-                    style={{ objectFit: 'cover', borderRadius: 6 }}
-                  />
-                ))}
-                {rest > 0 && <Text type="secondary">+{rest}</Text>}
-              </Space>
-            </Image.PreviewGroup>
+            <Space size={6} wrap>
+              {shown.map((url, idx) => {
+                const isVideo = videos.includes(url)
+                const fixedUrl = fixImageUrl(url) || ''
+                
+                if (isVideo) {
+                  // 视频缩略图：显示视频的第一帧
+                  return (
+                    <div 
+                      key={idx} 
+                      style={{ 
+                        position: 'relative',
+                        width: 40, 
+                        height: 40, 
+                        borderRadius: 6,
+                        overflow: 'hidden',
+                        backgroundColor: '#000'
+                      }}
+                    >
+                      <video 
+                        src={fixedUrl} 
+                        style={{ 
+                          width: '100%', 
+                          height: '100%', 
+                          objectFit: 'cover' 
+                        }}
+                      />
+                      <div style={{
+                        position: 'absolute',
+                        top: 0,
+                        left: 0,
+                        right: 0,
+                        bottom: 0,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        backgroundColor: 'rgba(0,0,0,0.3)',
+                        fontSize: 16,
+                        color: '#fff'
+                      }}>
+                        ▶
+                      </div>
+                    </div>
+                  )
+                } else {
+                  // 图片缩略图
+                  return (
+                    <Image
+                      key={idx}
+                      src={fixedUrl}
+                      width={40}
+                      height={40}
+                      style={{ objectFit: 'cover', borderRadius: 6 }}
+                      preview={{
+                        src: fixedUrl
+                      }}
+                    />
+                  )
+                }
+              })}
+              {rest > 0 && <Text type="secondary">+{rest}</Text>}
+            </Space>
           )
         },
       },
@@ -1055,6 +1112,47 @@ const ReimbursementsPage = () => {
                   </Image.PreviewGroup>
                 </>
               )}
+
+              {(() => {
+                console.log('[Reimbursements] video_urls:', detailQuery.data.video_urls);
+                console.log('[Reimbursements] video_urls type:', typeof detailQuery.data.video_urls);
+                console.log('[Reimbursements] video_urls length:', detailQuery.data.video_urls?.length);
+                
+                if (!detailQuery.data.video_urls || detailQuery.data.video_urls.length === 0) {
+                  return null;
+                }
+                
+                return (
+                  <>
+                    <Divider />
+                    <Text strong style={{ color: '#1890ff' }}>视频凭证 ({detailQuery.data.video_urls.length})：</Text>
+                    <Space direction="vertical" size={12} style={{ width: '100%', marginTop: 12 }}>
+                      {detailQuery.data.video_urls
+                        .map((u) => fixImageUrl(u) || '')
+                        .filter(Boolean)
+                        .map((src, idx) => {
+                          console.log('[Reimbursements] Rendering video:', src);
+                          return (
+                            <div key={idx} style={{ width: '100%', border: '2px solid #1890ff', padding: 8, borderRadius: 8 }}>
+                              <video 
+                                src={src} 
+                                controls 
+                                preload="metadata"
+                                style={{ 
+                                  width: '100%', 
+                                  maxHeight: 400,
+                                  borderRadius: 8,
+                                  backgroundColor: '#000'
+                                }} 
+                              />
+                              <div style={{ marginTop: 4, fontSize: 12, color: '#666' }}>视频 {idx + 1}: {src}</div>
+                            </div>
+                          );
+                        })}
+                    </Space>
+                  </>
+                );
+              })()}
             </Card>
 
             <Card title="审批流程">
