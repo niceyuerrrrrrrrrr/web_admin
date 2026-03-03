@@ -27,6 +27,7 @@ import {
   SolutionOutlined,
   TeamOutlined,
   WarningOutlined,
+  WalletOutlined,
 } from '@ant-design/icons'
 import type { MenuProps } from 'antd'
 import {
@@ -77,6 +78,19 @@ import HRPage from './pages/HR'
 import LeavePage from './pages/Leave'
 import ReportsPage from './pages/Reports'
 import PurchasesPage from './pages/Purchases'
+import FinOverviewPage from './pages/FinOverview'
+import FinAccountsPage from './pages/FinAccounts'
+import FinCategoriesPage from './pages/FinCategories'
+import FinSuppliersPage from './pages/FinSuppliers'
+import FinCustomersPage from './pages/FinCustomers'
+import FinCashInPage from './pages/FinCashIn'
+import FinCashOutPage from './pages/FinCashOut'
+import FinARPage from './pages/FinAR'
+import FinARReceiptsPage from './pages/FinARReceipts'
+import FinAPPage from './pages/FinAP'
+import FinAPPaymentsPage from './pages/FinAPPayments'
+import FinPettyGrantsPage from './pages/FinPettyGrants'
+import FinPettySettlesPage from './pages/FinPettySettles'
 import NoticesPage from './pages/Notices'
 import DocumentsPage from './pages/Documents'
 import SettingsPage from './pages/Settings'
@@ -95,6 +109,12 @@ import DriverSalaryPage from './pages/DriverSalary'
 import StaffSalaryPage from './pages/StaffSalary'
 import SettlementStatementPage from './pages/SettlementStatement'
 import PriceConfigPage from './pages/PriceConfig'
+import TireInventoryPage from './pages/TireInventory'
+import TirePurchasePage from './pages/TirePurchase'
+import TireSuppliersPage from './pages/TireSuppliers'
+import TireMaintenancePage from './pages/TireMaintenance'
+import TireSalesPage from './pages/TireSales'
+import TireStatisticsPage from './pages/TireStatistics'
 import './App.css'
 import { fetchSystemConfig } from './api/services/systemConfig'
 
@@ -157,6 +177,149 @@ const routeDefinitions = [
         element: <ReportsPage />,
       },
     ]
+  },
+  {
+    key: 'finance-center',
+    label: '财务中心',
+    icon: <DollarOutlined />,
+    children: [
+      {
+        key: 'fin-overview',
+        label: '财务概览',
+        path: '/fin/overview',
+        element: <FinOverviewPage />,
+      },
+      {
+        key: 'fund-management',
+        label: '资金管理',
+        icon: <DollarOutlined />,
+        children: [
+          {
+            key: 'cash-in-management',
+            label: '收款管理',
+            children: [
+              {
+                key: 'fin-cash-in',
+                label: '收款单列表',
+                path: '/fin/cash-in',
+                element: <FinCashInPage />,
+              },
+            ],
+          },
+          {
+            key: 'cash-out-management',
+            label: '付款管理',
+            children: [
+              {
+                key: 'fin-cash-out',
+                label: '付款单列表',
+                path: '/fin/cash-out',
+                element: <FinCashOutPage />,
+              },
+            ],
+          },
+          {
+            key: 'account-management',
+            label: '账户管理',
+            children: [
+              {
+                key: 'fin-accounts',
+                label: '账户列表',
+                path: '/fin/accounts',
+                element: <FinAccountsPage />,
+              },
+            ],
+          },
+        ],
+      },
+      {
+        key: 'receivable-payable',
+        label: '应收应付',
+        icon: <FileTextOutlined />,
+        children: [
+          {
+            key: 'receivable-management',
+            label: '应收管理',
+            children: [
+              {
+                key: 'fin-ar',
+                label: '应收账款',
+                path: '/fin/ar',
+                element: <FinARPage />,
+              },
+              {
+                key: 'fin-ar-receipts',
+                label: '应收回款',
+                path: '/fin/ar-receipts',
+                element: <FinARReceiptsPage />,
+              },
+            ],
+          },
+          {
+            key: 'payable-management',
+            label: '应付管理',
+            children: [
+              {
+                key: 'fin-ap',
+                label: '应付账款',
+                path: '/fin/ap',
+                element: <FinAPPage />,
+              },
+              {
+                key: 'fin-ap-payments',
+                label: '应付实付',
+                path: '/fin/ap-payments',
+                element: <FinAPPaymentsPage />,
+              },
+            ],
+          },
+        ],
+      },
+      {
+        key: 'fin-petty',
+        label: '备用金管理',
+        icon: <WalletOutlined />,
+        children: [
+          {
+            key: 'fin-petty-grants',
+            label: '备用金发放',
+            path: '/fin/petty-grants',
+            element: <FinPettyGrantsPage />,
+          },
+          {
+            key: 'fin-petty-settles',
+            label: '备用金核销',
+            path: '/fin/petty-settles',
+            element: <FinPettySettlesPage />,
+          },
+        ],
+      },
+      {
+        key: 'basic-data',
+        label: '基础数据',
+        icon: <DatabaseOutlined />,
+        children: [
+          {
+            key: 'fin-customers',
+            label: '客户管理',
+            path: '/fin/customers',
+            element: <FinCustomersPage />,
+          },
+          {
+            key: 'fin-suppliers',
+            label: '供应商管理',
+            path: '/fin/suppliers',
+            element: <FinSuppliersPage />,
+          },
+          {
+            key: 'fin-categories',
+            label: '分类设置',
+            path: '/fin/categories',
+            element: <FinCategoriesPage />,
+          },
+        ],
+      },
+    ],
   },
   {
     key: 'operations',
@@ -291,6 +454,49 @@ const routeDefinitions = [
         path: '/material-pricing',
         icon: <DollarOutlined />,
         element: <MaterialPricingPage />,
+      },
+      {
+        key: 'tire-management',
+        label: '轮胎管理',
+        icon: <CarOutlined />,
+        children: [
+          {
+            key: 'tire-statistics',
+            label: '数据统计',
+            path: '/tires/statistics',
+            element: <TireStatisticsPage />,
+          },
+          {
+            key: 'tire-inventory',
+            label: '轮胎库存',
+            path: '/tires/inventory',
+            element: <TireInventoryPage />,
+          },
+          {
+            key: 'tire-purchase',
+            label: '轮胎采购',
+            path: '/tires/purchase',
+            element: <TirePurchasePage />,
+          },
+          {
+            key: 'tire-sales',
+            label: '轮胎销售',
+            path: '/tires/sales',
+            element: <TireSalesPage />,
+          },
+          {
+            key: 'tire-maintenance',
+            label: '维护管理',
+            path: '/tires/maintenance',
+            element: <TireMaintenancePage />,
+          },
+          {
+            key: 'tire-suppliers',
+            label: '供应商管理',
+            path: '/tires/suppliers',
+            element: <TireSuppliersPage />,
+          },
+        ],
       },
     ]
   },

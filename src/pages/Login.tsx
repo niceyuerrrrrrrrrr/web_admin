@@ -1,5 +1,5 @@
-import { App as AntdApp, Button, Card, Form, Input, Typography, Divider } from 'antd'
-import { LockOutlined, UserOutlined, WechatOutlined } from '@ant-design/icons'
+import { App as AntdApp, Button, Card, Form, Input, Typography, Divider, Modal } from 'antd'
+import { LockOutlined, UserOutlined, WechatOutlined, ExclamationCircleOutlined } from '@ant-design/icons'
 import { useMutation } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 import { login } from '../api/services/auth'
@@ -9,7 +9,7 @@ const { Title, Paragraph } = Typography
 
 const LoginPage = () => {
   const [form] = Form.useForm()
-  const { message } = AntdApp.useApp()
+  const { message, modal } = AntdApp.useApp()
   const navigate = useNavigate()
   const { setAuth } = useAuthStore()
 
@@ -31,7 +31,28 @@ const LoginPage = () => {
       navigate('/dashboard', { replace: true })
     },
     onError: (error) => {
-      message.error((error as Error).message || '登录失败，请稍后重试')
+      const errorMessage = (error as Error).message || '登录失败，请稍后重试'
+      
+      // 如果是权限错误（403），显示弹窗
+      if (errorMessage.includes('无权访问管理后台') || errorMessage.includes('司机账号')) {
+        modal.error({
+          title: '登录失败',
+          icon: <ExclamationCircleOutlined />,
+          content: (
+            <div>
+              <p style={{ marginBottom: 16 }}>{errorMessage}</p>
+              <p style={{ color: '#666', fontSize: 14 }}>
+                如有疑问，请联系管理员：13484910242
+              </p>
+            </div>
+          ),
+          okText: '我知道了',
+          centered: true,
+        })
+      } else {
+        // 其他错误使用普通提示
+        message.error(errorMessage)
+      }
     },
   })
 
@@ -39,6 +60,7 @@ const LoginPage = () => {
     loginMutation.mutate({
       phone: values.phone,
       password: values.password,
+      source: 'admin',  // 标识这是管理后台登录
     })
   }
 

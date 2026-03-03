@@ -118,3 +118,18 @@ export const fetchReimbursementStats = (params?: { beginDate?: string; endDate?:
     }),
   )
 
+// 财务支付报销
+export const payReimbursement = (id: number, data: {
+  account_id: number
+  pay_method?: string
+  cash_date?: string
+  remark?: string
+  attachments?: string[]
+}) => unwrap<{
+  reimbursement_id: number
+  cash_out_id: number
+  amount_cents: number
+  pay_status: string
+  message: string
+}>(client.post(`/reimbursement/${id}/pay`, data))
+

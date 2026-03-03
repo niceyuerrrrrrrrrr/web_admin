@@ -351,6 +351,7 @@ export interface ReimbursementRecord {
   id: number
   user_id: number
   applicant_name?: string
+  user_name?: string
   latest_comment?: string
   comment_images?: string[]
   comment_user?: string
@@ -358,15 +359,21 @@ export interface ReimbursementRecord {
   can_approve?: boolean
   approver_name?: string
   amount: number
+  amount_cents?: number
   category: string
   subcategory?: string
   merchant?: string
   date: string
   remark?: string
   project?: string
+  images?: string[]
+  video_urls?: string[]
   is_public_account?: string
   status: ReimbursementStatus
-  images?: string[]
+  pay_status?: 'unpaid' | 'paid'
+  cash_out_id?: number
+  paid_at?: string
+  paid_by?: number
   created_at?: string
   updated_at?: string
 }
@@ -435,12 +442,20 @@ export interface PurchaseRecord {
   can_approve?: boolean
   approver_name?: string
   amount: number
+  amount_cents?: number
   category: string
   supplier?: string
   date: string
   remark?: string
   project?: string
   status: PurchaseStatus
+  pay_mode?: 'direct' | 'credit'
+  pay_status?: 'unpaid' | 'partial' | 'paid'
+  supplier_id?: number
+  ap_id?: number
+  cash_out_id?: number
+  paid_at?: string
+  paid_by?: number
   images?: string[]
   created_at?: string
   updated_at?: string
@@ -474,6 +489,119 @@ export interface PurchaseComment {
   content: string
   images?: string[]
   created_at?: string
+}
+
+// 财务中心：基础档案
+export interface FinAccountRecord {
+  id: number
+  company_id: number
+  name: string
+  type: string
+  opening_balance_cents: number
+  is_active: number
+  remark?: string | null
+}
+
+export interface FinCategoryRecord {
+  id: number
+  company_id: number
+  name: string
+  parent_id?: number | null
+  is_active: number
+  sort_order: number
+}
+
+export interface FinSupplierRecord {
+  id: number
+  company_id: number
+  name: string
+  contact_name?: string | null
+  contact_phone?: string | null
+  settlement_terms?: string | null
+  bank_info?: string | null
+  is_active: number
+  remark?: string | null
+}
+
+export interface FinCustomerRecord {
+  id: number
+  company_id: number
+  name: string
+  contact_name?: string | null
+  contact_phone?: string | null
+  billing_title?: string | null
+  tax_no?: string | null
+  settlement_terms?: string | null
+  credit_limit_cents?: number | null
+  is_active: number
+  remark?: string | null
+}
+
+// 财务中心：收/付款单
+export type FinCashStatus = 'draft' | 'reviewing' | 'approved' | 'rejected'
+
+export interface FinCashInRecord {
+  id: number
+  code?: string | null
+  company_id: number
+  account_id: number
+  payer_type: string
+  payer_id?: number | null
+  amount_cents: number
+  cash_date: string
+  method?: string | null
+  biz_type?: string | null
+  biz_id?: number | null
+  status: FinCashStatus
+  created_by?: number | null
+  approved_by?: number | null
+  approved_at?: string | null
+  created_at?: string | null
+  updated_at?: string | null
+}
+
+export interface FinCashInDetail extends FinCashInRecord {
+  remark?: string | null
+  attachments?: string[] | null
+}
+
+export interface FinCashOutRecord {
+  id: number
+  code?: string | null
+  company_id: number
+  account_id: number
+  payee_type: string
+  payee_id?: number | null
+  amount_cents: number
+  cash_date: string
+  method?: string | null
+  biz_type?: string | null
+  biz_id?: number | null
+  status: FinCashStatus
+  created_by?: number | null
+  approved_by?: number | null
+  approved_at?: string | null
+  created_at?: string | null
+  updated_at?: string | null
+}
+
+export interface FinCashOutDetail extends FinCashOutRecord {
+  remark?: string | null
+  attachments?: string[] | null
+}
+
+export interface FinCashInListResponse {
+  total: number
+  page: number
+  page_size: number
+  records: FinCashInRecord[]
+}
+
+export interface FinCashOutListResponse {
+  total: number
+  page: number
+  page_size: number
+  records: FinCashOutRecord[]
 }
 
 // 物品领用
@@ -788,6 +916,7 @@ export interface ReportRecord {
   location?: string
   priority: string
   images?: string[]
+  video_urls?: string[]
   status: ReportStatus
   applicant_name?: string
   approver_name?: string
@@ -1038,6 +1167,7 @@ export interface ExportJobRecord {
 export interface LoginPayload {
   phone: string
   password: string
+  source?: string  // 登录来源：'admin' 表示管理后台
 }
 
 export interface LoginUserInfo {

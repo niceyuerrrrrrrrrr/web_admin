@@ -55,8 +55,10 @@ import {
   fetchReimbursements,
   updateReimbursement,
   submitReimbursement,
+  payReimbursement,
 } from '../api/services/reimbursements'
 import { fetchUsers } from '../api/services/users'
+import { fetchFinAccounts } from '../api/services/finBase'
 import type { ReimbursementRecord, ReimbursementStats } from '../api/types'
 import useAuthStore from '../store/auth'
 import useCompanyStore from '../store/company'
@@ -91,6 +93,7 @@ const ReimbursementsPage = () => {
   const { selectedCompanyId } = useCompanyStore()
 
   const isSuperAdmin = user?.role === 'super_admin' || user?.positionType === '超级管理员'
+  const isFinance = user?.positionType === '财务' || isSuperAdmin
   const effectiveCompanyId = isSuperAdmin ? selectedCompanyId : undefined
   const showCompanyWarning = isSuperAdmin && !effectiveCompanyId
 
@@ -108,8 +111,10 @@ const ReimbursementsPage = () => {
   const [selectedRecord, setSelectedRecord] = useState<ReimbursementRecord | null>(null)
   const [detailDrawerOpen, setDetailDrawerOpen] = useState(false)
   const [createModalOpen, setCreateModalOpen] = useState(false)
+  const [payModalOpen, setPayModalOpen] = useState(false)
   const [actionModal, setActionModal] = useState<{ type: 'approve' | 'reject' | null }>({ type: null })
   const [createForm] = Form.useForm()
+  const [payForm] = Form.useForm()
   const [commentForm] = Form.useForm()
   const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([])
   const [currentPage, setCurrentPage] = useState(1)
@@ -177,9 +182,14 @@ const ReimbursementsPage = () => {
   })
 
   const usersQuery = useQuery({
-    queryKey: ['users', 'for-reimbursements', effectiveCompanyId],
-    queryFn: () => fetchUsers({ size: 200, company_id: effectiveCompanyId }),
-    enabled: isSuperAdmin ? !!effectiveCompanyId : true,
+    queryKey: ['users', 'all'],
+    queryFn: () => fetchUsers({ page: 1, size: 1000 }),
+  })
+
+  const accountsQuery = useQuery({
+    queryKey: ['fin-accounts', effectiveCompanyId],
+    queryFn: () => fetchFinAccounts({ companyId: effectiveCompanyId, activeOnly: true }),
+    enabled: isFinance,
   })
 
   const detailQuery = useQuery({
@@ -271,6 +281,27 @@ const ReimbursementsPage = () => {
     },
     onError: (error) => {
       message.error((error as Error).message || '更新失败')
+    },
+  })
+
+  const payMutation = useMutation({
+    mutationFn: (params: { id: number; account_id: number; pay_method?: string; cash_date?: string; remark?: string }) =>
+      payReimbursement(params.id, {
+        account_id: params.account_id,
+        pay_method: params.pay_method,
+        cash_date: params.cash_date,
+        remark: params.remark,
+      }),
+    onSuccess: (data) => {
+      message.success(data.message || '支付成功')
+      payForm.resetFields()
+      setPayModalOpen(false)
+      queryClient.invalidateQueries({ queryKey: ['reimbursements'] })
+      queryClient.invalidateQueries({ queryKey: ['reimbursements', 'stats'] })
+      queryClient.invalidateQueries({ queryKey: ['reimbursements', 'detail', selectedRecord?.id] })
+    },
+    onError: (error) => {
+      message.error((error as Error).message || '支付失败')
     },
   })
 
@@ -539,6 +570,25 @@ const ReimbursementsPage = () => {
         },
       },
       {
+        title: '支付状态',
+        dataIndex: 'pay_status',
+        width: 110,
+        filters: [
+          { text: '未支付', value: 'unpaid' },
+          { text: '已支付', value: 'paid' },
+        ],
+        onFilter: (value, record) => (record.pay_status || 'unpaid') === value,
+        render: (value: string, record) => {
+          if (record.status !== 'approved') return '-'
+          const isPaid = value === 'paid'
+          return (
+            <Tag color={isPaid ? 'success' : 'warning'} icon={isPaid ? <CheckCircleOutlined /> : <DollarOutlined />}>
+              {isPaid ? '已支付' : '未支付'}
+            </Tag>
+          )
+        },
+      },
+      {
         title: '操作',
         width: 200,
         fixed: 'right',
@@ -584,6 +634,28 @@ const ReimbursementsPage = () => {
                 onClick={() => setActionModal({ type: 'reject' })}
               >
                 拒绝
+              </Button>
+            )
+          }
+          
+          // 财务支付按钮
+          if (isFinance && record.status === 'approved' && (record.pay_status || 'unpaid') === 'unpaid') {
+            buttons.push(
+              <Button
+                key="pay"
+                type="link"
+                size="small"
+                icon={<DollarOutlined />}
+                onClick={() => {
+                  setSelectedRecord(record)
+                  setPayModalOpen(true)
+                  payForm.setFieldsValue({
+                    cash_date: dayjs(),
+                    pay_method: 'bank_transfer',
+                  })
+                }}
+              >
+                支付
               </Button>
             )
           }
@@ -1305,9 +1377,90 @@ const ReimbursementsPage = () => {
           </Form.Item>
         </Form>
       </Modal>
+
+      {/* 支付弹窗 */}
+      <Modal
+        title="报销支付"
+        open={payModalOpen}
+        onCancel={() => {
+          setPayModalOpen(false)
+          payForm.resetFields()
+        }}
+        onOk={() => payForm.submit()}
+        confirmLoading={payMutation.isPending}
+        width={500}
+      >
+        <Form
+          form={payForm}
+          layout="vertical"
+          onFinish={(values) => {
+            if (!selectedRecord) return
+            payMutation.mutate({
+              id: selectedRecord.id,
+              account_id: values.account_id,
+              pay_method: values.pay_method,
+              cash_date: values.cash_date?.format('YYYY-MM-DD'),
+              remark: values.remark,
+            })
+          }}
+        >
+          <Descriptions bordered size="small" style={{ marginBottom: 16 }}>
+            <Descriptions.Item label="报销单号">{selectedRecord?.id}</Descriptions.Item>
+            <Descriptions.Item label="报销人">{selectedRecord?.applicant_name}</Descriptions.Item>
+            <Descriptions.Item label="金额">
+              <Text strong style={{ color: '#ff4d4f', fontSize: 16 }}>
+                ¥ {selectedRecord?.amount?.toFixed(2)}
+              </Text>
+            </Descriptions.Item>
+          </Descriptions>
+
+          <Form.Item
+            name="account_id"
+            label="支付账户"
+            rules={[{ required: true, message: '请选择支付账户' }]}
+          >
+            <Select
+              placeholder="请选择支付账户"
+              loading={accountsQuery.isLoading}
+              options={(accountsQuery.data?.records || []).map((account) => ({
+                label: `${account.name} (余额: ¥${((account.opening_balance_cents || 0) / 100).toFixed(2)})`,
+                value: account.id,
+              }))}
+            />
+          </Form.Item>
+
+          <Form.Item
+            name="pay_method"
+            label="支付方式"
+            rules={[{ required: true, message: '请选择支付方式' }]}
+          >
+            <Select
+              placeholder="请选择支付方式"
+              options={[
+                { label: '银行转账', value: 'bank_transfer' },
+                { label: '现金', value: 'cash' },
+                { label: '支付宝', value: 'alipay' },
+                { label: '微信', value: 'wechat' },
+                { label: '其他', value: 'other' },
+              ]}
+            />
+          </Form.Item>
+
+          <Form.Item
+            name="cash_date"
+            label="支付日期"
+            rules={[{ required: true, message: '请选择支付日期' }]}
+          >
+            <DatePicker style={{ width: '100%' }} />
+          </Form.Item>
+
+          <Form.Item name="remark" label="备注">
+            <Input.TextArea rows={3} placeholder="请输入备注信息（可选）" />
+          </Form.Item>
+        </Form>
+      </Modal>
     </Space>
   )
 }
 
 export default ReimbursementsPage
-

@@ -26,7 +26,9 @@ import {
   CheckCircleOutlined,
   CloseCircleOutlined,
   CommentOutlined,
+  DollarOutlined,
   DownloadOutlined,
+  EyeOutlined,
   FileSearchOutlined,
   PlusOutlined,
   ReloadOutlined,
@@ -45,8 +47,11 @@ import {
   fetchPurchaseDetail,
   fetchPurchases,
   submitPurchase,
+  payPurchase,
+  createPurchaseAP,
 } from '../api/services/purchases'
 import { fetchUsers } from '../api/services/users'
+import { fetchFinAccounts } from '../api/services/finBase'
 import type { PurchaseRecord } from '../api/types'
 import useAuthStore from '../store/auth'
 import useCompanyStore from '../store/company'
@@ -71,6 +76,7 @@ const PurchasesPage = () => {
   const { selectedCompanyId } = useCompanyStore()
 
   const isSuperAdmin = user?.role === 'super_admin' || user?.positionType === '超级管理员'
+  const isFinance = user?.positionType === '财务' || isSuperAdmin
   const effectiveCompanyId = isSuperAdmin ? selectedCompanyId : undefined
   const showCompanyWarning = isSuperAdmin && !effectiveCompanyId
 
@@ -85,8 +91,12 @@ const PurchasesPage = () => {
   const [selectedRecord, setSelectedRecord] = useState<PurchaseRecord | null>(null)
   const [detailDrawerOpen, setDetailDrawerOpen] = useState(false)
   const [createModalOpen, setCreateModalOpen] = useState(false)
+  const [payModalOpen, setPayModalOpen] = useState(false)
+  const [apModalOpen, setApModalOpen] = useState(false)
   const [actionModal, setActionModal] = useState<{ type: 'approve' | 'reject' | null }>({ type: null })
   const [createForm] = Form.useForm()
+  const [payForm] = Form.useForm()
+  const [apForm] = Form.useForm()
   const [commentForm] = Form.useForm()
   const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([])
   const [currentPage, setCurrentPage] = useState(1)
@@ -143,6 +153,12 @@ const PurchasesPage = () => {
     queryKey: ['users', 'for-purchases', effectiveCompanyId],
     queryFn: () => fetchUsers({ size: 200, company_id: effectiveCompanyId }),
     enabled: isSuperAdmin ? !!effectiveCompanyId : true,
+  })
+
+  const accountsQuery = useQuery({
+    queryKey: ['fin-accounts', effectiveCompanyId],
+    queryFn: () => fetchFinAccounts({ companyId: effectiveCompanyId, activeOnly: true }),
+    enabled: isFinance,
   })
 
   const detailQuery = useQuery({
@@ -218,6 +234,44 @@ const PurchasesPage = () => {
     },
     onError: (error) => {
       message.error((error as Error).message || '评论失败')
+    },
+  })
+
+  const payMutation = useMutation({
+    mutationFn: (params: { id: number; account_id: number; pay_method?: string; cash_date?: string; remark?: string }) =>
+      payPurchase(params.id, {
+        account_id: params.account_id,
+        pay_method: params.pay_method,
+        cash_date: params.cash_date,
+        remark: params.remark,
+      }),
+    onSuccess: (data) => {
+      message.success(data.message || '支付成功')
+      payForm.resetFields()
+      setPayModalOpen(false)
+      queryClient.invalidateQueries({ queryKey: ['purchases'] })
+      queryClient.invalidateQueries({ queryKey: ['purchases', 'detail', selectedRecord?.id] })
+    },
+    onError: (error) => {
+      message.error((error as Error).message || '支付失败')
+    },
+  })
+
+  const createAPMutation = useMutation({
+    mutationFn: (params: { id: number; due_date: string; remark?: string }) =>
+      createPurchaseAP(params.id, {
+        due_date: params.due_date,
+        remark: params.remark,
+      }),
+    onSuccess: (data) => {
+      message.success(data.message || '应付单生成成功')
+      apForm.resetFields()
+      setApModalOpen(false)
+      queryClient.invalidateQueries({ queryKey: ['purchases'] })
+      queryClient.invalidateQueries({ queryKey: ['purchases', 'detail', selectedRecord?.id] })
+    },
+    onError: (error) => {
+      message.error((error as Error).message || '生成应付单失败')
     },
   })
 
@@ -402,6 +456,46 @@ const PurchasesPage = () => {
         },
       },
       {
+        title: '支付模式',
+        dataIndex: 'pay_mode',
+        width: 110,
+        filters: [
+          { text: '直接支付', value: 'direct' },
+          { text: '账期应付', value: 'credit' },
+        ],
+        onFilter: (value, record) => (record.pay_mode || 'direct') === value,
+        render: (value: string, record) => {
+          if (record.status !== 'approved') return '-'
+          const isDirect = (value || 'direct') === 'direct'
+          return (
+            <Tag color={isDirect ? 'blue' : 'orange'}>
+              {isDirect ? '直接支付' : '账期应付'}
+            </Tag>
+          )
+        },
+      },
+      {
+        title: '支付状态',
+        dataIndex: 'pay_status',
+        width: 110,
+        filters: [
+          { text: '未支付', value: 'unpaid' },
+          { text: '部分支付', value: 'partial' },
+          { text: '已支付', value: 'paid' },
+        ],
+        onFilter: (value, record) => (record.pay_status || 'unpaid') === value,
+        render: (value: string, record) => {
+          if (record.status !== 'approved') return '-'
+          const statusMap: Record<string, { color: string; label: string; icon: any }> = {
+            unpaid: { color: 'warning', label: '未支付', icon: <DollarOutlined /> },
+            partial: { color: 'processing', label: '部分支付', icon: <DollarOutlined /> },
+            paid: { color: 'success', label: '已支付', icon: <CheckCircleOutlined /> },
+          }
+          const status = statusMap[value || 'unpaid'] || statusMap.unpaid
+          return <Tag color={status.color} icon={status.icon}>{status.label}</Tag>
+        },
+      },
+      {
         title: '操作',
         width: 200,
         fixed: 'right',
@@ -447,6 +541,49 @@ const PurchasesPage = () => {
                 onClick={() => setActionModal({ type: 'reject' })}
               >
                 拒绝
+              </Button>
+            )
+          }
+          
+          // 财务支付按钮（直接支付模式）
+          if (isFinance && record.status === 'approved' && (record.pay_mode || 'direct') === 'direct' && (record.pay_status || 'unpaid') === 'unpaid') {
+            buttons.push(
+              <Button
+                key="pay"
+                type="link"
+                size="small"
+                icon={<DollarOutlined />}
+                onClick={() => {
+                  setSelectedRecord(record)
+                  setPayModalOpen(true)
+                  payForm.setFieldsValue({
+                    cash_date: dayjs(),
+                    pay_method: 'bank_transfer',
+                  })
+                }}
+              >
+                支付
+              </Button>
+            )
+          }
+          
+          // 生成应付单按钮（账期模式）
+          if (isFinance && record.status === 'approved' && record.pay_mode === 'credit' && !record.ap_id) {
+            buttons.push(
+              <Button
+                key="create_ap"
+                type="link"
+                size="small"
+                icon={<FileSearchOutlined />}
+                onClick={() => {
+                  setSelectedRecord(record)
+                  setApModalOpen(true)
+                  apForm.setFieldsValue({
+                    due_date: dayjs().add(30, 'day'),
+                  })
+                }}
+              >
+                生成应付单
               </Button>
             )
           }
@@ -885,6 +1022,144 @@ const PurchasesPage = () => {
         <Form id="action-comment-form" layout="vertical" onFinish={handleAction}>
           <Form.Item name="comment" label="审批意见">
             <Input.TextArea rows={3} placeholder="可选，填写审批说明" />
+          </Form.Item>
+        </Form>
+      </Modal>
+
+      {/* 支付弹窗 */}
+      <Modal
+        title="采购支付"
+        open={payModalOpen}
+        onCancel={() => {
+          setPayModalOpen(false)
+          payForm.resetFields()
+        }}
+        onOk={() => payForm.submit()}
+        confirmLoading={payMutation.isPending}
+        width={500}
+      >
+        <Form
+          form={payForm}
+          layout="vertical"
+          onFinish={(values) => {
+            if (!selectedRecord) return
+            payMutation.mutate({
+              id: selectedRecord.id,
+              account_id: values.account_id,
+              pay_method: values.pay_method,
+              cash_date: values.cash_date?.format('YYYY-MM-DD'),
+              remark: values.remark,
+            })
+          }}
+        >
+          <Descriptions bordered size="small" style={{ marginBottom: 16 }}>
+            <Descriptions.Item label="采购单号">{selectedRecord?.id}</Descriptions.Item>
+            <Descriptions.Item label="申请人">{selectedRecord?.applicant_name}</Descriptions.Item>
+            <Descriptions.Item label="金额">
+              <Text strong style={{ color: '#ff4d4f', fontSize: 16 }}>
+                ¥ {selectedRecord?.amount?.toFixed(2)}
+              </Text>
+            </Descriptions.Item>
+          </Descriptions>
+
+          <Form.Item
+            name="account_id"
+            label="支付账户"
+            rules={[{ required: true, message: '请选择支付账户' }]}
+          >
+            <Select
+              placeholder="请选择支付账户"
+              loading={accountsQuery.isLoading}
+              options={(accountsQuery.data?.records || []).map((account) => ({
+                label: `${account.name} (余额: ¥${((account.opening_balance_cents || 0) / 100).toFixed(2)})`,
+                value: account.id,
+              }))}
+            />
+          </Form.Item>
+
+          <Form.Item
+            name="pay_method"
+            label="支付方式"
+            rules={[{ required: true, message: '请选择支付方式' }]}
+          >
+            <Select
+              placeholder="请选择支付方式"
+              options={[
+                { label: '银行转账', value: 'bank_transfer' },
+                { label: '现金', value: 'cash' },
+                { label: '支付宝', value: 'alipay' },
+                { label: '微信', value: 'wechat' },
+                { label: '其他', value: 'other' },
+              ]}
+            />
+          </Form.Item>
+
+          <Form.Item
+            name="cash_date"
+            label="支付日期"
+            rules={[{ required: true, message: '请选择支付日期' }]}
+          >
+            <DatePicker style={{ width: '100%' }} />
+          </Form.Item>
+
+          <Form.Item name="remark" label="备注">
+            <Input.TextArea rows={3} placeholder="请输入备注信息（可选）" />
+          </Form.Item>
+        </Form>
+      </Modal>
+
+      {/* 生成应付单弹窗 */}
+      <Modal
+        title="生成应付单"
+        open={apModalOpen}
+        onCancel={() => {
+          setApModalOpen(false)
+          apForm.resetFields()
+        }}
+        onOk={() => apForm.submit()}
+        confirmLoading={createAPMutation.isPending}
+        width={500}
+      >
+        <Form
+          form={apForm}
+          layout="vertical"
+          onFinish={(values) => {
+            if (!selectedRecord) return
+            createAPMutation.mutate({
+              id: selectedRecord.id,
+              due_date: values.due_date?.format('YYYY-MM-DD'),
+              remark: values.remark,
+            })
+          }}
+        >
+          <Descriptions bordered size="small" style={{ marginBottom: 16 }}>
+            <Descriptions.Item label="采购单号">{selectedRecord?.id}</Descriptions.Item>
+            <Descriptions.Item label="供应商">{selectedRecord?.supplier || '-'}</Descriptions.Item>
+            <Descriptions.Item label="金额">
+              <Text strong style={{ color: '#ff4d4f', fontSize: 16 }}>
+                ¥ {selectedRecord?.amount?.toFixed(2)}
+              </Text>
+            </Descriptions.Item>
+          </Descriptions>
+
+          <Alert
+            message="提示"
+            description="生成应付单后，将进入账期管理流程。后续可通过应付实付功能进行付款。"
+            type="info"
+            showIcon
+            style={{ marginBottom: 16 }}
+          />
+
+          <Form.Item
+            name="due_date"
+            label="到期日期"
+            rules={[{ required: true, message: '请选择到期日期' }]}
+          >
+            <DatePicker style={{ width: '100%' }} />
+          </Form.Item>
+
+          <Form.Item name="remark" label="备注">
+            <Input.TextArea rows={3} placeholder="请输入备注信息（可选）" />
           </Form.Item>
         </Form>
       </Modal>

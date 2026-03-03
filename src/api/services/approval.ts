@@ -10,6 +10,8 @@ export const APPROVAL_TYPES = [
   { value: 'makeup', label: '补卡' },
   { value: 'regularization', label: '转正' },
   { value: 'offboarding', label: '离职' },
+  { value: 'fin_cash_in', label: '收款单' },
+  { value: 'fin_cash_out', label: '付款单' },
 ]
 
 export type ApprovalCoreFields = {

@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useMemo, useState } from 'react'
 import {
   Card,
   Table,
@@ -18,35 +18,43 @@ import { useQuery } from '@tanstack/react-query'
 import dayjs from 'dayjs'
 import type { Dayjs } from 'dayjs'
 import useCompanyStore from '../store/company'
+import useAuthStore from '../store/auth'
 import { fetchVehicleUsageCalendar } from '../api/services/vehicles'
 
 const { RangePicker } = DatePicker
 
 const VehicleUsageCalendar: React.FC = () => {
   const { selectedCompanyId } = useCompanyStore()
+  const { user } = useAuthStore()
   const [dateRange, setDateRange] = useState<[Dayjs, Dayjs]>([
     dayjs().startOf('month'),
     dayjs().endOf('month'),
   ])
 
+  const isSuperAdmin = user?.role === 'super_admin' || user?.role === 'admin' || user?.positionType === '超级管理员'
+  const effectiveCompanyId = isSuperAdmin ? selectedCompanyId : user?.companyId
+
+  const startDateStr = useMemo(() => dateRange[0].format('YYYY-MM-DD'), [dateRange])
+  const endDateStr = useMemo(() => dateRange[1].format('YYYY-MM-DD'), [dateRange])
+
   // 获取车辆使用数据（按公司过滤）
   const { data: usageData, refetch, isLoading, error } = useQuery({
-    queryKey: ['vehicleUsage', selectedCompanyId, dateRange],
+    queryKey: ['vehicleUsage', effectiveCompanyId, startDateStr, endDateStr],
     queryFn: async () => {
       console.log('查询车辆使用日历:', {
-        company_id: selectedCompanyId,
-        start_date: dateRange[0].format('YYYY-MM-DD'),
-        end_date: dateRange[1].format('YYYY-MM-DD'),
+        company_id: effectiveCompanyId,
+        start_date: startDateStr,
+        end_date: endDateStr,
       })
       const result = await fetchVehicleUsageCalendar({
-        company_id: selectedCompanyId!,
-        start_date: dateRange[0].format('YYYY-MM-DD'),
-        end_date: dateRange[1].format('YYYY-MM-DD'),
+        company_id: effectiveCompanyId,
+        start_date: startDateStr,
+        end_date: endDateStr,
       })
       console.log('车辆使用日历返回数据:', result)
       return result
     },
-    enabled: !!selectedCompanyId,
+    enabled: !!effectiveCompanyId,
   })
   
   // 打印错误信息
@@ -139,21 +147,22 @@ const VehicleUsageCalendar: React.FC = () => {
   }
 
   const columns = generateDateColumns()
-  // API返回格式：{success: true, data: [...], message: "..."}
-  // usageData本身就是ApiResponse，所以usageData.data是实际的车辆数组
-  const dataSource = usageData?.data || []
+  const dataSource = Array.isArray(usageData) ? usageData : []
 
   // 计算统计数据
   const totalVehicles = dataSource.length
   const totalDays = dateRange[1].diff(dateRange[0], 'day') + 1
   const totalUsageDays = dataSource.reduce(
-    (sum: number, vehicle: any) => sum + Object.keys(vehicle.usage || {}).length,
+    (sum: number, vehicle: any) => {
+      const usageKeys = vehicle && vehicle.usage ? Object.keys(vehicle.usage) : []
+      return sum + usageKeys.length
+    },
     0,
   )
   const avgUsageRate =
     totalVehicles > 0 && totalDays > 0
       ? ((totalUsageDays / (totalVehicles * totalDays)) * 100).toFixed(1)
-      : 0
+      : '0'
 
   return (
     <div style={{ padding: '24px' }}>
@@ -248,9 +257,14 @@ const VehicleUsageCalendar: React.FC = () => {
             description={
               <div>
                 <div>暂无数据</div>
-                {!isLoading && selectedCompanyId && (
+                {!isLoading && effectiveCompanyId && (
                   <div style={{ color: '#999', fontSize: 12, marginTop: 8 }}>
-                    当前公司ID: {selectedCompanyId}，日期范围: {dateRange[0].format('YYYY-MM-DD')} ~ {dateRange[1].format('YYYY-MM-DD')}
+                    当前公司ID: {effectiveCompanyId}，日期范围: {startDateStr} ~ {endDateStr}
+                  </div>
+                )}
+                {!isLoading && !effectiveCompanyId && (
+                  <div style={{ color: '#faad14', fontSize: 12, marginTop: 8 }}>
+                    {isSuperAdmin ? '请先在右上角选择公司' : '当前账号未绑定公司，无法查询车辆使用数据'}
                   </div>
                 )}
               </div>

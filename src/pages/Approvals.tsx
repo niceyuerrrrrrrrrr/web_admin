@@ -130,39 +130,133 @@ const statusOptions = [
 
 const detailFieldPresets: Record<string, { key: string; label: string }[]> = {
   reimbursement: [
+    { key: 'id', label: '单据编号' },
+    { key: 'user_name', label: '申请人' },
     { key: 'category', label: '费用类别' },
     { key: 'amount', label: '报销金额' },
-    { key: 'user_name', label: '申请人' },
+    { key: 'project', label: '项目/用途' },
     { key: 'date', label: '报销日期' },
     { key: 'status', label: '状态' },
-    { key: 'remark', label: '备注' },
+    { key: 'remark', label: '备注说明' },
+    { key: 'created_at', label: '提交时间' },
   ],
   purchase: [
+    { key: 'id', label: '单据编号' },
+    { key: 'user_name', label: '申请人' },
     { key: 'category', label: '采购类型' },
     { key: 'amount', label: '采购金额' },
     { key: 'supplier', label: '供应商' },
+    { key: 'project', label: '项目/用途' },
     { key: 'date', label: '申请日期' },
     { key: 'status', label: '状态' },
+    { key: 'remark', label: '备注说明' },
+    { key: 'created_at', label: '提交时间' },
   ],
   leave: [
+    { key: 'id', label: '单据编号' },
+    { key: 'user_name', label: '申请人' },
     { key: 'leave_type', label: '请假类型' },
-    { key: 'days', label: '天数' },
+    { key: 'days', label: '请假天数' },
     { key: 'start_date', label: '开始时间' },
     { key: 'end_date', label: '结束时间' },
     { key: 'reason', label: '请假原因' },
+    { key: 'status', label: '状态' },
+    { key: 'created_at', label: '提交时间' },
   ],
   material: [
+    { key: 'id', label: '单据编号' },
+    { key: 'user_name', label: '申请人' },
     { key: 'material_name', label: '物品名称' },
-    { key: 'quantity', label: '数量' },
+    { key: 'quantity', label: '申请数量' },
     { key: 'request_date', label: '申请时间' },
-    { key: 'purpose', label: '用途' },
+    { key: 'reason', label: '申请原因' },
+    { key: 'status', label: '状态' },
+    { key: 'created_at', label: '提交时间' },
   ],
   report: [
+    { key: 'id', label: '单据编号' },
+    { key: 'user_name', label: '上报人' },
     { key: 'title', label: '故障标题' },
-    { key: 'severity', label: '严重程度' },
+    { key: 'description', label: '故障描述' },
+    { key: 'location', label: '故障位置' },
     { key: 'submit_time', label: '上报时间' },
     { key: 'status', label: '状态' },
-    { key: 'description', label: '详情' },
+    { key: 'created_at', label: '提交时间' },
+  ],
+  makeup: [
+    { key: 'id', label: '单据编号' },
+    { key: 'user_name', label: '申请人' },
+    { key: 'work_date', label: '工作日期' },
+    { key: 'clock_type', label: '打卡类型' },
+    { key: 'reason', label: '补卡原因' },
+    { key: 'status', label: '状态' },
+    { key: 'created_at', label: '提交时间' },
+  ],
+  regularization: [
+    { key: 'id', label: '单据编号' },
+    { key: 'name', label: '员工姓名' },
+    { key: 'entry_date', label: '入职日期' },
+    { key: 'regularized_date', label: '转正日期' },
+    { key: 'probation_salary', label: '试用期工资' },
+    { key: 'regular_salary', label: '转正后工资' },
+    { key: 'status', label: '状态' },
+    { key: 'created_at', label: '提交时间' },
+  ],
+  offboarding: [
+    { key: 'id', label: '单据编号' },
+    { key: 'name', label: '员工姓名' },
+    { key: 'leave_date', label: '离职日期' },
+    { key: 'leave_reason', label: '离职原因' },
+    { key: 'status', label: '状态' },
+    { key: 'created_at', label: '提交时间' },
+  ],
+  fin_cash_in: [
+    { key: 'id', label: '单据编号' },
+    { key: 'amount_cents', label: '收款金额' },
+    { key: 'cash_date', label: '收款日期' },
+    { key: 'payer_type', label: '付款方类型' },
+    { key: 'payer_name', label: '付款方名称' },
+    { key: 'account_id', label: '收款账户ID' },
+    { key: 'method', label: '收款方式' },
+    { key: 'biz_type', label: '业务类型' },
+    { key: 'biz_id', label: '业务单据ID' },
+    { key: 'remark', label: '备注说明' },
+    { key: 'status', label: '状态' },
+    { key: 'created_at', label: '创建时间' },
+  ],
+  fin_cash_out: [
+    { key: 'id', label: '单据编号' },
+    { key: 'amount_cents', label: '付款金额' },
+    { key: 'cash_date', label: '付款日期' },
+    { key: 'payee_type', label: '收款方类型' },
+    { key: 'payee_name', label: '收款方名称' },
+    { key: 'account_id', label: '付款账户ID' },
+    { key: 'method', label: '付款方式' },
+    { key: 'biz_type', label: '业务类型' },
+    { key: 'biz_id', label: '业务单据ID' },
+    { key: 'remark', label: '备注说明' },
+    { key: 'status', label: '状态' },
+    { key: 'created_at', label: '创建时间' },
+  ],
+  fin_ar_receipt: [
+    { key: 'id', label: '单据编号' },
+    { key: 'ar_id', label: '应收单ID' },
+    { key: 'receipt_amount_cents', label: '回款金额' },
+    { key: 'receipt_date', label: '回款日期' },
+    { key: 'account_id', label: '收款账户ID' },
+    { key: 'remark', label: '备注说明' },
+    { key: 'status', label: '状态' },
+    { key: 'created_at', label: '创建时间' },
+  ],
+  fin_ap_payment: [
+    { key: 'id', label: '单据编号' },
+    { key: 'ap_id', label: '应付单ID' },
+    { key: 'pay_amount_cents', label: '实付金额' },
+    { key: 'pay_date', label: '付款日期' },
+    { key: 'account_id', label: '付款账户ID' },
+    { key: 'remark', label: '备注说明' },
+    { key: 'status', label: '状态' },
+    { key: 'created_at', label: '创建时间' },
   ],
 }
 
@@ -741,26 +835,78 @@ const ApprovalsPage = () => {
         title: '凭证',
         dataIndex: 'images',
         width: 220,
-        render: (value: unknown) => {
+        render: (value: unknown, record: any) => {
+          console.log('[Approvals-Pending] record:', record)
+          console.log('[Approvals-Pending] video_urls:', record.video_urls)
           const imgs = parseImages(value)
-          if (!imgs.length) return '-'
-          const shown = imgs.slice(0, 3)
-          const rest = imgs.length - shown.length
+          const videos = parseImages(record.video_urls)
+          console.log('[Approvals-Pending] imgs:', imgs, 'videos:', videos)
+          const totalCount = imgs.length + videos.length
+          
+          if (totalCount === 0) return '-'
+          
+          const allMedia = [...imgs, ...videos]
+          const shown = allMedia.slice(0, 3)
+          const rest = totalCount - shown.length
+          
           return (
-            <Image.PreviewGroup>
-              <Space size={6} wrap>
-                {shown.map((img) => (
-                  <Image
-                    key={img}
-                    src={img}
-                    width={40}
-                    height={40}
-                    style={{ objectFit: 'cover', borderRadius: 6 }}
-                  />
-                ))}
-                {rest > 0 && <Text type="secondary">+{rest}</Text>}
-              </Space>
-            </Image.PreviewGroup>
+            <Space size={6} wrap>
+              {shown.map((url, idx) => {
+                const isVideo = videos.includes(url)
+                
+                if (isVideo) {
+                  return (
+                    <div 
+                      key={idx} 
+                      style={{ 
+                        position: 'relative',
+                        width: 40, 
+                        height: 40, 
+                        borderRadius: 6,
+                        overflow: 'hidden',
+                        backgroundColor: '#000'
+                      }}
+                    >
+                      <video 
+                        src={url} 
+                        style={{ 
+                          width: '100%', 
+                          height: '100%', 
+                          objectFit: 'cover' 
+                        }}
+                      />
+                      <div style={{
+                        position: 'absolute',
+                        top: 0,
+                        left: 0,
+                        right: 0,
+                        bottom: 0,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        backgroundColor: 'rgba(0,0,0,0.3)',
+                        fontSize: 16,
+                        color: '#fff'
+                      }}>
+                        ▶
+                      </div>
+                    </div>
+                  )
+                } else {
+                  return (
+                    <Image
+                      key={idx}
+                      src={url}
+                      width={40}
+                      height={40}
+                      style={{ objectFit: 'cover', borderRadius: 6 }}
+                      preview={{ src: url }}
+                    />
+                  )
+                }
+              })}
+              {rest > 0 && <Text type="secondary">+{rest}</Text>}
+            </Space>
           )
         },
       },
@@ -920,26 +1066,78 @@ const ApprovalsPage = () => {
         title: '凭证',
         dataIndex: 'images',
         width: 220,
-        render: (value: unknown) => {
+        render: (value: unknown, record: any) => {
+          console.log('[Approvals-History] record:', record)
+          console.log('[Approvals-History] video_urls:', record.video_urls)
           const imgs = parseImages(value)
-          if (!imgs.length) return '-'
-          const shown = imgs.slice(0, 3)
-          const rest = imgs.length - shown.length
+          const videos = parseImages(record.video_urls)
+          console.log('[Approvals-History] imgs:', imgs, 'videos:', videos)
+          const totalCount = imgs.length + videos.length
+          
+          if (totalCount === 0) return '-'
+          
+          const allMedia = [...imgs, ...videos]
+          const shown = allMedia.slice(0, 3)
+          const rest = totalCount - shown.length
+          
           return (
-            <Image.PreviewGroup>
-              <Space size={6} wrap>
-                {shown.map((img) => (
-                  <Image
-                    key={img}
-                    src={img}
-                    width={40}
-                    height={40}
-                    style={{ objectFit: 'cover', borderRadius: 6 }}
-                  />
-                ))}
-                {rest > 0 && <Text type="secondary">+{rest}</Text>}
-              </Space>
-            </Image.PreviewGroup>
+            <Space size={6} wrap>
+              {shown.map((url, idx) => {
+                const isVideo = videos.includes(url)
+                
+                if (isVideo) {
+                  return (
+                    <div 
+                      key={idx} 
+                      style={{ 
+                        position: 'relative',
+                        width: 40, 
+                        height: 40, 
+                        borderRadius: 6,
+                        overflow: 'hidden',
+                        backgroundColor: '#000'
+                      }}
+                    >
+                      <video 
+                        src={url} 
+                        style={{ 
+                          width: '100%', 
+                          height: '100%', 
+                          objectFit: 'cover' 
+                        }}
+                      />
+                      <div style={{
+                        position: 'absolute',
+                        top: 0,
+                        left: 0,
+                        right: 0,
+                        bottom: 0,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        backgroundColor: 'rgba(0,0,0,0.3)',
+                        fontSize: 16,
+                        color: '#fff'
+                      }}>
+                        ▶
+                      </div>
+                    </div>
+                  )
+                } else {
+                  return (
+                    <Image
+                      key={idx}
+                      src={url}
+                      width={40}
+                      height={40}
+                      style={{ objectFit: 'cover', borderRadius: 6 }}
+                      preview={{ src: url }}
+                    />
+                  )
+                }
+              })}
+              {rest > 0 && <Text type="secondary">+{rest}</Text>}
+            </Space>
           )
         },
       },
@@ -1242,8 +1440,16 @@ const ApprovalsPage = () => {
   const detailData = detailQuery.data?.detail ?? {}
   const timelineInstance = timelineQuery.data?.instance
 
-  const renderDetailValue = (value: unknown) => {
+  const renderDetailValue = (value: unknown, fieldKey?: string) => {
     if (value === null || value === undefined || value === '') return '-'
+    
+    // 金额字段（分）转换为元，保留两位小数
+    if (fieldKey && (fieldKey.endsWith('_cents') || fieldKey.includes('amount_cents') || fieldKey.includes('receipt_amount_cents') || fieldKey.includes('pay_amount_cents'))) {
+      if (typeof value === 'number') {
+        return `¥ ${(value / 100).toFixed(2)}`
+      }
+    }
+    
     if (typeof value === 'number') return Number.isFinite(value) ? value : String(value)
     if (typeof value === 'object') {
       try {
@@ -1649,14 +1855,14 @@ const ApprovalsPage = () => {
                     <Descriptions column={1} bordered size="small">
                       {detailFields.map((field) => (
                         <Descriptions.Item key={field.key} label={field.label}>
-                          {renderDetailValue(detailData[field.key])}
+                          {renderDetailValue(detailData[field.key], field.key)}
                         </Descriptions.Item>
                       ))}
                     </Descriptions>
                   </Card>
                 )}
                 {parseImages((detailData as any).images).length > 0 && (
-                  <Card size="small" title="凭证" bordered={false}>
+                  <Card size="small" title="图片凭证" bordered={false}>
                     <Image.PreviewGroup>
                       <Space wrap size="middle">
                         {parseImages((detailData as any).images).map((img: string) => (
@@ -1672,15 +1878,28 @@ const ApprovalsPage = () => {
                     </Image.PreviewGroup>
                   </Card>
                 )}
-                <Card size="small" title="全部字段" bordered={false}>
-                  <Descriptions column={1} bordered size="small">
-                    {Object.entries(detailData).map(([key, value]) => (
-                      <Descriptions.Item key={key} label={key}>
-                        {renderDetailValue(value)}
-                      </Descriptions.Item>
-                    ))}
-                  </Descriptions>
-                </Card>
+                {parseImages((detailData as any).video_urls).length > 0 && (
+                  <Card size="small" title="视频凭证" bordered={false}>
+                    <Space direction="vertical" size={12} style={{ width: '100%' }}>
+                      {parseImages((detailData as any).video_urls).map((url: string, idx: number) => (
+                        <div key={idx} style={{ width: '100%', border: '2px solid #1890ff', padding: 8, borderRadius: 8 }}>
+                          <video 
+                            src={url} 
+                            controls 
+                            preload="metadata"
+                            style={{ 
+                              width: '100%', 
+                              maxHeight: 400,
+                              borderRadius: 8,
+                              backgroundColor: '#000'
+                            }} 
+                          />
+                          <div style={{ marginTop: 4, fontSize: 12, color: '#666' }}>视频 {idx + 1}: {url}</div>
+                        </div>
+                      ))}
+                    </Space>
+                  </Card>
+                )}
               </>
             )}
             <Card

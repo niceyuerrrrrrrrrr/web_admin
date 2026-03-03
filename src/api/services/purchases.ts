@@ -99,3 +99,30 @@ export const uploadPurchaseImage = (file: File) => {
     }),
   )
 }
+
+// 财务支付采购（直接支付模式）
+export const payPurchase = (id: number, data: {
+  account_id: number
+  pay_method?: string
+  cash_date?: string
+  remark?: string
+  attachments?: string[]
+}) => unwrap<{
+  purchase_id: number
+  cash_out_id: number
+  amount_cents: number
+  pay_status: string
+  message: string
+}>(client.post(`/purchase/${id}/pay`, data))
+
+// 生成应付单（账期模式）
+export const createPurchaseAP = (id: number, data: {
+  due_date: string
+  remark?: string
+}) => unwrap<{
+  purchase_id: number
+  ap_id: number
+  amount_cents: number
+  pay_status: string
+  message: string
+}>(client.post(`/purchase/${id}/create_ap`, data))

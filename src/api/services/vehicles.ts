@@ -260,11 +260,8 @@ export interface VehicleUsageRecord {
 /**
  * 获取车辆使用日历数据
  */
-export const fetchVehicleUsageCalendar = async (params: {
+export const fetchVehicleUsageCalendar = (params: {
   company_id?: number
   start_date: string
   end_date: string
-}): Promise<ApiResponse<VehicleUsageRecord[]>> => {
-  const response = await client.get('/vehicles/usage-calendar', { params })
-  return response.data
-}
+}) => unwrap<VehicleUsageRecord[]>(client.get('/vehicles/usage-calendar', { params }))

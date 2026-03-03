@@ -375,25 +375,81 @@ const ReportsPage = () => {
       title: '凭证',
       dataIndex: 'images',
       width: 180,
-      render: (value: string[]) => {
-        if (!value || value.length === 0) return '-'
-        const shown = value.slice(0, 2)
-        const rest = value.length - shown.length
+      render: (value: string[], record: any) => {
+        const images = value || []
+        const videos = record.video_urls || []
+        const totalCount = images.length + videos.length
+        
+        if (totalCount === 0) return '-'
+        
+        // 最多显示2个缩略图
+        const allMedia = [...images, ...videos]
+        const shown = allMedia.slice(0, 2)
+        const rest = totalCount - shown.length
+        
         return (
-          <Image.PreviewGroup>
-            <Space size={6} wrap>
-              {shown.map((img, idx) => (
-                <Image
-                  key={idx}
-                  src={img}
-                  width={40}
-                  height={40}
-                  style={{ objectFit: 'cover', borderRadius: 6 }}
-                />
-              ))}
-              {rest > 0 && <Text type="secondary">+{rest}</Text>}
-            </Space>
-          </Image.PreviewGroup>
+          <Space size={6} wrap>
+            {shown.map((url, idx) => {
+              const isVideo = videos.includes(url)
+              const fixedUrl = url.startsWith('http') ? url : `https://api.hodaruner.cn${url}`
+              
+              if (isVideo) {
+                // 视频缩略图：显示视频的第一帧
+                return (
+                  <div 
+                    key={idx} 
+                    style={{ 
+                      position: 'relative',
+                      width: 40, 
+                      height: 40, 
+                      borderRadius: 6,
+                      overflow: 'hidden',
+                      backgroundColor: '#000'
+                    }}
+                  >
+                    <video 
+                      src={fixedUrl} 
+                      style={{ 
+                        width: '100%', 
+                        height: '100%', 
+                        objectFit: 'cover' 
+                      }}
+                    />
+                    <div style={{
+                      position: 'absolute',
+                      top: 0,
+                      left: 0,
+                      right: 0,
+                      bottom: 0,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      backgroundColor: 'rgba(0,0,0,0.3)',
+                      fontSize: 16,
+                      color: '#fff'
+                    }}>
+                      ▶
+                    </div>
+                  </div>
+                )
+              } else {
+                // 图片缩略图
+                return (
+                  <Image
+                    key={idx}
+                    src={fixedUrl}
+                    width={40}
+                    height={40}
+                    style={{ objectFit: 'cover', borderRadius: 6 }}
+                    preview={{
+                      src: fixedUrl
+                    }}
+                  />
+                )
+              }
+            })}
+            {rest > 0 && <Text type="secondary">+{rest}</Text>}
+          </Space>
         )
       },
     },
@@ -765,12 +821,55 @@ const ReportsPage = () => {
                 {selectedDetail.description || '-'}
               </Descriptions.Item>
             </Descriptions>
-            <Flex gap={12} wrap>
-              {selectedDetail.images?.filter(img => img).map((img) => {
-                const imgUrl = img.startsWith('http') ? img : `https://api.hodaruner.cn${img}`
-                return <Avatar shape="square" key={img} src={imgUrl} size={80} />
-              })}
-            </Flex>
+            {selectedDetail.images && selectedDetail.images.filter(img => img).length > 0 && (
+              <div>
+                <div style={{ marginBottom: 8, fontWeight: 500 }}>图片凭证</div>
+                <Flex gap={12} wrap>
+                  {selectedDetail.images.filter(img => img).map((img) => {
+                    const imgUrl = img.startsWith('http') ? img : `https://api.hodaruner.cn${img}`
+                    return <Avatar shape="square" key={img} src={imgUrl} size={80} />
+                  })}
+                </Flex>
+              </div>
+            )}
+            {(() => {
+              console.log('[Reports] selectedDetail.video_urls:', selectedDetail.video_urls);
+              console.log('[Reports] video_urls type:', typeof selectedDetail.video_urls);
+              console.log('[Reports] video_urls length:', selectedDetail.video_urls?.length);
+              
+              if (!selectedDetail.video_urls || selectedDetail.video_urls.length === 0) {
+                return null;
+              }
+              
+              return (
+                <div>
+                  <div style={{ marginBottom: 8, fontWeight: 500, color: '#1890ff' }}>视频凭证 ({selectedDetail.video_urls.length})</div>
+                  <Space direction="vertical" size={12} style={{ width: '100%' }}>
+                    {selectedDetail.video_urls.map((v, idx) => {
+                      if (!v) return null;
+                      const videoUrl = v.startsWith('http') ? v : `https://api.hodaruner.cn${v}`;
+                      console.log('[Reports] Rendering video:', videoUrl);
+                      return (
+                        <div key={idx} style={{ width: '100%', border: '2px solid #1890ff', padding: 8, borderRadius: 8 }}>
+                          <video 
+                            src={videoUrl} 
+                            controls 
+                            preload="metadata"
+                            style={{ 
+                              width: '100%', 
+                              maxHeight: 400,
+                              borderRadius: 8,
+                              backgroundColor: '#000'
+                            }} 
+                          />
+                          <div style={{ marginTop: 4, fontSize: 12, color: '#666' }}>视频 {idx + 1}: {videoUrl}</div>
+                        </div>
+                      );
+                    })}
+                  </Space>
+                </div>
+              );
+            })()}
             <Flex gap={8} wrap>
               {selectedDetail.status === 'submitted' && (
                 <Button type="primary" onClick={() => handleSubmit(selectedDetail)}>
