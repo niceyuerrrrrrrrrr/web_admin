@@ -68,7 +68,7 @@ const InventoryPage = () => {
   const { user } = useAuthStore()
   const { selectedCompanyId } = useCompanyStore()
 
-  const isSuperAdmin = user?.role === 'super_admin' || user?.positionType === '超级管理员'
+  const isSuperAdmin = user?.role === 'super_admin'
   const isCEO = user?.positionType === '总经理'
   const canManageWarehouse = isSuperAdmin || isCEO
   const effectiveCompanyId = isSuperAdmin ? selectedCompanyId : undefined

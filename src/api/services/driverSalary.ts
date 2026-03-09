@@ -105,6 +105,13 @@ export interface TripDetailByCompany {
   total_trips: number
 }
 
+export interface TripDetailByDate {
+  user_id: number
+  driver_name: string
+  daily_trips: Record<string, number>
+  total: number
+}
+
 // ==================== 全局配置 API ====================
 
 /**
@@ -254,6 +261,18 @@ export const fetchTripDetailsByCompany = async (params: {
   department_id?: number
 }): Promise<ApiResponse<TripDetailByCompany[]>> => {
   const response = await client.get('/driver-salary/trips/detail-by-company', { params })
+  return response.data
+}
+
+/**
+ * 获取司机趟次明细（按日期统计）
+ */
+export const fetchTripDetailsByDate = async (params: {
+  period: string
+  company_id?: number
+  department_id?: number
+}): Promise<ApiResponse<TripDetailByDate[]>> => {
+  const response = await client.get('/driver-salary/trips/detail-by-date', { params })
   return response.data
 }
 

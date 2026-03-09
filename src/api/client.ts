@@ -1,5 +1,6 @@
 import axios from 'axios'
 import useAuthStore from '../store/auth'
+import useCompanyStore from '../store/company'
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api'
 
@@ -16,6 +17,21 @@ client.interceptors.request.use((config) => {
   if (token) {
     config.headers.Authorization = `Bearer ${token}`
   }
+
+  const selectedCompanyId = useCompanyStore.getState().selectedCompanyId
+  const requestUrl = config.url || ''
+  const isTiresApi = requestUrl.startsWith('/tires')
+
+  if (isTiresApi && selectedCompanyId !== undefined && selectedCompanyId !== null) {
+    const params = (config.params || {}) as Record<string, any>
+    if (params.company_id === undefined || params.company_id === null) {
+      config.params = {
+        ...params,
+        company_id: selectedCompanyId,
+      }
+    }
+  }
+
   return config
 })
 

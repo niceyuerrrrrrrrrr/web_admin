@@ -1,9 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { Card, Table, Button, Space, Tag, Modal, Form, Input, Select, DatePicker, InputNumber, message, Switch, Row, Col } from 'antd';
+import { Card, Table, Button, Space, Tag, Modal, Form, Input, Select, DatePicker, message, Descriptions, App, Row, Col, InputNumber, Switch } from 'antd';
 import { PlusOutlined, ToolOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import client from '../../api/client';
 import dayjs from 'dayjs';
+import useAuthStore from '../../store/auth';
+import useCompanyStore from '../../store/company';
+import ResizableTitle from '../../components/ResizableTitle';
 
 const { Option } = Select;
 const { TextArea } = Input;
@@ -12,6 +15,7 @@ interface MaintenanceRecord {
   id: number;
   tire_code: string;
   vehicle_plate?: string;
+  item_name?: string;
   maintenance_type: string;
   maintenance_date: string;
   cost?: number;
@@ -22,13 +26,22 @@ interface MaintenanceRecord {
 interface TireOption {
   id: number;
   tire_code: string;
+  tire_serial_no?: string;
   brand: string;
   model: string;
   vehicle_plate?: string;
   status: string;
+  purpose?: string;
 }
 
 const TireMaintenance: React.FC = () => {
+  const { modal } = App.useApp();
+  const { user } = useAuthStore();
+  const { selectedCompanyId } = useCompanyStore();
+  
+  const isSuperAdmin = user?.role === 'super_admin';
+  const effectiveCompanyId = isSuperAdmin ? selectedCompanyId : user?.companyId;
+  
   const [loading, setLoading] = useState(false);
   const [data, setData] = useState<MaintenanceRecord[]>([]);
   const [total, setTotal] = useState(0);
@@ -45,14 +58,48 @@ const TireMaintenance: React.FC = () => {
   
   // 轮胎选项
   const [tireOptions, setTireOptions] = useState<TireOption[]>([]);
+  const selectedVehiclePlate = Form.useWatch('vehicle_plate_filter', createForm);
   
   // 筛选条件
   const [typeFilter, setTypeFilter] = useState<string | undefined>(undefined);
+  const [itemNameFilter, setItemNameFilter] = useState<string>('轮胎');
+  
+  // 列宽状态
+  const [columnWidths, setColumnWidths] = useState<Record<string, number>>({});
+  
+  const handleResize = (index: number) => (
+    _e: React.SyntheticEvent,
+    { size }: { size: { width: number } }
+  ) => {
+    setColumnWidths((prev) => ({
+      ...prev,
+      [index]: size.width,
+    }))
+  }
+  
+  const mergeColumns = (cols: ColumnsType<any>) => {
+    return cols.map((col, index) => ({
+      ...col,
+      width: col.width ? (columnWidths[index] || col.width) : col.width,
+      ...(col.width
+        ? {
+            onHeaderCell: (column: any) => ({
+              width: columnWidths[index] || column.width,
+              onResize: handleResize(index),
+            }),
+          }
+        : {}),
+    }))
+  }
 
   const fetchTireOptions = async () => {
     try {
+      const params: any = { status: 'in_use', purpose: 'self_use', page_size: 100 };
+      if (effectiveCompanyId) {
+        params.company_id = effectiveCompanyId;
+      }
       const res = await client.get('/tires/inventory', {
-        params: { status: 'in_use', page_size: 1000 }
+        params
       });
       if (res.data.success) {
         setTireOptions(res.data.data.tires);
@@ -67,6 +114,8 @@ const TireMaintenance: React.FC = () => {
     try {
       const params: any = { page, page_size: pageSize };
       if (typeFilter) params.maintenance_type = typeFilter;
+      if (itemNameFilter) params.item_name = itemNameFilter;
+      if (effectiveCompanyId) params.company_id = effectiveCompanyId;
 
       const res = await client.get('/tires/maintenance', { params });
 
@@ -83,10 +132,16 @@ const TireMaintenance: React.FC = () => {
 
   const handleCreate = async (values: any) => {
     try {
-      await client.post('/tires/maintenance', {
-        ...values,
-        maintenance_date: values.maintenance_date.format('YYYY-MM-DD')
-      });
+      await client.post(
+        '/tires/maintenance',
+        {
+          ...values,
+          maintenance_date: values.maintenance_date.format('YYYY-MM-DD')
+        },
+        {
+          params: effectiveCompanyId ? { company_id: effectiveCompanyId } : undefined,
+        }
+      );
 
       message.success('维护记录创建成功');
       setCreateVisible(false);
@@ -109,10 +164,16 @@ const TireMaintenance: React.FC = () => {
 
   const handleUpdate = async (values: any) => {
     try {
-      await client.put(`/tires/maintenance/${editingId}`, {
-        ...values,
-        maintenance_date: values.maintenance_date.format('YYYY-MM-DD')
-      });
+      await client.put(
+        `/tires/maintenance/${editingId}`,
+        {
+          ...values,
+          maintenance_date: values.maintenance_date.format('YYYY-MM-DD')
+        },
+        {
+          params: effectiveCompanyId ? { company_id: effectiveCompanyId } : undefined,
+        }
+      );
       message.success('维护记录更新成功');
       setEditVisible(false);
       editForm.resetFields();
@@ -124,7 +185,7 @@ const TireMaintenance: React.FC = () => {
   };
 
   const handleDelete = (id: number) => {
-    Modal.confirm({
+    modal.confirm({
       title: '确认删除',
       content: '确定要删除这条维护记录吗？此操作不可恢复。',
       okText: '确定',
@@ -132,7 +193,9 @@ const TireMaintenance: React.FC = () => {
       okType: 'danger',
       onOk: async () => {
         try {
-          await client.delete(`/tires/maintenance/${id}`);
+          await client.delete(`/tires/maintenance/${id}`, {
+            params: effectiveCompanyId ? { company_id: effectiveCompanyId } : undefined,
+          });
           message.success('删除成功');
           fetchData();
         } catch (error: any) {
@@ -144,13 +207,21 @@ const TireMaintenance: React.FC = () => {
 
   useEffect(() => {
     fetchData();
-  }, [page, pageSize, typeFilter]);
+  }, [page, pageSize, typeFilter, itemNameFilter, effectiveCompanyId]);
 
   useEffect(() => {
     if (createVisible) {
       fetchTireOptions();
     }
   }, [createVisible]);
+
+  const filteredTireOptions = selectedVehiclePlate
+    ? tireOptions.filter((tire) => tire.vehicle_plate === selectedVehiclePlate)
+    : tireOptions;
+
+  const vehiclePlateOptions = Array.from(
+    new Set(tireOptions.map((tire) => tire.vehicle_plate).filter(Boolean))
+  ) as string[];
 
   const maintenanceTypeMap: Record<string, { text: string; color: string }> = {
     repair: { text: '补胎', color: 'red' },
@@ -181,6 +252,13 @@ const TireMaintenance: React.FC = () => {
       width: 120,
     },
     {
+      title: '物品名称',
+      dataIndex: 'item_name',
+      key: 'item_name',
+      width: 100,
+      render: (name: string) => name ? <Tag color="blue">{name}</Tag> : '-',
+    },
+    {
       title: '维护类型',
       dataIndex: 'maintenance_type',
       key: 'maintenance_type',
@@ -206,6 +284,7 @@ const TireMaintenance: React.FC = () => {
       title: '备注',
       dataIndex: 'notes',
       key: 'notes',
+      width: 220,
       ellipsis: true,
     },
   ];
@@ -216,6 +295,17 @@ const TireMaintenance: React.FC = () => {
         title="维护管理"
         extra={
           <Space>
+            <Select
+              placeholder="物品名称"
+              style={{ width: 120 }}
+              value={itemNameFilter}
+              onChange={(val) => setItemNameFilter(val || '轮胎')}
+            >
+              <Option value="轮胎">轮胎</Option>
+              <Option value="垫带">垫带</Option>
+              <Option value="内胎">内胎</Option>
+              <Option value="钢圈">钢圈</Option>
+            </Select>
             <Select
               placeholder="维护类型"
               style={{ width: 120 }}
@@ -237,10 +327,17 @@ const TireMaintenance: React.FC = () => {
         }
       >
         <Table
-          columns={columns}
+          columns={mergeColumns(columns)}
           dataSource={data}
           rowKey="id"
           loading={loading}
+          className="resizable-table"
+          components={{
+            header: {
+              cell: ResizableTitle,
+            },
+          }}
+          scroll={{ x: 1010 }}
           pagination={{
             current: page,
             pageSize: pageSize,
@@ -276,13 +373,32 @@ const TireMaintenance: React.FC = () => {
             if (changedValues.maintenance_type) {
               setMaintenanceType(changedValues.maintenance_type);
             }
+            if (Object.prototype.hasOwnProperty.call(changedValues, 'vehicle_plate_filter')) {
+              createForm.setFieldValue('tire_id', undefined);
+            }
           }}
         >
           <Row gutter={16}>
             <Col span={12}>
+              <Form.Item name="vehicle_plate_filter" label="车牌号筛选">
+                <Select
+                  placeholder="请先选择车牌号"
+                  allowClear
+                  showSearch
+                  optionFilterProp="children"
+                >
+                  {vehiclePlateOptions.map((plate) => (
+                    <Option key={plate} value={plate}>
+                      {plate}
+                    </Option>
+                  ))}
+                </Select>
+              </Form.Item>
+            </Col>
+            <Col span={12}>
               <Form.Item name="tire_id" label="选择轮胎" rules={[{ required: true, message: '请选择轮胎' }]}>
                 <Select
-                  placeholder="请选择轮胎"
+                  placeholder={selectedVehiclePlate ? '请选择该车辆的自用轮胎' : '请先选择车牌号或直接选择自用轮胎'}
                   showSearch
                   optionFilterProp="children"
                   filterOption={(input, option) => {
@@ -291,14 +407,17 @@ const TireMaintenance: React.FC = () => {
                     return label.toLowerCase().includes(input.toLowerCase());
                   }}
                 >
-                  {tireOptions.map(tire => (
+                  {filteredTireOptions.map(tire => (
                     <Option key={tire.id} value={tire.id}>
-                      {tire.tire_code} - {tire.brand} {tire.model} ({tire.vehicle_plate || '未安装'})
+                      {(tire.tire_serial_no || tire.tire_code)} - {tire.brand} {tire.model} ({tire.vehicle_plate || '未安装'})
                     </Option>
                   ))}
                 </Select>
               </Form.Item>
             </Col>
+          </Row>
+
+          <Row gutter={16}>
             <Col span={12}>
               <Form.Item name="maintenance_type" label="维护类型" rules={[{ required: true, message: '请选择维护类型' }]}>
                 <Select placeholder="请选择维护类型">

@@ -68,7 +68,7 @@ const UsersPage = () => {
   const { user } = useAuthStore()
   const { selectedCompanyId, setSelectedCompanyId } = useCompanyStore()
 
-  const isSuperAdmin = user?.role === 'super_admin' || user?.positionType === '超级管理员'
+  const isSuperAdmin = user?.role === 'super_admin'
   const effectiveCompanyId = isSuperAdmin ? selectedCompanyId : undefined
   const userCompanyId = user?.companyId
   const departmentsCompanyId = isSuperAdmin ? effectiveCompanyId : userCompanyId

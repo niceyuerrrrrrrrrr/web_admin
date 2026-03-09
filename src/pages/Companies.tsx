@@ -51,7 +51,7 @@ const CompaniesPage = () => {
   const { user } = useAuthStore()
   
   // 检查是否为超级管理员
-  const isSuperAdmin = user?.role === 'super_admin' || user?.positionType === '超级管理员'
+  const isSuperAdmin = user?.role === 'super_admin'
   
   // 如果不是超级管理员，重定向到首页
   if (!isSuperAdmin) {

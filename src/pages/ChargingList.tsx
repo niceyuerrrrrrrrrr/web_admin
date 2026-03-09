@@ -41,7 +41,7 @@ const ChargingList = () => {
   const { user } = useAuthStore()
   const { selectedCompanyId } = useCompanyStore()
 
-  const isSuperAdmin = user?.role === 'super_admin' || user?.positionType === '超级管理员'
+  const isSuperAdmin = user?.role === 'super_admin'
   const effectiveCompanyId = isSuperAdmin ? selectedCompanyId : undefined
 
   const [filters, setFilters] = useState<{
@@ -1034,7 +1034,49 @@ const ChargingList = () => {
             current: currentPage,
             pageSize: pageSize,
             total: receipts.length,
-            showTotal: (total) => `共 ${total} 条`,
+            showTotal: (total) => {
+              // 如果有勾选数据，显示勾选数据的统计
+              if (selectedRowKeys.length > 0) {
+                const selectedReceipts = receipts.filter((r: any) => 
+                  selectedRowKeys.includes(r.id)
+                )
+                const selectedEnergy = selectedReceipts.reduce((sum: number, r: any) => {
+                  return sum + parseFloat(r.energy_kwh || 0)
+                }, 0)
+                const selectedAmount = selectedReceipts.reduce((sum: number, r: any) => {
+                  return sum + parseFloat(r.total_amount || 0)
+                }, 0)
+                const selectedCalculatedAmount = selectedReceipts.reduce((sum: number, r: any) => {
+                  return sum + parseFloat(r.calculated_amount || 0)
+                }, 0)
+                
+                // 计算总统计
+                const totalEnergy = receipts.reduce((sum: number, r: any) => {
+                  return sum + parseFloat(r.energy_kwh || 0)
+                }, 0)
+                const totalAmount = receipts.reduce((sum: number, r: any) => {
+                  return sum + parseFloat(r.total_amount || 0)
+                }, 0)
+                const totalCalculatedAmount = receipts.reduce((sum: number, r: any) => {
+                  return sum + parseFloat(r.calculated_amount || 0)
+                }, 0)
+                
+                return `已选充电量: ${selectedEnergy.toFixed(2)} kWh | 已选金额: ¥${selectedAmount.toFixed(2)} | 已选计算金额: ¥${selectedCalculatedAmount.toFixed(2)} (${selectedRowKeys.length}条) | 总充电量: ${totalEnergy.toFixed(2)} kWh | 总金额: ¥${totalAmount.toFixed(2)} | 总计算金额: ¥${totalCalculatedAmount.toFixed(2)} | 共 ${total} 条`
+              }
+              
+              // 没有勾选时，显示筛选后的统计
+              const totalEnergy = receipts.reduce((sum: number, r: any) => {
+                return sum + parseFloat(r.energy_kwh || 0)
+              }, 0)
+              const totalAmount = receipts.reduce((sum: number, r: any) => {
+                return sum + parseFloat(r.total_amount || 0)
+              }, 0)
+              const totalCalculatedAmount = receipts.reduce((sum: number, r: any) => {
+                return sum + parseFloat(r.calculated_amount || 0)
+              }, 0)
+              
+              return `总充电量: ${totalEnergy.toFixed(2)} kWh | 总金额: ¥${totalAmount.toFixed(2)} | 总计算金额: ¥${totalCalculatedAmount.toFixed(2)} | 共 ${total} 条`
+            },
             showSizeChanger: true,
             pageSizeOptions: ['10', '20', '50', '100'],
             onChange: (page, size) => {

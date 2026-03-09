@@ -73,6 +73,8 @@ export const fetchReceipts = (params: ReceiptListParams & { userId?: number; sco
         scope: params.scope || 'all', // 默认获取全部数据
         deleted_status: params.deletedStatus || 'normal', // 默认只显示正常票据
         submitted_status: params.submittedStatus || 'all', // 交票状态筛选
+        submitted_start_date: params.submittedStartDate, // 交票开始日期
+        submitted_end_date: params.submittedEndDate, // 交票结束日期
       },
     }),
   )
@@ -310,15 +312,7 @@ export const deleteDepartureReceipt = (receiptId: number) =>
 /**
  * 获取已匹配的装卸数据列表
  */
-export const fetchMatchedReceipts = (params: {
-  userId?: number
-  startDate?: string
-  endDate?: string
-  companyId?: number
-  scope?: 'mine' | 'all'
-  deletedStatus?: string
-  vehicleNo?: string
-}) =>
+export const fetchMatchedReceipts = (params: ReceiptListParams) =>
   unwrap<{
     receipts: Array<{
       id: number

@@ -18,8 +18,9 @@ import {
   Input,
   Drawer,
   Descriptions,
+  Popconfirm,
 } from 'antd'
-import { PlusOutlined } from '@ant-design/icons'
+import { PlusOutlined, DeleteOutlined, RollbackOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
 import dayjs from 'dayjs'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
@@ -39,6 +40,18 @@ interface PettySettleRecord {
   remark: string
   status: string
   created_at: string
+  grant_id?: number
+  grant_code?: string
+}
+
+interface PettyGrantRecord {
+  id: number
+  code: string
+  person_name: string
+  grant_amount_cents: number
+  remaining_amount_cents: number
+  grant_date: string
+  status: string
 }
 
 const statusColor = (status?: string) => {
@@ -65,7 +78,7 @@ const FinPettySettlesPage = () => {
   const { user } = useAuthStore()
   const { selectedCompanyId } = useCompanyStore()
 
-  const isSuperAdmin = user?.role === 'super_admin' || user?.positionType === '超级管理员'
+  const isSuperAdmin = user?.role === 'super_admin'
   const effectiveCompanyId = isSuperAdmin ? selectedCompanyId : undefined
 
   const [filters, setFilters] = useState<{
@@ -81,6 +94,28 @@ const FinPettySettlesPage = () => {
   const [detailDrawerOpen, setDetailDrawerOpen] = useState(false)
   const [selectedRecord, setSelectedRecord] = useState<PettySettleRecord | null>(null)
   const [createForm] = Form.useForm()
+
+  // 获取备用金发放列表
+  const grantsQuery = useQuery({
+    queryKey: ['fin', 'petty-grants', 'available', effectiveCompanyId],
+    queryFn: async () => {
+      const params: any = {
+        page: 1,
+        page_size: 200,
+        status: 'approved', // 只获取已审批的发放单
+      }
+      if (effectiveCompanyId) params.company_id = effectiveCompanyId
+
+      const response = await client.get('/fin/petty-grants', { params })
+      if (!response.data.success) {
+        throw new Error(response.data.message || '获取失败')
+      }
+      return response.data.data
+    },
+    enabled: (!isSuperAdmin || !!effectiveCompanyId) && createModalOpen,
+  })
+
+  const grants: PettyGrantRecord[] = grantsQuery.data?.records || []
 
   const listQuery = useQuery({
     queryKey: ['fin', 'petty-settles', filters, currentPage, pageSize, effectiveCompanyId],
@@ -150,6 +185,7 @@ const FinPettySettlesPage = () => {
         settle_amount_cents: Math.round(Number(values.amount_yuan) * 100),
         settle_date: values.settle_date.format('YYYY-MM-DD'),
         remark: values.remark,
+        grant_id: values.grant_id, // 关联备用金发放单
       }, { params })
       
       if (!response.data.success) {
@@ -162,6 +198,7 @@ const FinPettySettlesPage = () => {
       setCreateModalOpen(false)
       createForm.resetFields()
       queryClient.invalidateQueries({ queryKey: ['fin', 'petty-settles'] })
+      queryClient.invalidateQueries({ queryKey: ['fin', 'petty-grants'] })
     },
     onError: (error: any) => {
       message.error(error.message || '创建失败')
@@ -173,26 +210,50 @@ const FinPettySettlesPage = () => {
     setDetailDrawerOpen(true)
   }
 
-  // 提交审批
-  const submitMutation = useMutation({
+  // 删除核销单
+  const deleteMutation = useMutation({
     mutationFn: async (id: number) => {
       const params: any = {}
       if (effectiveCompanyId) params.company_id = effectiveCompanyId
       
-      const response = await client.post(`/fin/petty-settles/${id}/submit`, null, { params })
+      const response = await client.delete(`/fin/petty-settles/${id}`, { params })
       
       if (!response.data.success) {
-        throw new Error(response.data.message || '提交失败')
+        throw new Error(response.data.message || '删除失败')
       }
       return response.data.data
     },
     onSuccess: () => {
-      message.success('已提交审批')
+      message.success('删除成功')
+      setDetailDrawerOpen(false)
+      queryClient.invalidateQueries({ queryKey: ['fin', 'petty-settles'] })
+      queryClient.invalidateQueries({ queryKey: ['fin', 'petty-grants'] })
+    },
+    onError: (error: any) => {
+      message.error(error.message || '删除失败')
+    },
+  })
+
+  // 撤回核销单
+  const withdrawMutation = useMutation({
+    mutationFn: async (id: number) => {
+      const params: any = {}
+      if (effectiveCompanyId) params.company_id = effectiveCompanyId
+      
+      const response = await client.post(`/fin/petty-settles/${id}/withdraw`, null, { params })
+      
+      if (!response.data.success) {
+        throw new Error(response.data.message || '撤回失败')
+      }
+      return response.data.data
+    },
+    onSuccess: () => {
+      message.success('撤回成功')
       setDetailDrawerOpen(false)
       queryClient.invalidateQueries({ queryKey: ['fin', 'petty-settles'] })
     },
     onError: (error: any) => {
-      message.error(error.message || '提交失败')
+      message.error(error.message || '撤回失败')
     },
   })
 
@@ -252,12 +313,38 @@ const FinPettySettlesPage = () => {
     {
       title: '操作',
       key: 'actions',
-      width: 100,
+      width: 200,
       fixed: 'right' as const,
       render: (_: any, record: PettySettleRecord) => (
-        <Button size="small" onClick={() => openDetail(record)}>
-          详情
-        </Button>
+        <Space size="small">
+          <Button size="small" onClick={() => openDetail(record)}>
+            详情
+          </Button>
+          {record.status === 'draft' && (
+            <Popconfirm
+              title="确定删除此核销单？"
+              onConfirm={() => deleteMutation.mutate(record.id)}
+              okText="确定"
+              cancelText="取消"
+            >
+              <Button size="small" danger icon={<DeleteOutlined />}>
+                删除
+              </Button>
+            </Popconfirm>
+          )}
+          {record.status === 'reviewing' && (
+            <Popconfirm
+              title="确定撤回此核销单？"
+              onConfirm={() => withdrawMutation.mutate(record.id)}
+              okText="确定"
+              cancelText="取消"
+            >
+              <Button size="small" icon={<RollbackOutlined />}>
+                撤回
+              </Button>
+            </Popconfirm>
+          )}
+        </Space>
       ),
     },
   ]
@@ -423,6 +510,31 @@ const FinPettySettlesPage = () => {
           onFinish={(values) => createMutation.mutate(values)}
         >
           <Form.Item
+            label="关联备用金发放单"
+            name="grant_id"
+            rules={[{ required: true, message: '请选择备用金发放单' }]}
+          >
+            <Select
+              placeholder="请选择备用金发放单"
+              loading={grantsQuery.isLoading}
+              onChange={(value) => {
+                const grant = grants.find(g => g.id === value)
+                if (grant) {
+                  createForm.setFieldsValue({
+                    person_name: grant.person_name,
+                    amount_yuan: ((grant.remaining_amount_cents || 0) / 100).toFixed(2),
+                  })
+                }
+              }}
+            >
+              {grants.map((grant) => (
+                <Select.Option key={grant.id} value={grant.id}>
+                  {grant.code} - {grant.person_name} (余额: ¥{((grant.remaining_amount_cents || 0) / 100).toFixed(2)})
+                </Select.Option>
+              ))}
+            </Select>
+          </Form.Item>
+          <Form.Item
             label="核销人姓名"
             name="person_name"
             rules={[{ required: true, message: '请输入核销人姓名' }]}
@@ -456,18 +568,41 @@ const FinPettySettlesPage = () => {
         width={560}
         onClose={() => setDetailDrawerOpen(false)}
         extra={
-          selectedRecord?.status === 'draft' && (
-            <Button
-              type="primary"
-              onClick={() => {
-                if (selectedRecord?.id) {
-                  submitMutation.mutate(selectedRecord.id)
-                }
-              }}
-              loading={submitMutation.isPending}
-            >
-              提交审批
-            </Button>
+          selectedRecord?.status === 'approved' ? null : (
+            <Space>
+              {selectedRecord?.status === 'draft' && (
+                <Popconfirm
+                  title="确定删除此核销单？"
+                  onConfirm={() => {
+                    if (selectedRecord?.id) {
+                      deleteMutation.mutate(selectedRecord.id)
+                    }
+                  }}
+                  okText="确定"
+                  cancelText="取消"
+                >
+                  <Button danger icon={<DeleteOutlined />} loading={deleteMutation.isPending}>
+                    删除
+                  </Button>
+                </Popconfirm>
+              )}
+              {selectedRecord?.status === 'reviewing' && (
+                <Popconfirm
+                  title="确定撤回此核销单？"
+                  onConfirm={() => {
+                    if (selectedRecord?.id) {
+                      withdrawMutation.mutate(selectedRecord.id)
+                    }
+                  }}
+                  okText="确定"
+                  cancelText="取消"
+                >
+                  <Button icon={<RollbackOutlined />} loading={withdrawMutation.isPending}>
+                    撤回
+                  </Button>
+                </Popconfirm>
+              )}
+            </Space>
           )
         }
       >
@@ -475,6 +610,7 @@ const FinPettySettlesPage = () => {
           <Descriptions bordered size="small" column={1}>
             <Descriptions.Item label="ID">{selectedRecord.id}</Descriptions.Item>
             <Descriptions.Item label="单号">{selectedRecord.code || '-'}</Descriptions.Item>
+            <Descriptions.Item label="关联发放单">{selectedRecord.grant_code || '-'}</Descriptions.Item>
             <Descriptions.Item label="核销人">{selectedRecord.person_name}</Descriptions.Item>
             <Descriptions.Item label="核销金额(元)">
               <Text strong>¥{((selectedRecord.settle_amount_cents || 0) / 100).toFixed(2)}</Text>

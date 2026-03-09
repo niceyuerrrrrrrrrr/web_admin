@@ -26,6 +26,8 @@ import { useQuery } from '@tanstack/react-query'
 import useCompanyStore from '../store/company'
 import useAuthStore from '../store/auth'
 import client from '../api/client'
+import { fetchFinAccounts } from '../api/services/finBase'
+import type { FinAccountRecord } from '../api/types'
 
 const { Title, Text } = Typography
 
@@ -76,6 +78,12 @@ const FinOverview = () => {
   const { data, isLoading, error } = useQuery({
     queryKey: ['financial-overview', selectedCompanyId],
     queryFn: () => fetchFinancialOverview(selectedCompanyId ?? null),
+    enabled: !!selectedCompanyId || !!user,
+  })
+
+  const accountsQuery = useQuery({
+    queryKey: ['fin', 'accounts', 'overview', selectedCompanyId],
+    queryFn: () => fetchFinAccounts({ companyId: selectedCompanyId ?? undefined, activeOnly: true }),
     enabled: !!selectedCompanyId || !!user,
   })
 
@@ -313,6 +321,54 @@ const FinOverview = () => {
         </Space>
       </Card>
 
+      <Card title="账户分账户统计" bordered={false}>
+        {accountsQuery.data?.records?.length ? (
+          <Row gutter={[16, 16]}>
+            {accountsQuery.data.records.map((account) => {
+              const opening = Number(account.opening_balance_cents || 0) / 100
+              const current = Number(account.balance_cents || 0) / 100
+              const flow = current - opening
+
+              return (
+                <Col xs={24} sm={12} xl={8} key={account.id}>
+                  <Card size="small">
+                    <Space direction="vertical" size={8} style={{ width: '100%' }}>
+                      <div>
+                        <Text strong>{account.name}</Text>
+                        <br />
+                        <Text type="secondary">{account.type}</Text>
+                      </div>
+
+                      <Row gutter={12}>
+                        <Col span={12}>
+                          <Statistic title="当前余额" value={current} precision={2} prefix="¥" valueStyle={{ fontSize: 20, color: '#1677ff' }} />
+                        </Col>
+                        <Col span={12}>
+                          <Statistic title="期初余额" value={opening} precision={2} prefix="¥" valueStyle={{ fontSize: 18 }} />
+                        </Col>
+                      </Row>
+
+                      <Statistic
+                        title="净流转"
+                        value={flow}
+                        precision={2}
+                        prefix="¥"
+                        valueStyle={{
+                          fontSize: 18,
+                          color: flow >= 0 ? '#3f8600' : '#cf1322',
+                        }}
+                      />
+                    </Space>
+                  </Card>
+                </Col>
+              )
+            })}
+          </Row>
+        ) : (
+          <Empty description="暂无账户数据" />
+        )}
+      </Card>
+
       {/* 数据可视化区域 */}
       <Row gutter={[16, 16]}>
         <Col xs={24} lg={16}>
@@ -322,10 +378,35 @@ const FinOverview = () => {
         </Col>
         <Col xs={24} lg={8}>
           <Card title="账户余额分布" bordered={false}>
-            <AccountBalanceChart />
+            <AccountBalanceChart accounts={accountsQuery.data?.records || []} />
           </Card>
         </Col>
       </Row>
+
+      <Card title="账户余额明细（分账户）" bordered={false}>
+        {accountsQuery.data?.records?.length ? (
+          <Row gutter={[16, 16]}>
+            {accountsQuery.data.records.map((account) => (
+              <Col xs={24} sm={12} lg={8} key={account.id}>
+                <Card size="small">
+                  <Space direction="vertical" size={4} style={{ width: '100%' }}>
+                    <Text strong>{account.name}</Text>
+                    <Text type="secondary">{account.type}</Text>
+                    <Text style={{ fontSize: 20, fontWeight: 600, color: '#1677ff' }}>
+                      ¥{((account.balance_cents || 0) / 100).toFixed(2)}
+                    </Text>
+                    <Text type="secondary">
+                      期初：¥{((account.opening_balance_cents || 0) / 100).toFixed(2)}
+                    </Text>
+                  </Space>
+                </Card>
+              </Col>
+            ))}
+          </Row>
+        ) : (
+          <Empty description="暂无账户数据" />
+        )}
+      </Card>
 
       <Row gutter={[16, 16]}>
         <Col xs={24}>
@@ -382,10 +463,10 @@ const IncomeTrendChart = () => {
         },
       }}
       tooltip={{
-        formatter: (datum: any) => {
+        formatter: (datum: any = {}) => {
           return {
-            name: datum.type,
-            value: `¥${datum.value.toFixed(2)}`,
+            name: datum?.type || '未知',
+            value: `¥${Number(datum?.value || 0).toFixed(2)}`,
           }
         },
       }}
@@ -395,14 +476,19 @@ const IncomeTrendChart = () => {
 }
 
 // 账户余额分布图组件
-const AccountBalanceChart = () => {
-  // 模拟账户数据
-  const data = useMemo(() => [
-    { type: '工商银行', value: 450000 },
-    { type: '建设银行', value: 320000 },
-    { type: '农业银行', value: 280000 },
-    { type: '现金账户', value: 184567.89 },
-  ], [])
+const AccountBalanceChart = ({ accounts }: { accounts: FinAccountRecord[] }) => {
+  const data = useMemo(
+    () =>
+      accounts.map((account) => ({
+        type: account.name,
+        value: Number(account.balance_cents || 0) / 100,
+      })),
+    [accounts],
+  )
+
+  if (!data.length) {
+    return <Empty description="暂无账户余额数据" />
+  }
 
   return (
     <Pie
@@ -413,8 +499,10 @@ const AccountBalanceChart = () => {
       innerRadius={0.6}
       label={{
         type: 'spider',
-        formatter: (datum: any) => {
-          return `${datum.type}\n¥${(datum.value / 10000).toFixed(2)}万`
+        formatter: (datum: any = {}) => {
+          const type = datum?.type || '未知'
+          const value = Number(datum?.value || 0)
+          return `${type}\n¥${(value / 10000).toFixed(2)}万`
         },
       }}
       statistic={{
@@ -465,16 +553,16 @@ const ARAPComparisonChart = () => {
         },
       }}
       tooltip={{
-        formatter: (datum: any) => {
+        formatter: (datum: any = {}) => {
           return {
-            name: datum.type,
-            value: `¥${datum.value.toFixed(2)}`,
+            name: datum?.type || '未知',
+            value: `¥${Number(datum?.value || 0).toFixed(2)}`,
           }
         },
       }}
       label={{
         position: 'top' as const,
-        formatter: (datum: any) => `¥${(datum.value / 10000).toFixed(1)}万`,
+        formatter: (datum: any = {}) => `¥${(Number(datum?.value || 0) / 10000).toFixed(1)}万`,
       }}
       height={300}
     />

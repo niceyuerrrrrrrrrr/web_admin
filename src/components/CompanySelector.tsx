@@ -14,9 +14,8 @@ interface CompanySelectorProps extends Omit<SelectProps, 'options'> {
 export default function CompanySelector({ onChange, value, ...props }: CompanySelectorProps) {
   const { user } = useAuthStore()
 
-  // 获取公司列表
-  const isSuperAdmin =
-    user?.role === 'super_admin' || user?.positionType === '超级管理员'
+  // 获取公司列表 - 仅超级管理员可见
+  const isSuperAdmin = user?.role === 'super_admin'
 
   const { data: companiesResponse, isLoading } = useQuery({
     queryKey: ['companies'],

@@ -94,7 +94,7 @@ const ReportsPage = () => {
   const queryClient = useQueryClient()
   const { selectedCompanyId } = useCompanyStore()
   const { user } = useAuthStore()
-  const isSuperAdmin = user?.role === 'super_admin' || user?.positionType === '超级管理员'
+  const isSuperAdmin = user?.role === 'super_admin'
   const effectiveCompanyId = isSuperAdmin ? selectedCompanyId : undefined
   
   const [filters, setFilters] = useState<{

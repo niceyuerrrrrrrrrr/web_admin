@@ -150,7 +150,7 @@ const ReceiptsPage = () => {
   const { user, setAuth } = useAuthStore()
   const { selectedCompanyId } = useCompanyStore()
 
-  const isSuperAdmin = user?.role === 'super_admin' || user?.positionType === '超级管理员'
+  const isSuperAdmin = user?.role === 'super_admin'
   // 检查是否是司机：除了司机，其他角色都可以编辑、删除、导出
   const isDriver = user?.positionType === '司机' || user?.positionType === '挂车司机' || user?.positionType === '罐车司机'
   // 统计、统计员、车队长、财务、总经理等管理角色可以编辑和删除
@@ -206,6 +206,8 @@ const ReceiptsPage = () => {
     deletedStatus?: 'all' | 'normal' | 'deleted'
     submittedStatus?: 'all' | 'submitted' | 'not_submitted'
     volumeFilter?: 'all' | 'small' | 'normal' // 新增：方量筛选
+    submittedStartDate?: string // 新增：交票开始时间
+    submittedEndDate?: string // 新增：交票结束时间
   }>({
     deletedStatus: 'normal', // 默认只显示正常票据
     submittedStatus: 'all', // 默认显示所有交票状态
@@ -707,13 +709,14 @@ const ReceiptsPage = () => {
     return record?.[field]
   }, [activeTab])
 
-  // 计算当前表格显示数据的KPI统计
+  // 计算当前表格显示数据的KPI统计（包括列筛选后的数据）
   const kpiStats = useMemo(() => {
     if (activeTab === 'matched') {
       return null // 装卸匹配使用单独的统计
     }
 
-    const currentReceipts = filteredReceipts.filter((r: any) => r.type === activeTab)
+    // 使用 dataForOperations 来计算统计数据，这样会包含列筛选的结果
+    const currentReceipts = dataForOperations.filter((r: any) => r.type === activeTab)
     const totalCount = currentReceipts.length
     let submittedCount = 0
 
@@ -765,15 +768,18 @@ const ReceiptsPage = () => {
         notSubmittedCount: totalCount - submittedCount,
       }
     } else if (activeTab === 'charging') {
-      // 充电单：总电量、总金额、总单据数、已交票/未交票
+      // 充电单：总电量、总金额、总计算金额、总单据数、已交票/未交票
       let totalEnergy = 0
       let totalAmount = 0
+      let totalCalculatedAmount = 0
 
       currentReceipts.forEach((receipt: any) => {
         const energy = parseFloat(receipt.energy_kwh || 0)
-        const amount = parseFloat(receipt.amount || 0)
+        const amount = parseFloat(receipt.total_amount || 0)
+        const calculatedAmount = parseFloat(receipt.calculated_amount || 0)
         totalEnergy += energy
         totalAmount += amount
+        totalCalculatedAmount += calculatedAmount
         
         if (receipt.submitted_to_finance === 'Y') {
           submittedCount++
@@ -784,6 +790,7 @@ const ReceiptsPage = () => {
         type: 'charging',
         totalEnergy: totalEnergy.toFixed(2),
         totalAmount: totalAmount.toFixed(2),
+        totalCalculatedAmount: totalCalculatedAmount.toFixed(2),
         totalCount,
         submittedCount,
         notSubmittedCount: totalCount - submittedCount,
@@ -805,7 +812,7 @@ const ReceiptsPage = () => {
     }
 
     return null
-  }, [activeTab, filteredReceipts])
+  }, [activeTab, dataForOperations])
 
   // 编辑充电单
   const updateChargingMutation = useMutation({
@@ -1005,17 +1012,21 @@ const ReceiptsPage = () => {
     deletedStatus?: 'all' | 'normal' | 'deleted'
     submittedStatus?: 'all' | 'submitted' | 'not_submitted'
     volumeFilter?: 'all' | 'small' | 'normal'
+    submittedDateRange?: Dayjs[]
   }) => {
     setFilters({
       receiptType: values.receiptType,
-      startDate: values.dateRange?.[0]?.format('YYYY-MM-DD'),
-      endDate: values.dateRange?.[1]?.format('YYYY-MM-DD'),
+      startDate: values.dateRange?.[0] ? dayjs(values.dateRange[0]).format('YYYY-MM-DD') : undefined,
+      endDate: values.dateRange?.[1] ? dayjs(values.dateRange[1]).format('YYYY-MM-DD') : undefined,
       vehicleNo: values.vehicleNo,
       tankerVehicleCode: values.tankerVehicleCode,
       deletedStatus: values.deletedStatus || 'normal',
       submittedStatus: values.submittedStatus || 'all',
       volumeFilter: values.volumeFilter || 'all',
+      submittedStartDate: values.submittedDateRange?.[0] ? dayjs(values.submittedDateRange[0]).format('YYYY-MM-DD') : undefined,
+      submittedEndDate: values.submittedDateRange?.[1] ? dayjs(values.submittedDateRange[1]).format('YYYY-MM-DD') : undefined,
     })
+    setCurrentPage(1)
   }
 
   const handleReset = () => {
@@ -3798,6 +3809,7 @@ const ReceiptsPage = () => {
           ID: receipt.id,
           创建时间: receipt.created_at ? dayjs(receipt.created_at).format('YYYY-MM-DD HH:mm') : '',
           交票状态: submittedToFinance === 'Y' ? '已交票' : '未交票',
+          交票日期: submittedAt ? dayjs(submittedAt).format('YYYY-MM-DD') : '',
           交票时间: formatDateTime(submittedAt),
           删除状态: deletedAt ? '已删除' : '正常',
           删除时间: formatDateTime(deletedAt),
@@ -4082,6 +4094,7 @@ const ReceiptsPage = () => {
           ID: receipt.id,
           创建时间: receipt.created_at ? dayjs(receipt.created_at).format('YYYY-MM-DD HH:mm') : '',
           交票状态: submittedToFinance === 'Y' ? '已交票' : '未交票',
+          交票日期: submittedAt ? dayjs(submittedAt).format('YYYY-MM-DD') : '',
           交票时间: formatDateTime(submittedAt),
           删除状态: deletedAt ? '已删除' : '正常',
           删除时间: formatDateTime(deletedAt),
@@ -4629,7 +4642,24 @@ const ReceiptsPage = () => {
           />
           <Form form={searchForm} layout="inline" onFinish={handleSearch} onReset={handleReset} style={{ display: 'inline-flex', gap: '8px' }}>
             <Form.Item name="dateRange" label="日期范围" style={{ marginBottom: 0 }}>
-              <RangePicker allowClear />
+              <RangePicker 
+                allowClear 
+                presets={[
+                  { label: '今日', value: [dayjs().startOf('day'), dayjs().endOf('day')] },
+                  { label: '昨日', value: [dayjs().subtract(1, 'day').startOf('day'), dayjs().subtract(1, 'day').endOf('day')] },
+                  { label: '本周', value: [dayjs().startOf('week'), dayjs().endOf('week')] },
+                  { label: '上周', value: [dayjs().subtract(1, 'week').startOf('week'), dayjs().subtract(1, 'week').endOf('week')] },
+                  { label: '下周', value: [dayjs().add(1, 'week').startOf('week'), dayjs().add(1, 'week').endOf('week')] },
+                  { label: '本月', value: [dayjs().startOf('month'), dayjs().endOf('month')] },
+                  { label: '上月', value: [dayjs().subtract(1, 'month').startOf('month'), dayjs().subtract(1, 'month').endOf('month')] },
+                  { label: '下月', value: [dayjs().add(1, 'month').startOf('month'), dayjs().add(1, 'month').endOf('month')] },
+                  { label: '本年', value: [dayjs().startOf('year'), dayjs().endOf('year')] },
+                  { label: '去年', value: [dayjs().subtract(1, 'year').startOf('year'), dayjs().subtract(1, 'year').endOf('year')] },
+                  { label: '明年', value: [dayjs().add(1, 'year').startOf('year'), dayjs().add(1, 'year').endOf('year')] },
+                  { label: '最近7天', value: [dayjs().subtract(6, 'day').startOf('day'), dayjs().endOf('day')] },
+                  { label: '最近30天', value: [dayjs().subtract(29, 'day').startOf('day'), dayjs().endOf('day')] },
+                ]}
+              />
             </Form.Item>
             <Form.Item name="vehicleNo" label="车牌号" style={{ marginBottom: 0 }}>
               <Select
@@ -4718,6 +4748,29 @@ const ReceiptsPage = () => {
                   { label: '已交票', value: 'submitted' },
                   { label: '未交票', value: 'not_submitted' },
                 ]}
+              />
+            </Form.Item>
+            <Form.Item name="submittedDateRange" label="交票时间" style={{ marginBottom: 0 }}>
+              <RangePicker 
+                allowClear 
+                presets={[
+                  { label: '今日', value: [dayjs().startOf('day'), dayjs().endOf('day')] },
+                  { label: '昨日', value: [dayjs().subtract(1, 'day').startOf('day'), dayjs().subtract(1, 'day').endOf('day')] },
+                  { label: '本周', value: [dayjs().startOf('week'), dayjs().endOf('week')] },
+                  { label: '上周', value: [dayjs().subtract(1, 'week').startOf('week'), dayjs().subtract(1, 'week').endOf('week')] },
+                  { label: '下周', value: [dayjs().add(1, 'week').startOf('week'), dayjs().add(1, 'week').endOf('week')] },
+                  { label: '本月', value: [dayjs().startOf('month'), dayjs().endOf('month')] },
+                  { label: '上月', value: [dayjs().subtract(1, 'month').startOf('month'), dayjs().subtract(1, 'month').endOf('month')] },
+                  { label: '下月', value: [dayjs().add(1, 'month').startOf('month'), dayjs().add(1, 'month').endOf('month')] },
+                  { label: '本年', value: [dayjs().startOf('year'), dayjs().endOf('year')] },
+                  { label: '去年', value: [dayjs().subtract(1, 'year').startOf('year'), dayjs().subtract(1, 'year').endOf('year')] },
+                  { label: '明年', value: [dayjs().add(1, 'year').startOf('year'), dayjs().add(1, 'year').endOf('year')] },
+                  { label: '最近7天', value: [dayjs().subtract(6, 'day').startOf('day'), dayjs().endOf('day')] },
+                  { label: '最近30天', value: [dayjs().subtract(29, 'day').startOf('day'), dayjs().endOf('day')] },
+                ]}
+                placeholder={['开始日期', '结束日期']}
+                style={{ width: 240 }}
+                format="YYYY-MM-DD"
               />
             </Form.Item>
             {activeTab === 'departure' && (
@@ -5023,7 +5076,93 @@ const ReceiptsPage = () => {
                     total: dataForOperations.length,
                     pageSize: pageSize,
                     showSizeChanger: true,
-                    showTotal: (total) => `共 ${total} 条`,
+                    showTotal: (total) => {
+                      // 如果是出厂单，显示方量总计
+                      if (activeTab === 'departure') {
+                        // 如果有勾选数据，显示勾选数据的方量总计
+                        if (selectedRowKeys.length > 0) {
+                          const selectedReceipts = dataForOperations.filter((r: any) => 
+                            selectedRowKeys.includes(`${r.type}-${r.id}`)
+                          )
+                          const selectedVolume = selectedReceipts.reduce((sum: number, r: any) => {
+                            return sum + parseFloat(r.concrete_volume || 0)
+                          }, 0)
+                          return `已选方量: ${selectedVolume.toFixed(2)} m³ (${selectedRowKeys.length}条) | 总方量: ${kpiStats?.totalVolume || '0.00'} m³ | 共 ${total} 条`
+                        }
+                        // 没有勾选时，显示筛选后的方量总计
+                        if (kpiStats?.totalVolume) {
+                          return `方量总计: ${kpiStats.totalVolume} m³ | 共 ${total} 条`
+                        }
+                      }
+                      
+                      // 如果是充电单，显示总金额和总计算金额
+                      if (activeTab === 'charging') {
+                        // 如果有勾选数据，显示勾选数据的金额统计
+                        if (selectedRowKeys.length > 0) {
+                          const selectedReceipts = dataForOperations.filter((r: any) => 
+                            selectedRowKeys.includes(`${r.type}-${r.id}`)
+                          )
+                          const selectedAmount = selectedReceipts.reduce((sum: number, r: any) => {
+                            return sum + parseFloat(r.total_amount || 0)
+                          }, 0)
+                          const selectedCalculatedAmount = selectedReceipts.reduce((sum: number, r: any) => {
+                            return sum + parseFloat(r.calculated_amount || 0)
+                          }, 0)
+                          return `已选金额: ¥${selectedAmount.toFixed(2)} | 已选计算金额: ¥${selectedCalculatedAmount.toFixed(2)} (${selectedRowKeys.length}条) | 总金额: ¥${kpiStats?.totalAmount || '0.00'} | 总计算金额: ¥${kpiStats?.totalCalculatedAmount || '0.00'} | 共 ${total} 条`
+                        }
+                        // 没有勾选时，显示筛选后的金额总计
+                        if (kpiStats?.totalAmount) {
+                          return `总金额: ¥${kpiStats.totalAmount} | 总计算金额: ¥${kpiStats.totalCalculatedAmount || '0.00'} | 共 ${total} 条`
+                        }
+                      }
+                      
+                      // 如果是装料单或卸货单，显示总净重
+                      if (activeTab === 'loading' || activeTab === 'unloading') {
+                        // 如果有勾选数据，显示勾选数据的净重统计
+                        if (selectedRowKeys.length > 0) {
+                          const selectedReceipts = dataForOperations.filter((r: any) => 
+                            selectedRowKeys.includes(`${r.type}-${r.id}`)
+                          )
+                          const selectedWeight = selectedReceipts.reduce((sum: number, r: any) => {
+                            return sum + parseFloat(r.net_weight || 0)
+                          }, 0)
+                          return `已选净重: ${selectedWeight.toFixed(2)} 吨 (${selectedRowKeys.length}条) | 总净重: ${kpiStats?.totalWeight || '0.00'} 吨 | 共 ${total} 条`
+                        }
+                        // 没有勾选时，显示筛选后的净重总计
+                        if (kpiStats?.totalWeight) {
+                          return `总净重: ${kpiStats.totalWeight} 吨 | 共 ${total} 条`
+                        }
+                      }
+                      
+                      // 如果是装卸匹配，显示总装料净重、总卸货净重和总磅差
+                      if (activeTab === 'matched') {
+                        // 如果有勾选数据，显示勾选数据的统计
+                        if (selectedRowKeys.length > 0) {
+                          const selectedReceipts = dataForOperations.filter((r: any) => 
+                            selectedRowKeys.includes(`matched-${r.task_id || r.id}`)
+                          )
+                          const selectedLoadWeight = selectedReceipts.reduce((sum: number, r: any) => {
+                            return sum + parseFloat(r.loadBill?.net_weight || 0)
+                          }, 0)
+                          const selectedUnloadWeight = selectedReceipts.reduce((sum: number, r: any) => {
+                            return sum + parseFloat(r.unloadBill?.net_weight || 0)
+                          }, 0)
+                          const selectedWeightDiff = selectedLoadWeight - selectedUnloadWeight
+                          return `已选装料净重: ${selectedLoadWeight.toFixed(2)} 吨 | 已选卸货净重: ${selectedUnloadWeight.toFixed(2)} 吨 | 已选磅差: ${selectedWeightDiff.toFixed(2)} 吨 (${selectedRowKeys.length}条) | 共 ${total} 条`
+                        }
+                        // 没有勾选时，显示筛选后的统计
+                        const totalLoadWeight = dataForOperations.reduce((sum: number, r: any) => {
+                          return sum + parseFloat(r.loadBill?.net_weight || 0)
+                        }, 0)
+                        const totalUnloadWeight = dataForOperations.reduce((sum: number, r: any) => {
+                          return sum + parseFloat(r.unloadBill?.net_weight || 0)
+                        }, 0)
+                        const totalWeightDiff = totalLoadWeight - totalUnloadWeight
+                        return `总装料净重: ${totalLoadWeight.toFixed(2)} 吨 | 总卸货净重: ${totalUnloadWeight.toFixed(2)} 吨 | 总磅差: ${totalWeightDiff.toFixed(2)} 吨 | 共 ${total} 条`
+                      }
+                      
+                      return `共 ${total} 条`
+                    },
                     pageSizeOptions: ['10', '20', '50', '100'],
                     onChange: (page) => setCurrentPage(page),
                     onShowSizeChange: (_current, size) => {

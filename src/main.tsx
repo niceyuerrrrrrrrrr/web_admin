@@ -9,6 +9,7 @@ import 'dayjs/locale/zh-cn'
 import 'antd/dist/reset.css'
 import App from './App.tsx'
 import './index.css'
+import './styles/resizable-table.css'
 
 dayjs.locale('zh-cn')
 

@@ -12,6 +12,8 @@ export const APPROVAL_TYPES = [
   { value: 'offboarding', label: '离职' },
   { value: 'fin_cash_in', label: '收款单' },
   { value: 'fin_cash_out', label: '付款单' },
+  { value: 'fin_ar_receipt', label: '应收回款' },
+  { value: 'fin_ap_payment', label: '应付实付' },
 ]
 
 export type ApprovalCoreFields = {

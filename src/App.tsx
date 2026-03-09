@@ -48,6 +48,8 @@ import {
   useLocation,
   useNavigate,
 } from 'react-router-dom'
+import ModuleHome from './pages/ModuleHome'
+import ModuleWorkspace from './pages/ModuleWorkspace'
 import DashboardPage from './pages/Dashboard'
 import StatisticsPage from './pages/Statistics'
 import ApprovalsPage from './pages/Approvals'
@@ -653,7 +655,7 @@ const GlobalCompanySelector = () => {
   const { user } = useAuthStore()
   const { selectedCompanyId, setSelectedCompanyId } = useCompanyStore()
 
-  const isSuperAdmin = user?.role === 'super_admin' || user?.positionType === '超级管理员'
+  const isSuperAdmin = user?.role === 'super_admin'
 
   if (isSuperAdmin) {
     return (
@@ -892,8 +894,12 @@ function App() {
   
   return (
     <Routes>
+      {/* 模块主页 - 独立布局，不显示侧边栏 */}
+      <Route path="/" element={<ModuleHome />} />
+      <Route path="/modules/:key" element={<ModuleWorkspace />} />
+      
+      {/* 其他页面 - 使用带侧边栏的标准布局 */}
       <Route element={<AppLayout />}>
-        <Route path="/" element={<Navigate to="/dashboard" replace />} />
         {flattenRoutes(routeDefinitions).map((route: any) => {
           // 公司管理路由需要超级管理员权限
           if (route.key === 'companies') {

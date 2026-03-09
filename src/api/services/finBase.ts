@@ -1,5 +1,12 @@
 import client from '../client'
-import type { ApiResponse, FinAccountRecord, FinCategoryRecord, FinCustomerRecord, FinSupplierRecord } from '../types'
+import type {
+  ApiResponse,
+  FinAccountCashflowResponse,
+  FinAccountRecord,
+  FinCategoryRecord,
+  FinCustomerRecord,
+  FinSupplierRecord,
+} from '../types'
 
 const unwrap = async <T>(promise: Promise<{ data: ApiResponse<T> }>) => {
   const response = await promise
@@ -85,6 +92,15 @@ export const toggleFinAccountActive = (id: number, data: { is_active: number; co
         },
       },
     ),
+  )
+
+export const fetchFinAccountCashflows = (id: number, params?: { companyId?: number }) =>
+  unwrap<FinAccountCashflowResponse>(
+    client.get(`/fin/accounts/${id}/cashflows`, {
+      params: {
+        company_id: params?.companyId,
+      },
+    }),
   )
 
 export const fetchFinCategories = (params?: { companyId?: number; parentId?: number | null; activeOnly?: boolean }) =>

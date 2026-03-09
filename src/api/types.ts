@@ -198,6 +198,9 @@ export interface ReceiptListParams {
   pageSize?: number
   deletedStatus?: 'all' | 'normal' | 'deleted'
   submittedStatus?: 'all' | 'submitted' | 'not_submitted'
+  submittedStartDate?: string
+  submittedEndDate?: string
+  scope?: 'mine' | 'all'
 }
 
 export interface ReceiptListResponse {
@@ -498,8 +501,37 @@ export interface FinAccountRecord {
   name: string
   type: string
   opening_balance_cents: number
+  balance_cents: number
   is_active: number
   remark?: string | null
+}
+
+export interface FinAccountCashflowRecord {
+  id: number
+  code?: string | null
+  date?: string | null
+  amount_cents: number
+  direction: 'in' | 'out'
+  direction_text: string
+  counterparty_type?: string | null
+  counterparty_name?: string | null
+  biz_type?: string | null
+  biz_id?: number | null
+  method?: string | null
+  status: string
+  approved_at?: string | null
+  remark?: string | null
+}
+
+export interface FinAccountCashflowResponse {
+  account: {
+    id: number
+    name: string
+    type: string
+    opening_balance_cents: number
+    balance_cents: number
+  }
+  records: FinAccountCashflowRecord[]
 }
 
 export interface FinCategoryRecord {

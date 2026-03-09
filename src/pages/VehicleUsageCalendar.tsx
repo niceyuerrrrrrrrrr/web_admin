@@ -31,7 +31,7 @@ const VehicleUsageCalendar: React.FC = () => {
     dayjs().endOf('month'),
   ])
 
-  const isSuperAdmin = user?.role === 'super_admin' || user?.role === 'admin' || user?.positionType === '超级管理员'
+  const isSuperAdmin = user?.role === 'super_admin'
   const effectiveCompanyId = isSuperAdmin ? selectedCompanyId : user?.companyId
 
   const startDateStr = useMemo(() => dateRange[0].format('YYYY-MM-DD'), [dateRange])

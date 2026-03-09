@@ -51,7 +51,7 @@ const ApprovalWorkflowsPage = () => {
   const { message, modal } = AntdApp.useApp()
   const { user } = useAuthStore()
   const { selectedCompanyId } = useCompanyStore()
-  const isSuperAdmin = user?.role === 'super_admin' || user?.positionType === '超级管理员'
+  const isSuperAdmin = user?.role === 'super_admin'
   const effectiveCompanyId = isSuperAdmin ? selectedCompanyId : undefined
   const [filterType, setFilterType] = useState<string>('all')
   const [drawerWorkflow, setDrawerWorkflow] = useState<Workflow | null>(null)

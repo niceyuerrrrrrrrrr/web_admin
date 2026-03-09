@@ -91,7 +91,7 @@ const FinCashOutPage = () => {
   const { user } = useAuthStore()
   const { selectedCompanyId } = useCompanyStore()
 
-  const isSuperAdmin = user?.role === 'super_admin' || user?.positionType === '超级管理员'
+  const isSuperAdmin = user?.role === 'super_admin'
   const effectiveCompanyId = isSuperAdmin ? selectedCompanyId : undefined
 
   const [filters, setFilters] = useState<{
@@ -571,8 +571,8 @@ const FinCashOutPage = () => {
                       <Tag color={statusColor(d.status)}>{statusText(d.status)}</Tag>
                     </Descriptions.Item>
                     <Descriptions.Item label="方式">{(d as any).method || ''}</Descriptions.Item>
-                    <Descriptions.Item label="付款方类型">{(d as any).payee_type || ''}</Descriptions.Item>
-                    <Descriptions.Item label="付款方ID">{(d as any).payee_id ?? ''}</Descriptions.Item>
+                    <Descriptions.Item label="收款方类型">{(d as any).payee_type || ''}</Descriptions.Item>
+                    <Descriptions.Item label="收款方ID">{(d as any).payee_id ?? ''}</Descriptions.Item>
                     <Descriptions.Item label="备注">{(d as any).remark || ''}</Descriptions.Item>
                     <Descriptions.Item label="附件">
                       {attachments.length ? (
@@ -682,7 +682,7 @@ const FinCashOutPage = () => {
           <Form.Item label="账户" name="account_id" rules={[{ required: true, message: '请选择账户' }] }>
             <Select options={accountOptions} />
           </Form.Item>
-          <Form.Item label="付款方类型" name="payee_type" rules={[{ required: true, message: '请选择类型' }]}>
+          <Form.Item label="收款方类型" name="payee_type" rules={[{ required: true, message: '请选择类型' }]}>
             <Select
               options={[
                 { value: 'supplier', label: '供应商' },

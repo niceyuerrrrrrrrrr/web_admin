@@ -49,7 +49,9 @@ export function fixImageUrl(url: string | null | undefined): string | null {
     return `${CURRENT_API_BASE}${url}`
   }
   
-  // 其他情况，拼接完整路径
+  // 其他情况（包括OSS对象名），拼接完整路径
+  // 注意：OSS对象名应该由后端转换为签名URL，但如果后端没有转换，
+  // 前端会将其作为API路径访问，这会失败
   return `${CURRENT_API_BASE}/${url}`
 }
 

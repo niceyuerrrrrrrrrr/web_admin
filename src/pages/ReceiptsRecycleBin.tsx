@@ -155,7 +155,7 @@ export default function ReceiptsRecycleBin() {
   const { selectedCompanyId } = useCompanyStore()
   const { message, modal } = App.useApp()
   const queryClient = useQueryClient()
-  const isSuperAdmin = user?.role === 'super_admin' || user?.positionType === '超级管理员'
+  const isSuperAdmin = user?.role === 'super_admin'
   const effectiveCompanyId = isSuperAdmin ? selectedCompanyId : user?.companyId
   const showCompanyWarning = isSuperAdmin && !effectiveCompanyId
 

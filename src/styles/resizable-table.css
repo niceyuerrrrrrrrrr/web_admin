@@ -13,7 +13,8 @@
   bottom: 0;
   right: -5px;
   cursor: col-resize;
-  z-index: 1;
+  z-index: 10;
+  background: transparent;
 }
 
 /* 调整手柄的可视化指示器 */
@@ -45,13 +46,13 @@
 }
 
 /* 表头单元格样式优化 */
-.ant-table-thead > tr > th {
+.resizable-table .ant-table-thead > tr > th {
   position: relative;
   user-select: none;
 }
 
 /* 表头单元格边框 */
-.ant-table-thead > tr > th::after {
+.resizable-table .ant-table-thead > tr > th::after {
   content: '';
   position: absolute;
   right: 0;
@@ -63,7 +64,7 @@
 }
 
 /* 最后一列不显示边框 */
-.ant-table-thead > tr > th:last-child::after {
+.resizable-table .ant-table-thead > tr > th:last-child::after {
   display: none;
 }
 

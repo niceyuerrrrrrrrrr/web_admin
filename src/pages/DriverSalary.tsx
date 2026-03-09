@@ -20,6 +20,8 @@ import {
   Descriptions,
   Tooltip,
   Select,
+  Radio,
+  Dropdown,
 } from 'antd'
 import {
   DollarOutlined,
@@ -41,6 +43,7 @@ import {
   fetchSalarySummaryList,
   fetchRealtimeTrips,
   fetchTripDetailsByCompany,
+  fetchTripDetailsByDate,
   calculateDriverSalary,
   batchCalculateSalary,
   batchConfirmSalary,
@@ -51,6 +54,7 @@ import {
   type GlobalConfig,
   type SalarySummary,
   type TripDetailByCompany,
+  type TripDetailByDate,
 } from '../api/services/driverSalary'
 import { fetchUsers } from '../api/services/users'
 import { fetchDepartments } from '../api/services/departments'
@@ -63,6 +67,7 @@ const DriverSalaryPage: React.FC = () => {
   const [selectedPeriod, setSelectedPeriod] = useState<string>(
     dayjs().format('YYYY-MM'),
   )
+  const [tripViewMode, setTripViewMode] = useState<'table' | 'calendar'>('table') // 趟次明细视图模式
   const [selectedDepartmentId, setSelectedDepartmentId] = useState<number | undefined>()
   const [globalConfigForm] = Form.useForm()
   const [detailModalVisible, setDetailModalVisible] = useState(false)
@@ -177,6 +182,18 @@ const DriverSalaryPage: React.FC = () => {
     queryKey: ['tripDetails', selectedPeriod, selectedCompanyId, selectedDepartmentId],
     queryFn: () =>
       fetchTripDetailsByCompany({
+        period: selectedPeriod,
+        company_id: selectedCompanyId || undefined,
+        department_id: selectedDepartmentId,
+      }),
+    enabled: activeTab === 'tripDetails' && !!selectedCompanyId,
+  })
+
+  // 获取趟次明细（按日期统计）
+  const { data: tripDetailsByDateData, refetch: refetchTripDetailsByDate, isLoading: isLoadingTripsByDate } = useQuery({
+    queryKey: ['tripDetailsByDate', selectedPeriod, selectedCompanyId, selectedDepartmentId],
+    queryFn: () =>
+      fetchTripDetailsByDate({
         period: selectedPeriod,
         company_id: selectedCompanyId || undefined,
         department_id: selectedDepartmentId,
@@ -325,8 +342,8 @@ const DriverSalaryPage: React.FC = () => {
     })
   }
 
-  // 导出趟次明细报表
-  const handleExportTripDetails = () => {
+  // 导出趟次明细报表（表格视图）
+  const handleExportTripDetailsTable = () => {
     if (!tripDetailsData_raw || tripDetailsData_raw.length === 0) {
       message.warning('暂无数据可导出')
       return
@@ -371,15 +388,97 @@ const DriverSalaryPage: React.FC = () => {
       colWidths.push({ wch: 12 }) // 总计列
       ws['!cols'] = colWidths
       
-      XLSX.utils.book_append_sheet(wb, ws, '趟次明细统计')
+      XLSX.utils.book_append_sheet(wb, ws, '趟次明细统计-表格视图')
       
-      const fileName = `司机趟次明细_${selectedPeriod}.xlsx`
+      const fileName = `司机趟次明细_表格视图_${selectedPeriod}.xlsx`
       XLSX.writeFile(wb, fileName)
       
       message.success('导出成功')
     } catch (error) {
       console.error('导出失败:', error)
-      message.error('导出失败')
+      message.error('导出失败，请重试')
+    }
+  }
+
+  // 导出趟次明细报表（日历视图）
+  const handleExportTripDetailsCalendar = () => {
+    if (!tripDetailsByDateData || !(tripDetailsByDateData as any)?.data || (tripDetailsByDateData as any).data.length === 0) {
+      message.warning('暂无数据可导出')
+      return
+    }
+
+    try {
+      const wb = XLSX.utils.book_new()
+      const calendarData = ((tripDetailsByDateData as any)?.data || []).map((driver: TripDetailByDate) => ({
+        driver_name: driver.driver_name,
+        user_id: driver.user_id,
+        dailyTrips: driver.daily_trips || {},
+        total: driver.total || 0,
+      }))
+
+      if (calendarData.length === 0) {
+        message.warning('暂无数据可导出')
+        return
+      }
+
+      // 获取当前月份的天数
+      const daysInMonth = dayjs(selectedPeriod).daysInMonth()
+      const monthStart = dayjs(selectedPeriod).startOf('month')
+      
+      // 生成日期列
+      const dateColumns = Array.from({ length: daysInMonth }, (_, i) => {
+        const date = monthStart.add(i, 'day')
+        return {
+          day: i + 1,
+          date: date.format('YYYY-MM-DD'),
+        }
+      })
+      
+      // 创建表头
+      const headers = ['司机姓名', ...dateColumns.map(col => `${col.day}日`), '月总计']
+      
+      // 创建数据行
+      const data = calendarData.map((driver: any) => {
+        const row: any = { '司机姓名': driver.driver_name }
+        
+        // 为每一天添加趟次数据
+        dateColumns.forEach((col) => {
+          row[`${col.day}日`] = driver.dailyTrips[col.date] || 0
+        })
+        
+        row['月总计'] = driver.total
+        return row
+      })
+      
+      // 添加总计行
+      const totalRow: any = { '司机姓名': '总计' }
+      dateColumns.forEach((col) => {
+        const dailyTotal = calendarData.reduce((sum: number, driver: any) => {
+          return sum + (driver.dailyTrips[col.date] || 0)
+        }, 0)
+        totalRow[`${col.day}日`] = dailyTotal
+      })
+      totalRow['月总计'] = calendarData.reduce((sum: number, driver: any) => sum + driver.total, 0)
+      data.push(totalRow)
+      
+      // 创建工作表
+      const ws = XLSX.utils.json_to_sheet(data, { header: headers })
+      
+      // 设置列宽
+      const colWidths = [{ wch: 15 }] // 司机姓名列
+      dateColumns.forEach(() => colWidths.push({ wch: 8 })) // 日期列
+      colWidths.push({ wch: 12 }) // 月总计列
+      ws['!cols'] = colWidths
+      
+      XLSX.utils.book_append_sheet(wb, ws, '趟次明细统计-日历视图')
+      
+      const fileName = `司机趟次明细_日历视图_${selectedPeriod}.xlsx`
+      XLSX.writeFile(wb, fileName)
+      
+      message.success('导出成功')
+    } catch (error) {
+      console.error('导出失败:', error)
+      message.error('导出失败，请重试')
     }
   }
 
@@ -1202,25 +1301,55 @@ const DriverSalaryPage: React.FC = () => {
           >
             <div style={{ marginBottom: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span style={{ color: '#999', fontSize: 14 }}>
-                按司机姓名统计各装料公司的趟次明细
+                按司机姓名统计各装料公司的趟次明细（按生产日期）
               </span>
-              <Button
-                type="primary"
-                icon={<DownloadOutlined />}
-                onClick={handleExportTripDetails}
-                disabled={!tripDetailsData_raw || tripDetailsData_raw.length === 0}
-              >
-                导出报表
-              </Button>
+              <Space>
+                <Radio.Group 
+                  value={tripViewMode} 
+                  onChange={(e: any) => setTripViewMode(e.target.value)}
+                  buttonStyle="solid"
+                >
+                  <Radio.Button value="table">表格视图</Radio.Button>
+                  <Radio.Button value="calendar">日历视图</Radio.Button>
+                </Radio.Group>
+                <Dropdown
+                  menu={{
+                    items: [
+                      {
+                        key: 'table',
+                        label: '导出表格视图',
+                        icon: <DownloadOutlined />,
+                        onClick: handleExportTripDetailsTable,
+                      },
+                      {
+                        key: 'calendar',
+                        label: '导出日历视图',
+                        icon: <DownloadOutlined />,
+                        onClick: handleExportTripDetailsCalendar,
+                      },
+                    ],
+                  }}
+                  disabled={(!tripDetailsData_raw || tripDetailsData_raw.length === 0) && (!tripDetailsByDateData || !(tripDetailsByDateData as any)?.data || (tripDetailsByDateData as any).data.length === 0)}
+                >
+                  <Button
+                    type="primary"
+                    icon={<DownloadOutlined />}
+                  >
+                    导出趟次明细
+                  </Button>
+                </Dropdown>
+              </Space>
             </div>
-            <Table
-              columns={tripDetailsColumns}
-              dataSource={tripDetailsData_raw}
-              rowKey="user_id"
-              scroll={{ x: 'max-content' }}
-              pagination={false}
-              bordered
-              summary={() => {
+            
+            {tripViewMode === 'table' ? (
+              <Table
+                columns={tripDetailsColumns}
+                dataSource={tripDetailsData_raw}
+                rowKey="user_id"
+                scroll={{ x: 'max-content' }}
+                pagination={false}
+                bordered
+                summary={() => {
                 if (tripDetailsData_raw.length === 0) return null
                 return (
                   <Table.Summary fixed>
@@ -1244,7 +1373,206 @@ const DriverSalaryPage: React.FC = () => {
                   </Table.Summary>
                 )
               }}
-            />
+              />
+            ) : (
+              (() => {
+                // 获取当前月份的天数
+                const daysInMonth = dayjs(selectedPeriod).daysInMonth()
+                const monthStart = dayjs(selectedPeriod).startOf('month')
+                
+                // 生成日期列
+                const dateColumns = Array.from({ length: daysInMonth }, (_, i) => {
+                  const date = monthStart.add(i, 'day')
+                  return {
+                    day: i + 1,
+                    date: date.format('YYYY-MM-DD'),
+                    weekday: date.day(), // 0=周日, 6=周六
+                  }
+                })
+                
+                // 使用真实的API数据
+                console.log('tripDetailsByDateData:', tripDetailsByDateData)
+                console.log('isLoadingTripsByDate:', isLoadingTripsByDate)
+                const calendarData = ((tripDetailsByDateData as any)?.data || []).map((driver: TripDetailByDate) => {
+                  return {
+                    driver_name: driver.driver_name,
+                    user_id: driver.user_id,
+                    dailyTrips: driver.daily_trips || {},
+                    total: driver.total || 0,
+                  }
+                })
+                console.log('calendarData:', calendarData)
+                
+                return (
+                  <div style={{ overflowX: 'auto' }}>
+                    <table style={{ 
+                      width: '100%', 
+                      borderCollapse: 'collapse',
+                      fontSize: '13px',
+                      minWidth: '1200px'
+                    }}>
+                      <thead>
+                        <tr style={{ backgroundColor: '#fafafa' }}>
+                          <th style={{ 
+                            border: '1px solid #e8e8e8', 
+                            padding: '8px 12px',
+                            position: 'sticky',
+                            left: 0,
+                            backgroundColor: '#fafafa',
+                            zIndex: 2,
+                            minWidth: '100px'
+                          }}>
+                            司机姓名
+                          </th>
+                          {dateColumns.map((col) => (
+                            <th 
+                              key={col.day}
+                              style={{ 
+                                border: '1px solid #e8e8e8', 
+                                padding: '8px 4px',
+                                backgroundColor: col.weekday === 0 || col.weekday === 6 ? '#fff7e6' : '#fafafa',
+                                minWidth: '40px',
+                                textAlign: 'center'
+                              }}
+                            >
+                              {col.day}
+                            </th>
+                          ))}
+                          <th style={{ 
+                            border: '1px solid #e8e8e8', 
+                            padding: '8px 12px',
+                            backgroundColor: '#e6f7ff',
+                            fontWeight: 'bold',
+                            minWidth: '60px'
+                          }}>
+                            月总计
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {isLoadingTripsByDate ? (
+                          <tr>
+                            <td 
+                              colSpan={daysInMonth + 2}
+                              style={{ 
+                                border: '1px solid #e8e8e8', 
+                                padding: '40px',
+                                textAlign: 'center',
+                                color: '#999'
+                              }}
+                            >
+                              加载中...
+                            </td>
+                          </tr>
+                        ) : calendarData.length === 0 ? (
+                          <tr>
+                            <td 
+                              colSpan={daysInMonth + 2}
+                              style={{ 
+                                border: '1px solid #e8e8e8', 
+                                padding: '40px',
+                                textAlign: 'center',
+                                color: '#999'
+                              }}
+                            >
+                              暂无数据
+                            </td>
+                          </tr>
+                        ) : (
+                          calendarData.map((driver: any) => (
+                            <tr key={driver.user_id}>
+                              <td style={{ 
+                                border: '1px solid #e8e8e8', 
+                                padding: '8px 12px',
+                                position: 'sticky',
+                                left: 0,
+                                backgroundColor: '#fff',
+                                zIndex: 1,
+                                fontWeight: 500
+                              }}>
+                                {driver.driver_name}
+                              </td>
+                              {dateColumns.map((col) => {
+                                const trips = driver.dailyTrips[col.date] || 0
+                                return (
+                                  <td 
+                                    key={col.day}
+                                    style={{ 
+                                      border: '1px solid #e8e8e8', 
+                                      padding: '8px 4px',
+                                      textAlign: 'center',
+                                      backgroundColor: col.weekday === 0 || col.weekday === 6 ? '#fffbe6' : '#fff',
+                                      color: trips > 0 ? '#000' : '#d9d9d9'
+                                    }}
+                                  >
+                                    {trips > 0 ? trips : '-'}
+                                  </td>
+                                )
+                              })}
+                              <td style={{ 
+                                border: '1px solid #e8e8e8', 
+                                padding: '8px 12px',
+                                textAlign: 'center',
+                                backgroundColor: '#e6f7ff',
+                                fontWeight: 'bold',
+                                color: '#1890ff'
+                              }}>
+                                {driver.total}
+                              </td>
+                            </tr>
+                          ))
+                        )}
+                        {/* 总计行 */}
+                        {calendarData.length > 0 && (
+                          <tr style={{ backgroundColor: '#fafafa', fontWeight: 'bold' }}>
+                            <td style={{ 
+                              border: '1px solid #e8e8e8', 
+                              padding: '8px 12px',
+                              position: 'sticky',
+                              left: 0,
+                              backgroundColor: '#fafafa',
+                              zIndex: 1
+                            }}>
+                              总计
+                            </td>
+                            {dateColumns.map((col) => {
+                              // 计算当天所有司机的总趟次
+                              const dailyTotal = calendarData.reduce((sum: number, driver: any) => {
+                                return sum + (driver.dailyTrips[col.date] || 0)
+                              }, 0)
+                              return (
+                                <td 
+                                  key={col.day}
+                                  style={{ 
+                                    border: '1px solid #e8e8e8', 
+                                    padding: '8px 4px',
+                                    textAlign: 'center',
+                                    backgroundColor: col.weekday === 0 || col.weekday === 6 ? '#fff7e6' : '#fafafa',
+                                    color: dailyTotal > 0 ? '#1890ff' : '#d9d9d9'
+                                  }}
+                                >
+                                  {dailyTotal > 0 ? dailyTotal : '-'}
+                                </td>
+                              )
+                            })}
+                            <td style={{ 
+                              border: '1px solid #e8e8e8', 
+                              padding: '8px 12px',
+                              textAlign: 'center',
+                              backgroundColor: '#1890ff',
+                              color: '#fff',
+                              fontSize: '16px'
+                            }}>
+                              {calendarData.reduce((sum: number, driver: any) => sum + driver.total, 0)}
+                            </td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                )
+              })()
+            )}
           </Tabs.TabPane>
 
           {/* 全局配置 */}

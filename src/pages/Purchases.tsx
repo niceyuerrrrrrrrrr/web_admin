@@ -75,7 +75,7 @@ const PurchasesPage = () => {
   const { user } = useAuthStore()
   const { selectedCompanyId } = useCompanyStore()
 
-  const isSuperAdmin = user?.role === 'super_admin' || user?.positionType === '超级管理员'
+  const isSuperAdmin = user?.role === 'super_admin'
   const isFinance = user?.positionType === '财务' || isSuperAdmin
   const effectiveCompanyId = isSuperAdmin ? selectedCompanyId : undefined
   const showCompanyWarning = isSuperAdmin && !effectiveCompanyId
@@ -1071,7 +1071,7 @@ const PurchasesPage = () => {
               placeholder="请选择支付账户"
               loading={accountsQuery.isLoading}
               options={(accountsQuery.data?.records || []).map((account) => ({
-                label: `${account.name} (余额: ¥${((account.opening_balance_cents || 0) / 100).toFixed(2)})`,
+                label: `${account.name} (余额: ¥${((account.balance_cents || 0) / 100).toFixed(2)})`,
                 value: account.id,
               }))}
             />

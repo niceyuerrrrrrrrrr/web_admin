@@ -9,6 +9,7 @@ import {
   Empty,
   Form,
   Input,
+  InputNumber,
   Modal,
   Select,
   Space,
@@ -16,6 +17,7 @@ import {
   Tag,
   Typography,
 } from 'antd'
+import { DollarOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
 import dayjs from 'dayjs'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
@@ -23,8 +25,8 @@ import useAuthStore from '../store/auth'
 import useCompanyStore from '../store/company'
 import ResizableHeaderCell from '../components/ResizableHeaderCell'
 import type { FinSupplierRecord } from '../api/types'
-import { fetchFinSuppliers } from '../api/services/finBase'
-import { AP_STATUS_OPTIONS, createAP, fetchAPDetail, fetchAPList, type FinAPRecord } from '../api/services/finArAp'
+import { fetchFinAccounts, fetchFinSuppliers } from '../api/services/finBase'
+import { AP_STATUS_OPTIONS, createAP, createAPPayment, fetchAPDetail, fetchAPList, type FinAPRecord } from '../api/services/finArAp'
 
 const { Title, Text } = Typography
 const { RangePicker } = DatePicker
@@ -53,7 +55,7 @@ const FinAPPage = () => {
   const { user } = useAuthStore()
   const { selectedCompanyId } = useCompanyStore()
 
-  const isSuperAdmin = user?.role === 'super_admin' || user?.positionType === '超级管理员'
+  const isSuperAdmin = user?.role === 'super_admin'
   const effectiveCompanyId = isSuperAdmin ? selectedCompanyId : undefined
 
   const [filters, setFilters] = useState<{
@@ -68,6 +70,10 @@ const FinAPPage = () => {
   const [detailDrawerOpen, setDetailDrawerOpen] = useState(false)
   const [createModalOpen, setCreateModalOpen] = useState(false)
   const [createForm] = Form.useForm()
+  
+  const [paymentModalOpen, setPaymentModalOpen] = useState(false)
+  const [paymentRecord, setPaymentRecord] = useState<FinAPRecord | null>(null)
+  const [paymentForm] = Form.useForm()
 
   const [currentPage, setCurrentPage] = useState(1)
   const [pageSize, setPageSize] = useState(20)
@@ -102,6 +108,12 @@ const FinAPPage = () => {
   const suppliersQuery = useQuery({
     queryKey: ['fin', 'suppliers', effectiveCompanyId],
     queryFn: () => fetchFinSuppliers({ companyId: effectiveCompanyId, activeOnly: true }),
+    enabled: !isSuperAdmin || !!effectiveCompanyId,
+  })
+  
+  const accountsQuery = useQuery({
+    queryKey: ['fin', 'accounts', effectiveCompanyId],
+    queryFn: () => fetchFinAccounts({ companyId: effectiveCompanyId, activeOnly: true }),
     enabled: !isSuperAdmin || !!effectiveCompanyId,
   })
 
@@ -143,10 +155,37 @@ const FinAPPage = () => {
       message.error((error as Error).message || '创建失败')
     },
   })
+  
+  const paymentMutation = useMutation({
+    mutationFn: createAPPayment,
+    onSuccess: () => {
+      message.success('付款单已提交，等待审批')
+      paymentForm.resetFields()
+      setPaymentModalOpen(false)
+      setPaymentRecord(null)
+      queryClient.invalidateQueries({ queryKey: ['fin', 'ap'] })
+      queryClient.invalidateQueries({ queryKey: ['fin', 'ap-payments'] })
+    },
+    onError: (error) => {
+      message.error((error as Error).message || '付款失败')
+    },
+  })
 
   const openDetail = (record: FinAPRecord) => {
     setSelectedRecord(record)
     setDetailDrawerOpen(true)
+  }
+  
+  const openPayment = (record: FinAPRecord) => {
+    setPaymentRecord(record)
+    const unpaidCents = (record.ap_amount_cents || 0) - (record.paid_amount_cents || 0)
+    const unpaidAmount = unpaidCents / 100
+    paymentForm.setFieldsValue({
+      pay_amount: unpaidAmount,
+      pay_date: dayjs(),
+      pay_method: 'bank',
+    })
+    setPaymentModalOpen(true)
   }
 
   const records = listQuery.data?.records || []
@@ -206,12 +245,21 @@ const FinAPPage = () => {
         {
           title: '操作',
           key: 'actions',
-          width: 120,
+          width: 200,
           fixed: 'right',
           render: (_v, r) => (
             <Space>
               <Button size="small" onClick={() => openDetail(r)}>
                 详情
+              </Button>
+              <Button 
+                size="small" 
+                type="primary"
+                icon={<DollarOutlined />}
+                onClick={() => openPayment(r)}
+                disabled={r.status === 'settled' || r.status === 'void'}
+              >
+                付款
               </Button>
             </Space>
           ),
@@ -386,6 +434,134 @@ const FinAPPage = () => {
             <Input.TextArea rows={3} />
           </Form.Item>
         </Form>
+      </Modal>
+
+      <Modal
+        title="应付账款付款"
+        open={paymentModalOpen}
+        onCancel={() => {
+          setPaymentModalOpen(false)
+          setPaymentRecord(null)
+          paymentForm.resetFields()
+        }}
+        onOk={() => paymentForm.submit()}
+        confirmLoading={paymentMutation.isPending}
+        destroyOnClose
+        width={600}
+      >
+        {paymentRecord && (
+          <Form
+            form={paymentForm}
+            layout="vertical"
+            onFinish={(values) => {
+              const payload = {
+                apId: paymentRecord.id,
+                companyId: effectiveCompanyId,
+                pay_amount: Number(values.pay_amount),
+                pay_date: values.pay_date.format('YYYY-MM-DD'),
+                pay_method: values.pay_method as string,
+                account_id: Number(values.account_id),
+                remark: values.remark as string | undefined,
+              }
+              paymentMutation.mutate(payload)
+            }}
+          >
+            <Form.Item label="应付单号">
+              <Input value={paymentRecord.code || `#${paymentRecord.id}`} disabled />
+            </Form.Item>
+            <Form.Item label="供应商">
+              <Input 
+                value={
+                  (suppliersQuery.data?.records || []).find((s) => s.id === paymentRecord.supplier_id)?.name || 
+                  paymentRecord.supplier_id
+                } 
+                disabled 
+              />
+            </Form.Item>
+            <Form.Item label="应付总额">
+              <Input value={`¥${centsToYuan(paymentRecord.ap_amount_cents)}`} disabled />
+            </Form.Item>
+            <Form.Item label="已付金额">
+              <Input value={`¥${centsToYuan(paymentRecord.paid_amount_cents)}`} disabled />
+            </Form.Item>
+            <Form.Item label="未付金额">
+              <Input 
+                value={`¥${centsToYuan((paymentRecord.ap_amount_cents || 0) - (paymentRecord.paid_amount_cents || 0))}`} 
+                disabled 
+              />
+            </Form.Item>
+            
+            <Form.Item 
+              label="付款金额" 
+              name="pay_amount"
+              rules={[
+                { required: true, message: '请输入付款金额' },
+                {
+                  validator: (_, value) => {
+                    const unpaidAmount = ((paymentRecord.ap_amount_cents || 0) - (paymentRecord.paid_amount_cents || 0)) / 100
+                    if (value > unpaidAmount) {
+                      return Promise.reject(new Error(`付款金额不能超过未付金额 ¥${unpaidAmount.toFixed(2)}`))
+                    }
+                    if (value <= 0) {
+                      return Promise.reject(new Error('付款金额必须大于0'))
+                    }
+                    return Promise.resolve()
+                  },
+                },
+              ]}
+            >
+              <InputNumber
+                style={{ width: '100%' }}
+                min={0}
+                max={((paymentRecord.ap_amount_cents || 0) - (paymentRecord.paid_amount_cents || 0)) / 100}
+                step={0.01}
+                precision={2}
+                placeholder="请输入付款金额"
+                addonBefore="¥"
+              />
+            </Form.Item>
+            
+            <Form.Item 
+              label="付款日期" 
+              name="pay_date"
+              rules={[{ required: true, message: '请选择付款日期' }]}
+            >
+              <DatePicker style={{ width: '100%' }} />
+            </Form.Item>
+            
+            <Form.Item 
+              label="付款方式" 
+              name="pay_method"
+              rules={[{ required: true, message: '请选择付款方式' }]}
+            >
+              <Select placeholder="请选择付款方式">
+                <Select.Option value="bank">银行转账</Select.Option>
+                <Select.Option value="cash">现金</Select.Option>
+                <Select.Option value="wechat">微信</Select.Option>
+                <Select.Option value="alipay">支付宝</Select.Option>
+                <Select.Option value="other">其他</Select.Option>
+              </Select>
+            </Form.Item>
+            
+            <Form.Item 
+              label="付款账户" 
+              name="account_id"
+              rules={[{ required: true, message: '请选择付款账户' }]}
+            >
+              <Select placeholder="请选择付款账户">
+                {(accountsQuery.data?.records || []).map((account: any) => (
+                  <Select.Option key={account.id} value={account.id}>
+                    {account.name} {account.type ? `(${account.type})` : ''}
+                  </Select.Option>
+                ))}
+              </Select>
+            </Form.Item>
+            
+            <Form.Item label="备注" name="remark">
+              <Input.TextArea rows={3} placeholder="请输入备注信息" />
+            </Form.Item>
+          </Form>
+        )}
       </Modal>
     </div>
   )

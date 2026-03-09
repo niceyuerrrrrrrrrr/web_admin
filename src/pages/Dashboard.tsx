@@ -154,7 +154,7 @@ const DashboardPage = () => {
   const { selectedCompanyId, setSelectedCompanyId } = useCompanyStore()
   const [timeRange, setTimeRange] = useState<string>('month')
 
-  const isSuperAdmin = user?.role === 'super_admin' || user?.positionType === '超级管理员'
+  const isSuperAdmin = user?.role === 'super_admin'
   const effectiveCompanyId = isSuperAdmin ? selectedCompanyId : undefined
   const shouldLoad = !isSuperAdmin || !!selectedCompanyId
   const { beginDate, endDate } = useMemo(() => getDateRange(timeRange), [timeRange])

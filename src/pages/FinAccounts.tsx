@@ -1,12 +1,12 @@
 import { useCallback, useMemo, useState } from 'react'
-import { App as AntdApp, Button, Card, Form, Input, Modal, Select, Space, Switch, Table, Tag, Typography } from 'antd'
+import { App as AntdApp, Button, Card, Descriptions, Drawer, Form, Input, Modal, Select, Space, Statistic, Switch, Table, Tag, Typography } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import useAuthStore from '../store/auth'
 import useCompanyStore from '../store/company'
 import ResizableHeaderCell from '../components/ResizableHeaderCell'
-import type { FinAccountRecord } from '../api/types'
-import { createFinAccount, fetchFinAccounts, toggleFinAccountActive, updateFinAccount } from '../api/services/finBase'
+import type { FinAccountCashflowRecord, FinAccountRecord } from '../api/types'
+import { createFinAccount, fetchFinAccountCashflows, fetchFinAccounts, toggleFinAccountActive, updateFinAccount } from '../api/services/finBase'
 
 const { Title, Text } = Typography
 
@@ -26,7 +26,7 @@ const FinAccountsPage = () => {
   const { user } = useAuthStore()
   const { selectedCompanyId } = useCompanyStore()
 
-  const isSuperAdmin = user?.role === 'super_admin' || user?.positionType === '超级管理员'
+  const isSuperAdmin = user?.role === 'super_admin'
   const effectiveCompanyId = isSuperAdmin ? selectedCompanyId : undefined
 
   const userPosition = (user as any)?.positionType || (user as any)?.position_type
@@ -37,6 +37,8 @@ const FinAccountsPage = () => {
   const [createOpen, setCreateOpen] = useState(false)
   const [editOpen, setEditOpen] = useState(false)
   const [editing, setEditing] = useState<FinAccountRecord | null>(null)
+  const [cashflowOpen, setCashflowOpen] = useState(false)
+  const [cashflowAccount, setCashflowAccount] = useState<FinAccountRecord | null>(null)
   const [createForm] = Form.useForm()
   const [editForm] = Form.useForm()
 
@@ -72,6 +74,46 @@ const FinAccountsPage = () => {
     queryFn: () => fetchFinAccounts({ companyId: effectiveCompanyId, activeOnly: filters.activeOnly }),
     enabled: !isSuperAdmin || !!effectiveCompanyId,
   })
+
+  const cashflowQuery = useQuery({
+    queryKey: ['fin', 'account-cashflows', cashflowAccount?.id, effectiveCompanyId],
+    queryFn: () => fetchFinAccountCashflows(cashflowAccount!.id, { companyId: effectiveCompanyId }),
+    enabled: !!cashflowAccount && cashflowOpen,
+  })
+
+  const cashflowView = useMemo(() => {
+    const openingBalance = Number(cashflowAccount?.opening_balance_cents || 0)
+    const rawRecords = cashflowQuery.data?.records || []
+    const orderedRecords = [...rawRecords].sort((a, b) => {
+      const aKey = `${a.date || ''} ${a.approved_at || ''} ${String(a.id).padStart(10, '0')}`
+      const bKey = `${b.date || ''} ${b.approved_at || ''} ${String(b.id).padStart(10, '0')}`
+      return aKey.localeCompare(bKey)
+    })
+
+    let runningBalance = openingBalance
+    const withRunningBalance = orderedRecords.map((record) => {
+      runningBalance += record.direction === 'in' ? Number(record.amount_cents || 0) : -Number(record.amount_cents || 0)
+      return {
+        ...record,
+        running_balance_cents: runningBalance,
+      }
+    })
+
+    const incomeTotal = withRunningBalance
+      .filter((record) => record.direction === 'in')
+      .reduce((sum, record) => sum + Number(record.amount_cents || 0), 0)
+    const expenseTotal = withRunningBalance
+      .filter((record) => record.direction === 'out')
+      .reduce((sum, record) => sum + Number(record.amount_cents || 0), 0)
+
+    return {
+      openingBalance,
+      incomeTotal,
+      expenseTotal,
+      netFlow: incomeTotal - expenseTotal,
+      records: [...withRunningBalance].reverse(),
+    }
+  }, [cashflowAccount?.opening_balance_cents, cashflowQuery.data?.records])
 
   const createMutation = useMutation({
     mutationFn: createFinAccount,
@@ -135,6 +177,13 @@ const FinAccountsPage = () => {
           render: (v) => centsToYuan(v),
         },
         {
+          title: '当前余额(元)',
+          dataIndex: 'balance_cents',
+          key: 'balance_cents',
+          width: 140,
+          render: (v) => <Text strong>{centsToYuan(v)}</Text>,
+        },
+        {
           title: '启用',
           dataIndex: 'is_active',
           key: 'is_active',
@@ -150,10 +199,19 @@ const FinAccountsPage = () => {
         {
           title: '操作',
           key: 'actions',
-          width: 260,
+          width: 320,
           fixed: 'right',
           render: (_v, r) => (
             <Space>
+              <Button
+                size="small"
+                onClick={() => {
+                  setCashflowAccount(r)
+                  setCashflowOpen(true)
+                }}
+              >
+                明细
+              </Button>
               <Button
                 size="small"
                 onClick={() => {
@@ -199,6 +257,73 @@ const FinAccountsPage = () => {
         },
       ]),
     [addResizableToColumns, canEdit, editForm, effectiveCompanyId, isSuperAdmin, message, toggleMutation],
+  )
+
+  const cashflowColumns: ColumnsType<FinAccountCashflowRecord> = useMemo(
+    () => [
+      {
+        title: '单号',
+        dataIndex: 'code',
+        key: 'code',
+        width: 140,
+        render: (v, r) => v || `${r.direction === 'in' ? '收款' : '付款'}#${r.id}`,
+      },
+      {
+        title: '日期',
+        dataIndex: 'date',
+        key: 'date',
+        width: 110,
+      },
+      {
+        title: '方向',
+        dataIndex: 'direction_text',
+        key: 'direction_text',
+        width: 90,
+        render: (_v, r) => <Tag color={r.direction === 'in' ? 'success' : 'error'}>{r.direction_text}</Tag>,
+      },
+      {
+        title: '金额(元)',
+        dataIndex: 'amount_cents',
+        key: 'amount_cents',
+        width: 120,
+        render: (v, r) => (
+          <Text style={{ color: r.direction === 'in' ? '#1677ff' : '#cf1322', fontWeight: 600 }}>
+            {r.direction === 'in' ? '+' : '-'}{centsToYuan(v)}
+          </Text>
+        ),
+      },
+      {
+        title: '对方',
+        key: 'counterparty_name',
+        width: 180,
+        render: (_v, r) => r.counterparty_name || '-',
+      },
+      {
+        title: '业务',
+        key: 'biz',
+        width: 140,
+        render: (_v, r) => (r.biz_type ? `${r.biz_type}${r.biz_id ? ` #${r.biz_id}` : ''}` : '-'),
+      },
+      {
+        title: '逐笔余额(元)',
+        dataIndex: 'running_balance_cents',
+        key: 'running_balance_cents',
+        width: 140,
+        render: (v) => <Text strong>¥ {centsToYuan(v)}</Text>,
+      },
+      {
+        title: '方式',
+        dataIndex: 'method',
+        key: 'method',
+        width: 120,
+      },
+      {
+        title: '备注',
+        dataIndex: 'remark',
+        key: 'remark',
+      },
+    ],
+    [],
   )
 
   return (
@@ -376,6 +501,50 @@ const FinAccountsPage = () => {
           </Form.Item>
         </Form>
       </Modal>
+
+      <Drawer
+        title={cashflowAccount ? `${cashflowAccount.name} - 现金流明细` : '账户现金流明细'}
+        open={cashflowOpen}
+        onClose={() => {
+          setCashflowOpen(false)
+          setCashflowAccount(null)
+        }}
+        width={980}
+      >
+        {cashflowAccount ? (
+          <Space direction="vertical" size="middle" style={{ width: '100%' }}>
+            <Descriptions column={3} bordered size="small">
+              <Descriptions.Item label="账户名称">{cashflowAccount.name}</Descriptions.Item>
+              <Descriptions.Item label="账户类型">{cashflowAccount.type}</Descriptions.Item>
+              <Descriptions.Item label="当前余额">¥ {centsToYuan(cashflowAccount.balance_cents)}</Descriptions.Item>
+              <Descriptions.Item label="期初余额">¥ {centsToYuan(cashflowAccount.opening_balance_cents)}</Descriptions.Item>
+              <Descriptions.Item label="净流转">
+                ¥ {((Number(cashflowAccount.balance_cents || 0) - Number(cashflowAccount.opening_balance_cents || 0)) / 100).toFixed(2)}
+              </Descriptions.Item>
+              <Descriptions.Item label="备注">{cashflowAccount.remark || '-'}</Descriptions.Item>
+            </Descriptions>
+
+            <Card size="small">
+              <Space size="large" wrap>
+                <Statistic title="期初余额" value={cashflowView.openingBalance / 100} precision={2} prefix="¥" />
+                <Statistic title="收入合计" value={cashflowView.incomeTotal / 100} precision={2} prefix="¥" valueStyle={{ color: '#1677ff' }} />
+                <Statistic title="支出合计" value={cashflowView.expenseTotal / 100} precision={2} prefix="¥" valueStyle={{ color: '#cf1322' }} />
+                <Statistic title="净流转" value={cashflowView.netFlow / 100} precision={2} prefix="¥" valueStyle={{ color: cashflowView.netFlow >= 0 ? '#3f8600' : '#cf1322' }} />
+                <Statistic title="流水笔数" value={cashflowView.records.length} suffix="笔" />
+              </Space>
+            </Card>
+
+            <Table
+              rowKey={(record) => `${record.direction}-${record.id}`}
+              columns={cashflowColumns}
+              dataSource={cashflowView.records}
+              loading={cashflowQuery.isLoading}
+              pagination={{ pageSize: 10, showSizeChanger: false }}
+              scroll={{ x: 1080 }}
+            />
+          </Space>
+        ) : null}
+      </Drawer>
     </div>
   )
 }

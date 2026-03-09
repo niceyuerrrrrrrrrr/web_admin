@@ -2,8 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { Card, Row, Col, Statistic, Table, Select, DatePicker, Space, Spin } from 'antd';
 import { CarOutlined, DollarOutlined, ShoppingOutlined, ToolOutlined, LineChartOutlined } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
-import axios from 'axios';
 import dayjs from 'dayjs';
+import client from '../../api/client';
+import useAuthStore from '../../store/auth';
+import useCompanyStore from '../../store/company';
+import ResizableTitle from '../../components/ResizableTitle';
 
 const { RangePicker } = DatePicker;
 const { Option } = Select;
@@ -14,6 +17,14 @@ interface Stats {
   in_use: number;
   sold: number;
   scrapped: number;
+  item_breakdown?: Array<{
+    item_name: string;
+    total: number;
+    in_stock: number;
+    in_use: number;
+    sold: number;
+    scrapped: number;
+  }>;
 }
 
 interface CostAnalysis {
@@ -23,6 +34,12 @@ interface CostAnalysis {
   total_maintenance_cost: number;
   total_sales_amount: number;
   profit: number;
+  item_analysis?: Array<{
+    item_name: string;
+    total_cost: number;
+    count: number;
+    avg_cost: number;
+  }>;
 }
 
 interface BrandStats {
@@ -41,6 +58,12 @@ interface MaintenanceStats {
 }
 
 const TireStatistics: React.FC = () => {
+  const { user } = useAuthStore();
+  const { selectedCompanyId } = useCompanyStore();
+  
+  const isSuperAdmin = user?.role === 'super_admin';
+  const effectiveCompanyId = isSuperAdmin ? selectedCompanyId : user?.companyId;
+  
   const [loading, setLoading] = useState(false);
   const [stats, setStats] = useState<Stats>({ total: 0, in_stock: 0, in_use: 0, sold: 0, scrapped: 0 });
   const [costAnalysis, setCostAnalysis] = useState<CostAnalysis>({
@@ -53,15 +76,47 @@ const TireStatistics: React.FC = () => {
   });
   const [brandStats, setBrandStats] = useState<BrandStats[]>([]);
   const [maintenanceStats, setMaintenanceStats] = useState<MaintenanceStats[]>([]);
+  const [itemBreakdown, setItemBreakdown] = useState<NonNullable<Stats['item_breakdown']>>([]);
+  const [itemCostAnalysis, setItemCostAnalysis] = useState<NonNullable<CostAnalysis['item_analysis']>>([]);
+  
+  // 列宽状态
+  const [columnWidths, setColumnWidths] = useState<Record<string, number>>({});
+  
+  const handleResize = (index: number) => (
+    _e: React.SyntheticEvent,
+    { size }: { size: { width: number } }
+  ) => {
+    setColumnWidths((prev) => ({
+      ...prev,
+      [index]: size.width,
+    }))
+  }
+  
+  const mergeColumns = (cols: ColumnsType<any>) => {
+    return cols.map((col, index) => ({
+      ...col,
+      width: col.width ? (columnWidths[index] || col.width) : col.width,
+      ...(col.width
+        ? {
+            onHeaderCell: (column: any) => ({
+              width: columnWidths[index] || column.width,
+              onResize: handleResize(index),
+            }),
+          }
+        : {}),
+    }))
+  }
 
   const fetchInventoryStats = async () => {
     try {
-      const token = localStorage.getItem('token');
-      const res = await axios.get('/api/v1/tires/inventory/stats', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const params: any = {};
+      if (effectiveCompanyId) {
+        params.company_id = effectiveCompanyId;
+      }
+      const res = await client.get('/tires/inventory/stats', { params });
       if (res.data.success) {
         setStats(res.data.data);
+        setItemBreakdown(res.data.data.item_breakdown || []);
       }
     } catch (error) {
       console.error('获取库存统计失败:', error);
@@ -70,25 +125,21 @@ const TireStatistics: React.FC = () => {
 
   const fetchCostAnalysis = async () => {
     try {
-      const token = localStorage.getItem('token');
-      
+      const params: any = { page: 1, page_size: 100 };
+      if (effectiveCompanyId) {
+        params.company_id = effectiveCompanyId;
+      }
+
+      const costRes = await client.get('/tires/cost-analysis', { params: { company_id: effectiveCompanyId } });
+
       // 获取采购统计
-      const purchaseRes = await axios.get('/api/v1/tires/purchases', {
-        headers: { Authorization: `Bearer ${token}` },
-        params: { page: 1, page_size: 1000 }
-      });
+      const purchaseRes = await client.get('/tires/purchases', { params });
 
       // 获取维护统计
-      const maintenanceRes = await axios.get('/api/v1/tires/maintenance', {
-        headers: { Authorization: `Bearer ${token}` },
-        params: { page: 1, page_size: 1000 }
-      });
+      const maintenanceRes = await client.get('/tires/maintenance', { params });
 
       // 获取销售统计
-      const salesRes = await axios.get('/api/v1/tires/sales', {
-        headers: { Authorization: `Bearer ${token}` },
-        params: { page: 1, page_size: 1000 }
-      });
+      const salesRes = await client.get('/tires/sales', { params });
 
       if (purchaseRes.data.success && maintenanceRes.data.success && salesRes.data.success) {
         const purchases = purchaseRes.data.data.batches || [];
@@ -108,6 +159,13 @@ const TireStatistics: React.FC = () => {
           total_sales_amount: totalSalesAmount,
           profit: totalSalesAmount - totalPurchaseAmount - totalMaintenanceCost,
         });
+
+        // 使用后端按物品成本统计数据
+        if (costRes.data.success && Array.isArray(costRes.data.data?.item_analysis)) {
+          setItemCostAnalysis(costRes.data.data.item_analysis);
+        } else {
+          setItemCostAnalysis([]);
+        }
       }
     } catch (error) {
       console.error('获取成本分析失败:', error);
@@ -116,11 +174,11 @@ const TireStatistics: React.FC = () => {
 
   const fetchBrandStats = async () => {
     try {
-      const token = localStorage.getItem('token');
-      const res = await axios.get('/api/v1/tires/inventory', {
-        headers: { Authorization: `Bearer ${token}` },
-        params: { page: 1, page_size: 1000 }
-      });
+      const params: any = { page: 1, page_size: 100 };
+      if (effectiveCompanyId) {
+        params.company_id = effectiveCompanyId;
+      }
+      const res = await client.get('/tires/inventory', { params });
 
       if (res.data.success) {
         const tires = res.data.data.tires || [];
@@ -167,11 +225,11 @@ const TireStatistics: React.FC = () => {
 
   const fetchMaintenanceStats = async () => {
     try {
-      const token = localStorage.getItem('token');
-      const res = await axios.get('/api/v1/tires/maintenance', {
-        headers: { Authorization: `Bearer ${token}` },
-        params: { page: 1, page_size: 1000 }
-      });
+      const params: any = { page: 1, page_size: 100 };
+      if (effectiveCompanyId) {
+        params.company_id = effectiveCompanyId;
+      }
+      const res = await client.get('/tires/maintenance', { params });
 
       if (res.data.success) {
         const records = res.data.data.records || [];
@@ -215,7 +273,7 @@ const TireStatistics: React.FC = () => {
     ]).finally(() => {
       setLoading(false);
     });
-  }, []);
+  }, [effectiveCompanyId]);
 
   const maintenanceTypeMap: Record<string, string> = {
     repair: '补胎',
@@ -231,31 +289,43 @@ const TireStatistics: React.FC = () => {
       title: '品牌',
       dataIndex: 'brand',
       key: 'brand',
+      width: 160,
     },
     {
       title: '总数量',
       dataIndex: 'count',
       key: 'count',
+      width: 100,
       render: (count: number) => `${count}条`,
     },
     {
       title: '使用中',
       dataIndex: 'in_use',
       key: 'in_use',
+      width: 100,
       render: (count: number) => `${count}条`,
     },
     {
       title: '平均磨损',
       dataIndex: 'average_wear',
       key: 'average_wear',
+      width: 120,
       render: (wear: number) => `${wear}%`,
     },
     {
       title: '平均使用里程',
       dataIndex: 'average_mileage',
       key: 'average_mileage',
+      width: 160,
       render: (mileage: number) => mileage > 0 ? `${mileage.toLocaleString()} km` : '-',
     },
+  ];
+
+  const itemCostColumns: ColumnsType<any> = [
+    { title: '物品名称', dataIndex: 'item_name', key: 'item_name', width: 120 },
+    { title: '数量', dataIndex: 'count', key: 'count', width: 100, render: (v: number) => `${v}个` },
+    { title: '总成本', dataIndex: 'total_cost', key: 'total_cost', width: 140, render: (v: number) => `¥${Number(v || 0).toFixed(2)}` },
+    { title: '平均成本', dataIndex: 'avg_cost', key: 'avg_cost', width: 140, render: (v: number) => `¥${Number(v || 0).toFixed(2)}` },
   ];
 
   const maintenanceColumns: ColumnsType<MaintenanceStats> = [
@@ -263,24 +333,28 @@ const TireStatistics: React.FC = () => {
       title: '维护类型',
       dataIndex: 'maintenance_type',
       key: 'maintenance_type',
+      width: 160,
       render: (type: string) => maintenanceTypeMap[type] || type,
     },
     {
       title: '次数',
       dataIndex: 'count',
       key: 'count',
+      width: 100,
       render: (count: number) => `${count}次`,
     },
     {
       title: '总费用',
       dataIndex: 'total_cost',
       key: 'total_cost',
+      width: 140,
       render: (cost: number) => `¥${cost.toFixed(2)}`,
     },
     {
       title: '平均费用',
       dataIndex: 'average_cost',
       key: 'average_cost',
+      width: 140,
       render: (cost: number) => `¥${cost.toFixed(2)}`,
     },
   ];
@@ -331,6 +405,39 @@ const TireStatistics: React.FC = () => {
                 valueStyle={{ color: '#f5222d' }}
               />
             </Col>
+          </Row>
+        </Card>
+
+        {/* 物品成本统计 */}
+        <Card title="按物品成本统计" style={{ marginBottom: 24 }}>
+          <Table
+            columns={mergeColumns(itemCostColumns)}
+            dataSource={itemCostAnalysis}
+            rowKey="item_name"
+            className="resizable-table"
+            components={{
+              header: {
+                cell: ResizableTitle,
+              },
+            }}
+            scroll={{ x: 500 }}
+            pagination={false}
+          />
+        </Card>
+
+        {/* 物品分类库存统计 */}
+        <Card title="按物品分类库存统计" style={{ marginBottom: 24 }}>
+          <Row gutter={16}>
+            {itemBreakdown.map((item) => (
+              <Col span={6} key={item.item_name} style={{ marginBottom: 12 }}>
+                <Card size="small">
+                  <Statistic title={item.item_name} value={item.total} suffix="个" />
+                  <div style={{ marginTop: 8, color: '#666', fontSize: 12 }}>
+                    在库 {item.in_stock} / 使用中 {item.in_use} / 已售 {item.sold}
+                  </div>
+                </Card>
+              </Col>
+            ))}
           </Row>
         </Card>
 
@@ -395,9 +502,16 @@ const TireStatistics: React.FC = () => {
         {/* 品牌统计 */}
         <Card title="品牌统计" style={{ marginBottom: 24 }}>
           <Table
-            columns={brandColumns}
+            columns={mergeColumns(brandColumns)}
             dataSource={brandStats}
             rowKey="brand"
+            className="resizable-table"
+            components={{
+              header: {
+                cell: ResizableTitle,
+              },
+            }}
+            scroll={{ x: 640 }}
             pagination={false}
           />
         </Card>
@@ -405,9 +519,16 @@ const TireStatistics: React.FC = () => {
         {/* 维护统计 */}
         <Card title="维护统计">
           <Table
-            columns={maintenanceColumns}
+            columns={mergeColumns(maintenanceColumns)}
             dataSource={maintenanceStats}
             rowKey="maintenance_type"
+            className="resizable-table"
+            components={{
+              header: {
+                cell: ResizableTitle,
+              },
+            }}
+            scroll={{ x: 540 }}
             pagination={false}
           />
         </Card>

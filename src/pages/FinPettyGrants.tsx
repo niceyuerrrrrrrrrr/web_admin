@@ -18,8 +18,9 @@ import {
   Input,
   Drawer,
   Descriptions,
+  Popconfirm,
 } from 'antd'
-import { PlusOutlined } from '@ant-design/icons'
+import { PlusOutlined, DeleteOutlined, RollbackOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
 import dayjs from 'dayjs'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
@@ -65,7 +66,7 @@ const FinPettyGrantsPage = () => {
   const { user } = useAuthStore()
   const { selectedCompanyId } = useCompanyStore()
 
-  const isSuperAdmin = user?.role === 'super_admin' || user?.positionType === '超级管理员'
+  const isSuperAdmin = user?.role === 'super_admin'
   const effectiveCompanyId = isSuperAdmin ? selectedCompanyId : undefined
 
   const [filters, setFilters] = useState<{
@@ -106,9 +107,19 @@ const FinPettyGrantsPage = () => {
   })
 
   const records: PettyGrantRecord[] = listQuery.data?.records || []
+  const backendStats = listQuery.data?.statistics
 
   // 统计数据
   const statistics = useMemo(() => {
+    if (backendStats) {
+      return {
+        total: (backendStats.total_amount_cents || 0) / 100,
+        settled: (backendStats.total_settled_cents || 0) / 100,
+        remaining: (backendStats.total_remaining_cents || 0) / 100,
+        count: records.length,
+      }
+    }
+    
     const total = records.reduce((sum, r) => sum + (r.amount_cents || 0), 0)
     const approved = records.filter(r => r.status === 'approved').reduce((sum, r) => sum + (r.amount_cents || 0), 0)
     const reviewing = records.filter(r => r.status === 'reviewing').length
@@ -119,7 +130,7 @@ const FinPettyGrantsPage = () => {
       approved: approved / 100,
       reviewing,
     }
-  }, [records])
+  }, [records, backendStats])
 
   // 快速筛选
   const quickFilters = [
@@ -177,26 +188,49 @@ const FinPettyGrantsPage = () => {
     setDetailDrawerOpen(true)
   }
 
-  // 提交审批
-  const submitMutation = useMutation({
+  // 删除发放单
+  const deleteMutation = useMutation({
     mutationFn: async (id: number) => {
       const params: any = {}
       if (effectiveCompanyId) params.company_id = effectiveCompanyId
       
-      const response = await client.post(`/fin/petty-grants/${id}/submit`, null, { params })
+      const response = await client.delete(`/fin/petty-grants/${id}`, { params })
       
       if (!response.data.success) {
-        throw new Error(response.data.message || '提交失败')
+        throw new Error(response.data.message || '删除失败')
       }
       return response.data.data
     },
     onSuccess: () => {
-      message.success('已提交审批')
+      message.success('删除成功')
       setDetailDrawerOpen(false)
       queryClient.invalidateQueries({ queryKey: ['fin', 'petty-grants'] })
     },
     onError: (error: any) => {
-      message.error(error.message || '提交失败')
+      message.error(error.message || '删除失败')
+    },
+  })
+
+  // 撤回发放单
+  const withdrawMutation = useMutation({
+    mutationFn: async (id: number) => {
+      const params: any = {}
+      if (effectiveCompanyId) params.company_id = effectiveCompanyId
+      
+      const response = await client.post(`/fin/petty-grants/${id}/withdraw`, null, { params })
+      
+      if (!response.data.success) {
+        throw new Error(response.data.message || '撤回失败')
+      }
+      return response.data.data
+    },
+    onSuccess: () => {
+      message.success('撤回成功')
+      setDetailDrawerOpen(false)
+      queryClient.invalidateQueries({ queryKey: ['fin', 'petty-grants'] })
+    },
+    onError: (error: any) => {
+      message.error(error.message || '撤回失败')
     },
   })
 
@@ -256,12 +290,38 @@ const FinPettyGrantsPage = () => {
     {
       title: '操作',
       key: 'actions',
-      width: 100,
+      width: 200,
       fixed: 'right' as const,
       render: (_: any, record: PettyGrantRecord) => (
-        <Button size="small" onClick={() => openDetail(record)}>
-          详情
-        </Button>
+        <Space size="small">
+          <Button size="small" onClick={() => openDetail(record)}>
+            详情
+          </Button>
+          {record.status === 'draft' && (
+            <Popconfirm
+              title="确定删除此发放单？"
+              onConfirm={() => deleteMutation.mutate(record.id)}
+              okText="确定"
+              cancelText="取消"
+            >
+              <Button size="small" danger icon={<DeleteOutlined />}>
+                删除
+              </Button>
+            </Popconfirm>
+          )}
+          {record.status === 'reviewing' && (
+            <Popconfirm
+              title="确定撤回此发放单？"
+              onConfirm={() => withdrawMutation.mutate(record.id)}
+              okText="确定"
+              cancelText="取消"
+            >
+              <Button size="small" icon={<RollbackOutlined />}>
+                撤回
+              </Button>
+            </Popconfirm>
+          )}
+        </Space>
       ),
     },
   ]
@@ -319,17 +379,19 @@ const FinPettyGrantsPage = () => {
           <Col xs={24} sm={12} md={6}>
             <Card>
               <Statistic
-                title="发放笔数"
-                value={statistics.count}
-                suffix="笔"
+                title="已核销金额"
+                value={statistics.settled || 0}
+                precision={2}
+                prefix="¥"
+                valueStyle={{ color: '#ff4d4f' }}
               />
             </Card>
           </Col>
           <Col xs={24} sm={12} md={6}>
             <Card>
               <Statistic
-                title="已审批金额"
-                value={statistics.approved}
+                title="账户余额"
+                value={statistics.remaining || 0}
                 precision={2}
                 prefix="¥"
                 valueStyle={{ color: '#52c41a' }}
@@ -339,10 +401,9 @@ const FinPettyGrantsPage = () => {
           <Col xs={24} sm={12} md={6}>
             <Card>
               <Statistic
-                title="待审批"
-                value={statistics.reviewing}
+                title="发放笔数"
+                value={statistics.count}
                 suffix="笔"
-                valueStyle={{ color: '#faad14' }}
               />
             </Card>
           </Col>
@@ -467,18 +528,41 @@ const FinPettyGrantsPage = () => {
         width={560}
         onClose={() => setDetailDrawerOpen(false)}
         extra={
-          selectedRecord?.status === 'draft' && (
-            <Button
-              type="primary"
-              onClick={() => {
-                if (selectedRecord?.id) {
-                  submitMutation.mutate(selectedRecord.id)
-                }
-              }}
-              loading={submitMutation.isPending}
-            >
-              提交审批
-            </Button>
+          selectedRecord?.status === 'approved' ? null : (
+            <Space>
+              {selectedRecord?.status === 'draft' && (
+                <Popconfirm
+                  title="确定删除此发放单？"
+                  onConfirm={() => {
+                    if (selectedRecord?.id) {
+                      deleteMutation.mutate(selectedRecord.id)
+                    }
+                  }}
+                  okText="确定"
+                  cancelText="取消"
+                >
+                  <Button danger icon={<DeleteOutlined />} loading={deleteMutation.isPending}>
+                    删除
+                  </Button>
+                </Popconfirm>
+              )}
+              {selectedRecord?.status === 'reviewing' && (
+                <Popconfirm
+                  title="确定撤回此发放单？"
+                  onConfirm={() => {
+                    if (selectedRecord?.id) {
+                      withdrawMutation.mutate(selectedRecord.id)
+                    }
+                  }}
+                  okText="确定"
+                  cancelText="取消"
+                >
+                  <Button icon={<RollbackOutlined />} loading={withdrawMutation.isPending}>
+                    撤回
+                  </Button>
+                </Popconfirm>
+              )}
+            </Space>
           )
         }
       >

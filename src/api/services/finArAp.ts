@@ -188,3 +188,28 @@ export const createAP = async (data: {
     )
   )
 }
+
+// 从应付单创建付款单
+export const createAPPayment = async (data: {
+  apId: number
+  companyId?: number
+  pay_amount: number
+  pay_date: string
+  pay_method: string
+  account_id: number
+  remark?: string
+}) => {
+  return unwrap<{ payment_code: string; status: string }>(
+    client.post(
+      `/fin/ap/${data.apId}/create-payment`,
+      {
+        pay_amount: data.pay_amount,
+        pay_date: data.pay_date,
+        pay_method: data.pay_method,
+        account_id: data.account_id,
+        remark: data.remark,
+      },
+      { params: { company_id: data.companyId } }
+    )
+  )
+}

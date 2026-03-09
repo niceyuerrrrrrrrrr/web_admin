@@ -119,7 +119,7 @@ interface DriverVehicleStats {
 const ReceiptAnalytics = () => {
   const { user, setAuth } = useAuthStore()
   const { selectedCompanyId } = useCompanyStore()
-  const isSuperAdmin = user?.role === 'super_admin' || user?.positionType === '超级管理员'
+  const isSuperAdmin = user?.role === 'super_admin'
 
   // 如果用户信息中没有公司信息，从API获取（保持与票据列表页一致）
   const meQuery = useQuery({

@@ -64,6 +64,7 @@ import useAuthStore from '../store/auth'
 import useCompanyStore from '../store/company'
 import ResizableHeaderCell from '../components/ResizableHeaderCell'
 import { fixImageUrl } from '../utils/imageUrl'
+import client from '../api/client'
 
 const { Title, Paragraph, Text } = Typography
 const { RangePicker } = DatePicker
@@ -92,7 +93,7 @@ const ReimbursementsPage = () => {
   const { user } = useAuthStore()
   const { selectedCompanyId } = useCompanyStore()
 
-  const isSuperAdmin = user?.role === 'super_admin' || user?.positionType === '超级管理员'
+  const isSuperAdmin = user?.role === 'super_admin'
   const isFinance = user?.positionType === '财务' || isSuperAdmin
   const effectiveCompanyId = isSuperAdmin ? selectedCompanyId : undefined
   const showCompanyWarning = isSuperAdmin && !effectiveCompanyId
@@ -112,9 +113,11 @@ const ReimbursementsPage = () => {
   const [detailDrawerOpen, setDetailDrawerOpen] = useState(false)
   const [createModalOpen, setCreateModalOpen] = useState(false)
   const [payModalOpen, setPayModalOpen] = useState(false)
+  const [pettySettleModalOpen, setPettySettleModalOpen] = useState(false)
   const [actionModal, setActionModal] = useState<{ type: 'approve' | 'reject' | null }>({ type: null })
   const [createForm] = Form.useForm()
   const [payForm] = Form.useForm()
+  const [pettySettleForm] = Form.useForm()
   const [commentForm] = Form.useForm()
   const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([])
   const [currentPage, setCurrentPage] = useState(1)
@@ -182,14 +185,35 @@ const ReimbursementsPage = () => {
   })
 
   const usersQuery = useQuery({
-    queryKey: ['users', 'all'],
-    queryFn: () => fetchUsers({ page: 1, size: 1000 }),
+    queryKey: ['users', 'all', effectiveCompanyId],
+    queryFn: () => fetchUsers({ page: 1, size: 1000, company_id: effectiveCompanyId }),
+    enabled: !isSuperAdmin || !!effectiveCompanyId,
   })
 
   const accountsQuery = useQuery({
     queryKey: ['fin-accounts', effectiveCompanyId],
     queryFn: () => fetchFinAccounts({ companyId: effectiveCompanyId, activeOnly: true }),
     enabled: isFinance,
+  })
+
+  // 获取备用金发放列表
+  const grantsQuery = useQuery({
+    queryKey: ['fin', 'petty-grants', 'available', effectiveCompanyId],
+    queryFn: async () => {
+      const params: any = {
+        page: 1,
+        page_size: 200,
+        status: 'approved', // 只获取已审批的发放单
+      }
+      if (effectiveCompanyId) params.company_id = effectiveCompanyId
+
+      const response = await client.get('/fin/petty-grants', { params })
+      if (!response.data.success) {
+        throw new Error(response.data.message || '获取失败')
+      }
+      return response.data.data
+    },
+    enabled: isFinance && pettySettleModalOpen,
   })
 
   const detailQuery = useQuery({
@@ -302,6 +326,41 @@ const ReimbursementsPage = () => {
     },
     onError: (error) => {
       message.error((error as Error).message || '支付失败')
+    },
+  })
+
+  const pettySettleMutation = useMutation({
+    mutationFn: async (params: { person_name: string; amount: number; settle_date: string; remark?: string; reimbursement_id: number; grant_id: number }) => {
+      const createParams: any = {}
+      if (effectiveCompanyId) createParams.company_id = effectiveCompanyId
+      
+      const response = await client.post('/fin/petty-settles', {
+        person_type: 'employee',
+        person_name: params.person_name,
+        settle_amount_cents: Math.round(params.amount * 100),
+        settle_date: params.settle_date,
+        remark: params.remark || `报销单 #${params.reimbursement_id} 备用金核销`,
+        reimbursement_id: params.reimbursement_id,
+        grant_id: params.grant_id,
+      }, { params: createParams })
+      
+      if (!response.data.success) {
+        throw new Error(response.data.message || '创建备用金核销单失败')
+      }
+      return response.data.data
+    },
+    onSuccess: () => {
+      message.success('备用金核销单已创建')
+      pettySettleForm.resetFields()
+      setPettySettleModalOpen(false)
+      queryClient.invalidateQueries({ queryKey: ['reimbursements'] })
+      queryClient.invalidateQueries({ queryKey: ['reimbursements', 'stats'] })
+      queryClient.invalidateQueries({ queryKey: ['reimbursements', 'detail', selectedRecord?.id] })
+      queryClient.invalidateQueries({ queryKey: ['fin', 'petty-settles'] })
+      queryClient.invalidateQueries({ queryKey: ['fin', 'petty-grants'] })
+    },
+    onError: (error: any) => {
+      message.error(error.message || '创建备用金核销单失败')
     },
   })
 
@@ -638,26 +697,53 @@ const ReimbursementsPage = () => {
             )
           }
           
-          // 财务支付按钮
+          // 财务支付按钮 - 根据是否公户报销显示不同按钮
           if (isFinance && record.status === 'approved' && (record.pay_status || 'unpaid') === 'unpaid') {
-            buttons.push(
-              <Button
-                key="pay"
-                type="link"
-                size="small"
-                icon={<DollarOutlined />}
-                onClick={() => {
-                  setSelectedRecord(record)
-                  setPayModalOpen(true)
-                  payForm.setFieldsValue({
-                    cash_date: dayjs(),
-                    pay_method: 'bank_transfer',
-                  })
-                }}
-              >
-                支付
-              </Button>
-            )
+            const isPublicAccount = (record.is_public_account || 'N') === 'Y'
+            
+            if (isPublicAccount) {
+              // 公户报销 - 发起付款单
+              buttons.push(
+                <Button
+                  key="pay"
+                  type="link"
+                  size="small"
+                  icon={<DollarOutlined />}
+                  onClick={() => {
+                    setSelectedRecord(record)
+                    setPayModalOpen(true)
+                    payForm.setFieldsValue({
+                      cash_date: dayjs(),
+                      pay_method: 'bank_transfer',
+                    })
+                  }}
+                >
+                  支付
+                </Button>
+              )
+            } else {
+              // 备用金报销 - 发起备用金核销
+              buttons.push(
+                <Button
+                  key="petty-settle"
+                  type="link"
+                  size="small"
+                  icon={<DollarOutlined />}
+                  onClick={() => {
+                    setSelectedRecord(record)
+                    setPettySettleModalOpen(true)
+                    pettySettleForm.setFieldsValue({
+                      person_name: record.applicant_name,
+                      amount: record.amount,
+                      settle_date: dayjs(),
+                      remark: `报销单 #${record.id} 备用金核销`,
+                    })
+                  }}
+                >
+                  备用金核销
+                </Button>
+              )
+            }
           }
           
           return (
@@ -1423,7 +1509,7 @@ const ReimbursementsPage = () => {
               placeholder="请选择支付账户"
               loading={accountsQuery.isLoading}
               options={(accountsQuery.data?.records || []).map((account) => ({
-                label: `${account.name} (余额: ¥${((account.opening_balance_cents || 0) / 100).toFixed(2)})`,
+                label: `${account.name} (余额: ¥${((account.balance_cents || 0) / 100).toFixed(2)})`,
                 value: account.id,
               }))}
             />
@@ -1450,6 +1536,113 @@ const ReimbursementsPage = () => {
             name="cash_date"
             label="支付日期"
             rules={[{ required: true, message: '请选择支付日期' }]}
+          >
+            <DatePicker style={{ width: '100%' }} />
+          </Form.Item>
+
+          <Form.Item name="remark" label="备注">
+            <Input.TextArea rows={3} placeholder="请输入备注信息（可选）" />
+          </Form.Item>
+        </Form>
+      </Modal>
+
+      {/* 备用金核销弹窗 */}
+      <Modal
+        title="备用金核销"
+        open={pettySettleModalOpen}
+        onCancel={() => {
+          setPettySettleModalOpen(false)
+          pettySettleForm.resetFields()
+        }}
+        onOk={() => pettySettleForm.submit()}
+        confirmLoading={pettySettleMutation.isPending}
+        width={500}
+      >
+        <Form
+          form={pettySettleForm}
+          layout="vertical"
+          onFinish={(values) => {
+            if (!selectedRecord) return
+            pettySettleMutation.mutate({
+              person_name: values.person_name,
+              amount: values.amount,
+              settle_date: values.settle_date?.format('YYYY-MM-DD'),
+              remark: values.remark,
+              reimbursement_id: selectedRecord.id,
+              grant_id: values.grant_id,
+            })
+          }}
+        >
+          <Descriptions bordered size="small" style={{ marginBottom: 16 }}>
+            <Descriptions.Item label="报销单号">{selectedRecord?.id}</Descriptions.Item>
+            <Descriptions.Item label="报销人">{selectedRecord?.applicant_name}</Descriptions.Item>
+            <Descriptions.Item label="金额">
+              <Text strong style={{ color: '#ff4d4f', fontSize: 16 }}>
+                ¥ {selectedRecord?.amount?.toFixed(2)}
+              </Text>
+            </Descriptions.Item>
+          </Descriptions>
+
+          <Alert
+            type="info"
+            message="备用金核销说明"
+            description="此报销单使用备用金支付，将创建备用金核销单进行处理。核销单创建后需要提交审批。"
+            showIcon
+            style={{ marginBottom: 16 }}
+          />
+
+          <Form.Item
+            name="grant_id"
+            label="关联备用金发放单"
+            rules={[{ required: true, message: '请选择备用金发放单' }]}
+          >
+            <Select
+              placeholder="请选择备用金发放单"
+              loading={grantsQuery.isLoading}
+              onChange={(value) => {
+                const grants = grantsQuery.data?.records || []
+                const grant = grants.find((g: any) => g.id === value)
+                if (grant) {
+                  pettySettleForm.setFieldsValue({
+                    person_name: grant.person_name,
+                    amount: ((grant.remaining_amount_cents || 0) / 100),
+                  })
+                }
+              }}
+            >
+              {(grantsQuery.data?.records || []).map((grant: any) => (
+                <Select.Option key={grant.id} value={grant.id}>
+                  {grant.code} - {grant.person_name} (余额: ¥{((grant.remaining_amount_cents || 0) / 100).toFixed(2)})
+                </Select.Option>
+              ))}
+            </Select>
+          </Form.Item>
+
+          <Form.Item
+            name="person_name"
+            label="核销人"
+            rules={[{ required: true, message: '请输入核销人姓名' }]}
+          >
+            <Input placeholder="请输入核销人姓名" />
+          </Form.Item>
+
+          <Form.Item
+            name="amount"
+            label="核销金额（元）"
+            rules={[{ required: true, message: '请输入核销金额' }]}
+          >
+            <InputNumber
+              min={0}
+              precision={2}
+              style={{ width: '100%' }}
+              prefix="¥"
+            />
+          </Form.Item>
+
+          <Form.Item
+            name="settle_date"
+            label="核销日期"
+            rules={[{ required: true, message: '请选择核销日期' }]}
           >
             <DatePicker style={{ width: '100%' }} />
           </Form.Item>

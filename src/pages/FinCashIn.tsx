@@ -91,7 +91,7 @@ const FinCashInPage = () => {
   const { user } = useAuthStore()
   const { selectedCompanyId } = useCompanyStore()
 
-  const isSuperAdmin = user?.role === 'super_admin' || user?.positionType === '超级管理员'
+  const isSuperAdmin = user?.role === 'super_admin'
   const effectiveCompanyId = isSuperAdmin ? selectedCompanyId : undefined
 
   const [filters, setFilters] = useState<{
@@ -571,8 +571,8 @@ const FinCashInPage = () => {
                       <Tag color={statusColor(d.status)}>{statusText(d.status)}</Tag>
                     </Descriptions.Item>
                     <Descriptions.Item label="方式">{(d as any).method || ''}</Descriptions.Item>
-                    <Descriptions.Item label="收款方类型">{(d as any).payer_type || ''}</Descriptions.Item>
-                    <Descriptions.Item label="收款方ID">{(d as any).payer_id ?? ''}</Descriptions.Item>
+                    <Descriptions.Item label="付款方类型">{(d as any).payer_type || ''}</Descriptions.Item>
+                    <Descriptions.Item label="付款方ID">{(d as any).payer_id ?? ''}</Descriptions.Item>
                     <Descriptions.Item label="备注">{(d as any).remark || ''}</Descriptions.Item>
                     <Descriptions.Item label="附件">
                       {attachments.length ? (
@@ -682,17 +682,13 @@ const FinCashInPage = () => {
           <Form.Item label="账户" name="account_id" rules={[{ required: true, message: '请选择账户' }]}>
             <Select options={accountOptions} />
           </Form.Item>
-          <Form.Item label="收款方类型" name="payer_type" rules={[{ required: true, message: '请选择类型' }]}>
+          <Form.Item label="付款方类型" name="payer_type" rules={[{ required: true, message: '请选择类型' }]}>
             <Select
               options={[
                 { value: 'customer', label: '客户' },
-                { value: 'employee', label: '员工' },
                 { value: 'other', label: '其他' },
               ]}
-              onChange={(v) => {
-                setPayerType(v)
-                createForm.setFieldValue('payer_id', undefined)
-              }}
+              onChange={(v) => setPayerType(v)}
             />
           </Form.Item>
           {payerType === 'customer' ? (
@@ -707,7 +703,7 @@ const FinCashInPage = () => {
               />
             </Form.Item>
           ) : (
-            <Form.Item label="收款方ID" name="payer_id">
+            <Form.Item label="付款方ID" name="payer_id">
               <Input placeholder="可选" />
             </Form.Item>
           )}

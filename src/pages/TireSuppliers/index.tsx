@@ -1,9 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { Card, Table, Button, Space, Tag, Modal, Form, Input, Select, message, Descriptions } from 'antd';
+import { Card, Table, Button, Space, Tag, Modal, Form, Input, Select, message, Descriptions, App } from 'antd';
 import { PlusOutlined, EyeOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import client from '../../api/client';
 import dayjs from 'dayjs';
+import useAuthStore from '../../store/auth';
+import useCompanyStore from '../../store/company';
+import ResizableTitle from '../../components/ResizableTitle';
 
 const { Option } = Select;
 const { TextArea } = Input;
@@ -24,6 +27,17 @@ interface Supplier {
 }
 
 const TireSuppliers: React.FC = () => {
+  const { modal } = App.useApp();
+  const { user } = useAuthStore();
+  const { selectedCompanyId } = useCompanyStore();
+  
+  const isSuperAdmin =
+    user?.role === 'super_admin' ||
+    user?.role === 'admin' ||
+    user?.role?.toLowerCase?.().includes('super') ||
+    user?.positionType?.includes('超级');
+  const effectiveCompanyId = isSuperAdmin ? selectedCompanyId : user?.companyId;
+  
   const [loading, setLoading] = useState(false);
   const [data, setData] = useState<Supplier[]>([]);
   const [createVisible, setCreateVisible] = useState(false);
@@ -34,12 +48,51 @@ const TireSuppliers: React.FC = () => {
   const [createForm] = Form.useForm();
   const [editForm] = Form.useForm();
   const [statusFilter, setStatusFilter] = useState<string | undefined>(undefined);
+  
+  // 列宽状态
+  const [columnWidths, setColumnWidths] = useState<Record<string, number>>({});
+  
+  const handleResize = (index: number) => (
+    _e: React.SyntheticEvent,
+    { size }: { size: { width: number } }
+  ) => {
+    setColumnWidths((prev) => ({
+      ...prev,
+      [index]: size.width,
+    }))
+  }
+  
+  const mergeColumns = (cols: ColumnsType<any>) => {
+    return cols.map((col, index) => ({
+      ...col,
+      width: col.width ? (columnWidths[index] || col.width) : col.width,
+      ...(col.width
+        ? {
+            onHeaderCell: (column: any) => ({
+              width: columnWidths[index] || column.width,
+              onResize: handleResize(index),
+            }),
+          }
+        : {}),
+    }))
+  }
 
   const fetchData = async () => {
     setLoading(true);
     try {
       const params: any = {};
       if (statusFilter) params.status = statusFilter;
+      
+      // 超级管理员：传递选中的公司ID（可能为undefined，表示查看所有）
+      // 普通用户：传递用户所属公司ID
+      if (isSuperAdmin) {
+        if (effectiveCompanyId) {
+          params.company_id = effectiveCompanyId;
+        }
+        // 未选择公司时不传company_id，后端会返回所有数据
+      } else if (effectiveCompanyId) {
+        params.company_id = effectiveCompanyId;
+      }
 
       const res = await client.get('/tires/suppliers', { params });
 
@@ -47,7 +100,8 @@ const TireSuppliers: React.FC = () => {
         setData(res.data.data.suppliers);
       }
     } catch (error) {
-      message.error('获取数据失败');
+      setData([]);
+      message.error((error as any)?.response?.data?.message || '获取数据失败');
     } finally {
       setLoading(false);
     }
@@ -55,7 +109,9 @@ const TireSuppliers: React.FC = () => {
 
   const handleCreate = async (values: any) => {
     try {
-      await client.post('/tires/suppliers', values);
+      await client.post('/tires/suppliers', values, {
+        params: effectiveCompanyId ? { company_id: effectiveCompanyId } : undefined,
+      });
 
       message.success('供应商创建成功');
       setCreateVisible(false);
@@ -74,7 +130,9 @@ const TireSuppliers: React.FC = () => {
 
   const handleUpdate = async (values: any) => {
     try {
-      await client.put(`/tires/suppliers/${editingId}`, values);
+      await client.put(`/tires/suppliers/${editingId}`, values, {
+        params: effectiveCompanyId ? { company_id: effectiveCompanyId } : undefined,
+      });
       message.success('供应商更新成功');
       setEditVisible(false);
       editForm.resetFields();
@@ -86,7 +144,7 @@ const TireSuppliers: React.FC = () => {
   };
 
   const handleDelete = (id: number) => {
-    Modal.confirm({
+    modal.confirm({
       title: '确认删除',
       content: '确定要删除这个供应商吗？此操作不可恢复。',
       okText: '确定',
@@ -94,7 +152,9 @@ const TireSuppliers: React.FC = () => {
       okType: 'danger',
       onOk: async () => {
         try {
-          await client.delete(`/tires/suppliers/${id}`);
+          await client.delete(`/tires/suppliers/${id}`, {
+            params: effectiveCompanyId ? { company_id: effectiveCompanyId } : undefined,
+          });
           message.success('删除成功');
           fetchData();
         } catch (error: any) {
@@ -111,7 +171,7 @@ const TireSuppliers: React.FC = () => {
 
   useEffect(() => {
     fetchData();
-  }, [statusFilter]);
+  }, [statusFilter, effectiveCompanyId]);
 
   const statusMap: Record<string, { text: string; color: string }> = {
     active: { text: '合作中', color: 'green' },
@@ -185,10 +245,9 @@ const TireSuppliers: React.FC = () => {
     {
       title: '操作',
       key: 'action',
-      width: 150,
-      fixed: 'right',
+      width: 200,
       render: (_, record) => (
-        <Space>
+        <Space size="small">
           <Button type="link" size="small" icon={<EyeOutlined />} onClick={() => handleViewDetail(record)}>
             详情
           </Button>
@@ -226,11 +285,17 @@ const TireSuppliers: React.FC = () => {
         }
       >
         <Table
-          columns={columns}
+          columns={mergeColumns(columns)}
           dataSource={data}
           rowKey="id"
           loading={loading}
-          scroll={{ x: 1200 }}
+          className="resizable-table"
+          components={{
+            header: {
+              cell: ResizableTitle,
+            },
+          }}
+          scroll={{ x: 1230 }}
           pagination={false}
         />
       </Card>
