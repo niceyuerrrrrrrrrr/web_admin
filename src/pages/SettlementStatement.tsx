@@ -14,6 +14,7 @@ import {
   Statistic,
   Row,
   Col,
+  Alert,
 } from 'antd'
 import {
   FileTextOutlined,
@@ -40,6 +41,12 @@ const SettlementStatementPage: React.FC = () => {
   const [form] = Form.useForm()
   const [loading, setLoading] = useState(false)
   const [statement, setStatement] = useState<SettlementStatement | null>(null)
+  const [generatedForm, setGeneratedForm] = useState<{
+    start_date?: string
+    end_date?: string
+    loading_company?: string
+    department_id?: number
+  } | null>(null)
   
   const { user } = useAuthStore()
   const { selectedCompanyId } = useCompanyStore()
@@ -64,6 +71,9 @@ const SettlementStatementPage: React.FC = () => {
   })
 
   const loadingCompanies = loadingCompaniesData || []
+  const watchedDateRange = Form.useWatch('dateRange', form)
+  const watchedLoadingCompany = Form.useWatch('loading_company', form)
+  const watchedDepartmentId = Form.useWatch('department_id', form)
 
   // 计算最近的对账周期
   const calculateRecentReconciliationPeriod = (config: PriceConfig): [Dayjs, Dayjs] | null => {
@@ -194,8 +204,10 @@ const SettlementStatementPage: React.FC = () => {
 
       if (parsed?.statement) {
         setStatement(parsed.statement)
+        setGeneratedForm(parsed?.form || null)
       } else {
         setStatement(null)
+        setGeneratedForm(null)
       }
 
       const f = parsed?.form
@@ -208,8 +220,25 @@ const SettlementStatementPage: React.FC = () => {
       }
     } catch {
       setStatement(null)
+      setGeneratedForm(null)
     }
   }, [effectiveCompanyId, form])
+
+  const isCurrentFormMatchedWithStatement = useMemo(() => {
+    if (!statement || !generatedForm) return false
+    if (!Array.isArray(watchedDateRange) || watchedDateRange.length !== 2) return false
+
+    const [startDate, endDate] = watchedDateRange as [Dayjs, Dayjs]
+    const currentStart = startDate?.format('YYYY-MM-DD HH:mm:ss')
+    const currentEnd = endDate?.format('YYYY-MM-DD HH:mm:ss')
+
+    return (
+      currentStart === generatedForm.start_date &&
+      currentEnd === generatedForm.end_date &&
+      watchedLoadingCompany === generatedForm.loading_company &&
+      (watchedDepartmentId ?? null) === (generatedForm.department_id ?? null)
+    )
+  }, [statement, generatedForm, watchedDateRange, watchedLoadingCompany, watchedDepartmentId])
 
   // 生成结算单
   const handleGenerate = async () => {
@@ -240,6 +269,12 @@ const SettlementStatementPage: React.FC = () => {
 
       if (ok && data) {
         setStatement(data)
+        setGeneratedForm({
+          start_date: params.start_date,
+          end_date: params.end_date,
+          loading_company: params.loading_company,
+          department_id: params.department_id,
+        })
         try {
           localStorage.setItem(
             settlementCacheKey(effectiveCompanyId),
@@ -579,7 +614,7 @@ const SettlementStatementPage: React.FC = () => {
               >
                 生成结算单
               </Button>
-              {statement && (
+              {statement && isCurrentFormMatchedWithStatement && (
                 <>
                   <Button
                     icon={<DownloadOutlined />}
@@ -605,7 +640,16 @@ const SettlementStatementPage: React.FC = () => {
           </div>
         )}
 
-        {!loading && statement && (
+        {!loading && statement && !isCurrentFormMatchedWithStatement && (
+          <Alert
+            type="info"
+            showIcon
+            message="当前筛选条件已变化，下方结算结果已失效，请重新点击“生成结算单”"
+            style={{ marginBottom: 16 }}
+          />
+        )}
+
+        {!loading && statement && isCurrentFormMatchedWithStatement && (
           <>
             <Card
               style={{ marginBottom: 24, background: '#fafafa' }}

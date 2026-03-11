@@ -494,6 +494,8 @@ const ReceiptsPage = () => {
         departmentId: selectedDepartmentId, // 部门筛选
         deletedStatus: filters.deletedStatus, // 删除状态筛选
         submittedStatus: filters.submittedStatus, // 交票状态筛选
+        submittedStartDate: filters.submittedStartDate,
+        submittedEndDate: filters.submittedEndDate,
       }),
     enabled: (isSuperAdmin ? !!effectiveCompanyId : true) && activeTab !== 'matched', // 匹配数据使用单独的查询
   })
